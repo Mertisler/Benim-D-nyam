@@ -1,6 +1,8 @@
 package com.loc.benimdunyam.core.navigation
 
 sealed class Screen(val route: String) {
+    object Search : Screen("search")
+    object People : Screen("people")
     object Onboarding : Screen("onboarding")
     object Main : Screen("main")
     object JournalDetail : Screen("journal_detail/{journalId}") {
