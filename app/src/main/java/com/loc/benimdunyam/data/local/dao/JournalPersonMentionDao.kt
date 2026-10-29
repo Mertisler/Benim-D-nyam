@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface JournalPersonMentionDao {
 
+    @Query("SELECT * FROM journal_person_mentions")
+    suspend fun getAllMentionEntities(): List<JournalPersonMentionEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMention(mention: JournalPersonMentionEntity)
 

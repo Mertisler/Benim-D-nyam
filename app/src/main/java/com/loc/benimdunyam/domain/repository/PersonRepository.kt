@@ -4,6 +4,8 @@ import com.loc.benimdunyam.domain.model.Person
 import kotlinx.coroutines.flow.Flow
 
 interface PersonRepository {
+
+    suspend fun getPersonByName(name: String): Person?
     fun observeAllPeople(): Flow<List<Person>>
     suspend fun getPersonById(id: String): Person?
     suspend fun insertPerson(person: Person)

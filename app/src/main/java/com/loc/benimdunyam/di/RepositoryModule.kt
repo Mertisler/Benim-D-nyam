@@ -1,7 +1,9 @@
 package com.loc.benimdunyam.di
 
+import com.loc.benimdunyam.data.repository.BackupRepositoryImpl
 import com.loc.benimdunyam.data.repository.JournalRepositoryImpl
 import com.loc.benimdunyam.data.repository.PersonRepositoryImpl
+import com.loc.benimdunyam.domain.repository.BackupRepository
 import com.loc.benimdunyam.domain.repository.JournalRepository
 import com.loc.benimdunyam.domain.repository.PersonRepository
 import dagger.Binds
@@ -25,4 +27,10 @@ abstract class RepositoryModule {
     abstract fun bindPersonRepository(
         personRepositoryImpl: PersonRepositoryImpl
     ): PersonRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindBackupRepository(
+        backupRepositoryImpl: BackupRepositoryImpl
+    ): BackupRepository
 }

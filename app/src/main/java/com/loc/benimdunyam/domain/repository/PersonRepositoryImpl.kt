@@ -14,6 +14,21 @@ class PersonRepositoryImpl @Inject constructor(
     private val personDao: PersonDao,
     private val mentionDao: JournalPersonMentionDao
 ) : PersonRepository {
+    override suspend fun getPersonByName(name: String): Person? {
+        val entity = personDao.getPersonByName(name) ?: return null
+        val uniqueCount = mentionDao.getUniqueJournalCountForPerson(entity.id)
+        val totalCount = mentionDao.getTotalMentionCountForPerson(entity.id)
+        return Person(
+            id = entity.id,
+            name = entity.name,
+            note = entity.note,
+            createdAt = entity.createdAt,
+            updatedAt = entity.updatedAt,
+            uniqueJournalCount = uniqueCount,
+            totalMentionCount = totalCount
+        )
+    }
+
 
     override fun observeAllPeople(): Flow<List<Person>> {
         return personDao.observeAllPeople().map { entities ->

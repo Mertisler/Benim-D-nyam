@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface JournalDao {
 
+    @Query("SELECT * FROM journal_entries")
+    suspend fun getAllJournalEntities(): List<JournalEntryEntity>
+
     @Query("SELECT * FROM journal_entries ORDER BY entryDate DESC")
     fun observeAllJournals(): Flow<List<JournalEntryEntity>>
 

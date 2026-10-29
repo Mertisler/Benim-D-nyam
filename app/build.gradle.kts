@@ -75,4 +75,9 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Gson Bağımlılığı
+    implementation(libs.gson)
+
+    implementation("androidx.biometric:biometric:1.1.0")
 }

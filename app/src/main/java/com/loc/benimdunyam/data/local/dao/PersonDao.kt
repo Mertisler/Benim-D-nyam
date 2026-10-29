@@ -11,6 +11,12 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface PersonDao {
 
+    @Query("SELECT * FROM people WHERE name = :name LIMIT 1")
+    suspend fun getPersonByName(name: String): PersonEntity?
+
+    @Query("SELECT * FROM people")
+    suspend fun getAllPersonEntities(): List<PersonEntity>
+
     @Query("SELECT * FROM people ORDER BY name ASC")
     fun observeAllPeople(): Flow<List<PersonEntity>>
 
