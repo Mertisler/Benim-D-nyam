@@ -2,6 +2,7 @@ package com.loc.benimdunyam.data.backup
 
 import com.loc.benimdunyam.data.local.entity.JournalEntryEntity
 import com.loc.benimdunyam.data.local.entity.JournalPersonMentionEntity
+import com.loc.benimdunyam.data.local.entity.LifeSeasonEntity
 import com.loc.benimdunyam.data.local.entity.PersonEntity
 
 data class BackupData(
@@ -9,5 +10,6 @@ data class BackupData(
     val exportTimestamp: Long = System.currentTimeMillis(),
     val journals: List<JournalEntryEntity>,
     val people: List<PersonEntity>,
-    val mentions: List<JournalPersonMentionEntity>
+    val mentions: List<JournalPersonMentionEntity>,
+    val seasons: List<LifeSeasonEntity> = emptyList()
 )

@@ -11,5 +11,7 @@ data class JournalEntryEntity(
     val content: String,
     val entryDate: Long,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val seasonId: String? = null,
+    val episodeId: String? = null
 )

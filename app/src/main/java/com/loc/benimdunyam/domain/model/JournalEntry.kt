@@ -7,5 +7,8 @@ data class JournalEntry(
     val entryDate: Long,
     val createdAt: Long,
     val updatedAt: Long,
-    val mentionedPeople: List<Person> = emptyList()
+    val mentionedPeople: List<Person> = emptyList(),
+    val seasonId: String? = null,
+    val episodeId: String? = null
+
 )

@@ -16,8 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.loc.benimdunyam.domain.model.JournalEntry
-import com.loc.benimdunyam.feature.home.StatCard
+import com.loc.benimdunyam.ui.components.StatCard // Doğru ortak paket importu
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -114,7 +113,7 @@ fun PersonDetailScreen(
                     }
                 }
 
-                // Temel Metrikler Kartı[cite: 4, 6, 7]
+                // Temel Metrikler Kartı
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -192,7 +191,7 @@ fun PersonDetailScreen(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text(text = "Kişiyi Sil") },
-            text = { Text(text = "Bu kişiyi silmek istiyor musunuz? Günlükleriniz silinmez, yalnızca kişi bağlantıları temizlenir[cite: 6, 7].") },
+            text = { Text(text = "Bu kişiyi silmek istiyor musunuz? Günlükleriniz silinmez, yalnızca kişi bağlantıları temizlenir.") },
             confirmButton = {
                 TextButton(
                     onClick = {

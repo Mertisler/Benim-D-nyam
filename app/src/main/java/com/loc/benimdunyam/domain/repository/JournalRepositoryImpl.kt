@@ -27,6 +27,7 @@ class JournalRepositoryImpl @Inject constructor(
                     entryDate = entity.entryDate,
                     createdAt = entity.createdAt,
                     updatedAt = entity.updatedAt,
+                    seasonId = entity.seasonId, // EKLENDİ
                     mentionedPeople = peopleEntities.map { p ->
                         Person(
                             id = p.id,
@@ -51,6 +52,7 @@ class JournalRepositoryImpl @Inject constructor(
             entryDate = entity.entryDate,
             createdAt = entity.createdAt,
             updatedAt = entity.updatedAt,
+            seasonId = entity.seasonId, // EKLENDİ
             mentionedPeople = peopleEntities.map { p ->
                 Person(
                     id = p.id,
@@ -70,7 +72,8 @@ class JournalRepositoryImpl @Inject constructor(
             content = journal.content,
             entryDate = journal.entryDate,
             createdAt = journal.createdAt,
-            updatedAt = journal.updatedAt
+            updatedAt = journal.updatedAt,
+            seasonId = journal.seasonId // EKLENDİ
         )
         journalDao.insertJournal(entity)
 
@@ -95,7 +98,8 @@ class JournalRepositoryImpl @Inject constructor(
             content = journal.content,
             entryDate = journal.entryDate,
             createdAt = journal.createdAt,
-            updatedAt = journal.updatedAt
+            updatedAt = journal.updatedAt,
+            seasonId = journal.seasonId // EKLENDİ
         )
         journalDao.updateJournal(entity)
 
@@ -129,6 +133,7 @@ class JournalRepositoryImpl @Inject constructor(
                     entryDate = entity.entryDate,
                     createdAt = entity.createdAt,
                     updatedAt = entity.updatedAt,
+                    seasonId = entity.seasonId,
                     mentionedPeople = peopleEntities.map { p ->
                         Person(
                             id = p.id,

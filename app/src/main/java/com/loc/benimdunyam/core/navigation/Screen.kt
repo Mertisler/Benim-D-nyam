@@ -1,6 +1,10 @@
 package com.loc.benimdunyam.core.navigation
 
 sealed class Screen(val route: String) {
+
+    object LifeEpisodes : Screen("life_episodes/{seasonId}") {
+        fun createRoute(seasonId: String) = "life_episodes/$seasonId"
+    }
     object Search : Screen("search")
     object People : Screen("people")
     object Onboarding : Screen("onboarding")
@@ -20,6 +24,8 @@ sealed class Screen(val route: String) {
             if (personId != null) "person_create_edit?personId=$personId" else "person_create_edit"
     }
     object Settings : Screen("settings")
+    object LifeSeasons : Screen("life_seasons") // Faz 3: Yaşam Dönemleri
+    object Timeline : Screen("timeline")       // Faz 3: Zaman Çizgisi
 }
 
 sealed class BottomNavScreen(val route: String, val title: String, val iconResName: String) {

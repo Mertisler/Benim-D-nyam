@@ -7,8 +7,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loc.benimdunyam.domain.model.JournalEntry
+import com.loc.benimdunyam.domain.model.LifeSeason
 import com.loc.benimdunyam.domain.model.Person
 import com.loc.benimdunyam.domain.usecase.GetJournalByIdUseCase
+import com.loc.benimdunyam.domain.usecase.ObserveLifeSeasonsUseCase
 import com.loc.benimdunyam.domain.usecase.ObservePeopleUseCase
 import com.loc.benimdunyam.domain.usecase.SaveJournalUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,6 +25,8 @@ data class JournalEditorUiState(
     val entryDate: Long = System.currentTimeMillis(),
     val mentionedPeople: List<Person> = emptyList(),
     val allPeople: List<Person> = emptyList(),
+    val allSeasons: List<LifeSeason> = emptyList(),
+    val selectedSeasonId: String? = null,
     val isMentionPopupVisible: Boolean = false,
     val mentionQuery: String = "",
     val isLoading: Boolean = false,
@@ -35,7 +39,8 @@ class JournalEditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getJournalByIdUseCase: GetJournalByIdUseCase,
     private val saveJournalUseCase: SaveJournalUseCase,
-    observePeopleUseCase: ObservePeopleUseCase
+    observePeopleUseCase: ObservePeopleUseCase,
+    observeLifeSeasonsUseCase: ObserveLifeSeasonsUseCase
 ) : ViewModel() {
 
     private val journalId: String? = savedStateHandle.get<String>("journalId")
@@ -48,6 +53,13 @@ class JournalEditorViewModel @Inject constructor(
         viewModelScope.launch {
             observePeopleUseCase().collectLatest { people ->
                 uiState = uiState.copy(allPeople = people)
+            }
+        }
+
+        // Tüm yaşam dönemlerini gözlemle
+        viewModelScope.launch {
+            observeLifeSeasonsUseCase().collectLatest { seasons ->
+                uiState = uiState.copy(allSeasons = seasons)
             }
         }
 
@@ -67,6 +79,7 @@ class JournalEditorViewModel @Inject constructor(
                     content = journal.content,
                     entryDate = journal.entryDate,
                     mentionedPeople = journal.mentionedPeople,
+                    selectedSeasonId = journal.seasonId,
                     isLoading = false
                 )
             } else {
@@ -103,8 +116,11 @@ class JournalEditorViewModel @Inject constructor(
         uiState = uiState.copy(entryDate = newDate)
     }
 
+    fun onSeasonSelected(seasonId: String?) {
+        uiState = uiState.copy(selectedSeasonId = seasonId)
+    }
+
     fun selectPersonForMention(person: Person) {
-        // @ karakterinden sonraki kısmı seçilen kişinin ismiyle değiştir
         val currentContent = uiState.content
         val lastAtIndex = currentContent.lastIndexOf('@')
         val updatedContent = if (lastAtIndex != -1) {
@@ -151,6 +167,7 @@ class JournalEditorViewModel @Inject constructor(
                 title = title,
                 content = content,
                 entryDate = uiState.entryDate,
+                seasonId = uiState.selectedSeasonId,
                 createdAt = currentTime,
                 updatedAt = currentTime,
                 mentionedPeople = uiState.mentionedPeople

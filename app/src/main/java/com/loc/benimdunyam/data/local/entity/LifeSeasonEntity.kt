@@ -12,6 +12,7 @@ data class LifeSeasonEntity(
     val startDate: Long,
     val endDate: Long?,
     val colorHex: String,
+    val coverImagePath: String? = null, // Kapak resmi yolu
     val createdAt: Long
 ) {
     fun toDomain() = LifeSeason(
@@ -21,6 +22,7 @@ data class LifeSeasonEntity(
         startDate = startDate,
         endDate = endDate,
         colorHex = colorHex,
+        coverImagePath = coverImagePath, // Eksiksiz aktarılıyor
         createdAt = createdAt
     )
 
@@ -32,6 +34,7 @@ data class LifeSeasonEntity(
             startDate = model.startDate,
             endDate = model.endDate,
             colorHex = model.colorHex,
+            coverImagePath = model.coverImagePath, // Eksiksiz aktarılıyor
             createdAt = model.createdAt
         )
     }

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,6 +20,10 @@ import com.loc.benimdunyam.feature.people.PersonEditorScreen
 import com.loc.benimdunyam.feature.search.SearchScreen
 import com.loc.benimdunyam.feature.settings.SettingsScreen
 import com.loc.benimdunyam.feature.onboarding.OnboardingScreen
+import com.loc.benimdunyam.feature.seasons.LifeSeasonsScreen
+import com.loc.benimdunyam.feature.seasons.episodes.LifeEpisodesScreen
+import com.loc.benimdunyam.feature.seasons.episodes.LifeEpisodesViewModel
+import com.loc.benimdunyam.feature.timeline.TimelineScreen
 
 @Composable
 fun BenimDunyamNavGraph(
@@ -59,11 +64,17 @@ fun BenimDunyamNavGraph(
                     onNavigateToSearch = {
                         navController.navigate(Screen.Search.route)
                     },
-                    onNavigateToPeople = {
-                        navController.navigate(BottomNavScreen.People.route)
-                    },
                     onNavigateToSettings = {
                         navController.navigate(Screen.Settings.route)
+                    },
+                    onNavigateToSeasons = {
+                        navController.navigate(Screen.LifeSeasons.route)
+                    },
+                    onNavigateToTimeline = {
+                        navController.navigate(Screen.Timeline.route)
+                    },
+                    onNavigateToEpisodes = { seasonId ->
+                        navController.navigate(Screen.LifeEpisodes.createRoute(seasonId))
                     }
                 )
             }
@@ -115,7 +126,6 @@ fun BenimDunyamNavGraph(
                     navArgument("journalId") { type = NavType.StringType }
                 )
             ) {
-                    JournalDetailSnapshot ->
                 JournalDetailScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToEdit = { journalId ->
@@ -179,6 +189,40 @@ fun BenimDunyamNavGraph(
                         navController.navigate(Screen.Onboarding.route) {
                             popUpTo(BottomNavScreen.Home.route) { inclusive = true }
                         }
+                    }
+                )
+            }
+
+            // 11. Yaşam Dönemleri Ekranı (Sezonlar)
+            composable(route = Screen.LifeSeasons.route) {
+                LifeSeasonsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToEpisodes = { seasonId ->
+                        navController.navigate(Screen.LifeEpisodes.createRoute(seasonId))
+                    }
+                )
+            }
+
+            // 12. Sezon Bölümleri Ekranı
+            composable(
+                route = Screen.LifeEpisodes.route,
+                arguments = listOf(
+                    navArgument("seasonId") { type = NavType.StringType }
+                )
+            ) {
+                val viewModel: LifeEpisodesViewModel = hiltViewModel()
+                LifeEpisodesScreen(
+                    viewModel = viewModel,
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
+            // 13. Zaman Çizgisi Ekranı (Faz 3)
+            composable(route = Screen.Timeline.route) {
+                TimelineScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToJournalDetail = { journalId ->
+                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
                     }
                 )
             }

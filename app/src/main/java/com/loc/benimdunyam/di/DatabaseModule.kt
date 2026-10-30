@@ -5,6 +5,8 @@ import androidx.room.Room
 import com.loc.benimdunyam.data.local.AppDatabase
 import com.loc.benimdunyam.data.local.dao.JournalDao
 import com.loc.benimdunyam.data.local.dao.JournalPersonMentionDao
+import com.loc.benimdunyam.data.local.dao.LifeEpisodeDao
+import com.loc.benimdunyam.data.local.dao.LifeSeasonDao
 import com.loc.benimdunyam.data.local.dao.PersonDao
 import dagger.Module
 import dagger.Provides
@@ -26,7 +28,8 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             AppDatabase.DATABASE_NAME
-        ).build()
+        ).fallbackToDestructiveMigration()
+            .build()
     }
 
     @Provides
@@ -46,4 +49,17 @@ object DatabaseModule {
     fun provideJournalPersonMentionDao(database: AppDatabase): JournalPersonMentionDao {
         return database.journalPersonMentionDao()
     }
+
+    @Provides
+    @Singleton
+    fun provideLifeSeasonDao(database: AppDatabase): LifeSeasonDao {
+        return database.lifeSeasonDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideLifeEpisodeDao(database: AppDatabase): LifeEpisodeDao {
+        return database.lifeEpisodeDao()
+    }
+
 }

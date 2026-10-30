@@ -7,5 +7,6 @@ data class LifeSeason(
     val startDate: Long,
     val endDate: Long?,
     val colorHex: String,
+    val coverImagePath: String? = null,
     val createdAt: Long
 )
