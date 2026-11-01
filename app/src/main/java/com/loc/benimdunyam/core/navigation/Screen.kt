@@ -12,10 +12,26 @@ sealed class Screen(val route: String) {
     object JournalDetail : Screen("journal_detail/{journalId}") {
         fun createRoute(journalId: String) = "journal_detail/$journalId"
     }
-    object JournalCreateEdit : Screen("journal_create_edit?journalId={journalId}") {
-        fun createRoute(journalId: String? = null) =
-            if (journalId != null) "journal_create_edit?journalId=$journalId" else "journal_create_edit"
+    object JournalCreateEdit : Screen("journal_create_edit?journalId={journalId}&seasonId={seasonId}&episodeId={episodeId}") {
+        fun createRoute(journalId: String? = null, seasonId: String? = null, episodeId: String? = null): String {
+            return buildString {
+                append("journal_create_edit")
+                val params = mutableListOf<String>()
+                if (!journalId.isNullOrBlank()) params.add("journalId=$journalId")
+                if (!seasonId.isNullOrBlank()) params.add("seasonId=$seasonId")
+                if (!episodeId.isNullOrBlank()) params.add("episodeId=$episodeId")
+                if (params.isNotEmpty()) {
+                    append("?")
+                    append(params.joinToString("&"))
+                }
+            }
+        }
     }
+
+    object EpisodeMemories : Screen("episode_memories/{seasonId}/{episodeId}") {
+        fun createRoute(seasonId: String, episodeId: String) = "episode_memories/$seasonId/$episodeId"
+    }
+
     object PersonDetail : Screen("person_detail/{personId}") {
         fun createRoute(personId: String) = "person_detail/$personId"
     }

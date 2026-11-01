@@ -11,7 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.loc.benimdunyam.feature.home.HomeScreen
-import com.loc.benimdunyam.feature.journals.JournalsScreen
+import com.loc.benimdunyam.feature.journal.JournalsScreen
 import com.loc.benimdunyam.feature.journal.JournalDetailScreen
 import com.loc.benimdunyam.feature.journal.JournalEditorScreen
 import com.loc.benimdunyam.feature.people.PeopleScreen
@@ -21,6 +21,7 @@ import com.loc.benimdunyam.feature.search.SearchScreen
 import com.loc.benimdunyam.feature.settings.SettingsScreen
 import com.loc.benimdunyam.feature.onboarding.OnboardingScreen
 import com.loc.benimdunyam.feature.seasons.LifeSeasonsScreen
+import com.loc.benimdunyam.feature.seasons.episodes.EpisodeMemoriesScreen
 import com.loc.benimdunyam.feature.seasons.episodes.LifeEpisodesScreen
 import com.loc.benimdunyam.feature.seasons.episodes.LifeEpisodesViewModel
 import com.loc.benimdunyam.feature.timeline.TimelineScreen
@@ -55,8 +56,13 @@ fun BenimDunyamNavGraph(
             // 2. Ana Sayfa (Tab 1)
             composable(route = BottomNavScreen.Home.route) {
                 HomeScreen(
-                    onNavigateToCreateJournal = {
-                        navController.navigate(Screen.JournalCreateEdit.createRoute())
+                    onNavigateToCreateJournal = { seasonId, episodeId ->
+                        navController.navigate(
+                            Screen.JournalCreateEdit.createRoute(
+                                seasonId = seasonId,
+                                episodeId = episodeId
+                            )
+                        )
                     },
                     onNavigateToJournalDetail = { journalId ->
                         navController.navigate(Screen.JournalDetail.createRoute(journalId))
@@ -105,13 +111,11 @@ fun BenimDunyamNavGraph(
 
             // 5. Günlük Ekleme / Düzenleme
             composable(
-                route = Screen.JournalCreateEdit.route,
+                route = "journal_create_edit?journalId={journalId}&seasonId={seasonId}&episodeId={episodeId}",
                 arguments = listOf(
-                    navArgument("journalId") {
-                        type = NavType.StringType
-                        nullable = true
-                        defaultValue = null
-                    }
+                    navArgument("journalId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("seasonId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("episodeId") { type = NavType.StringType; nullable = true; defaultValue = null }
                 )
             ) {
                 JournalEditorScreen(
@@ -209,11 +213,24 @@ fun BenimDunyamNavGraph(
                 arguments = listOf(
                     navArgument("seasonId") { type = NavType.StringType }
                 )
-            ) {
+            ) { backStackEntry ->
+                val seasonId = backStackEntry.arguments?.getString("seasonId") ?: ""
                 val viewModel: LifeEpisodesViewModel = hiltViewModel()
+
                 LifeEpisodesScreen(
                     viewModel = viewModel,
-                    onBackClick = { navController.popBackStack() }
+                    seasonId = seasonId,
+                    onBackClick = { navController.popBackStack() },
+                    onNavigateToCreateJournal = { sId, eId ->
+                        viewModel.setSelectedSeasonAndEpisode(eId)
+                        navController.navigate(Screen.JournalCreateEdit.createRoute(seasonId = sId, episodeId = eId))
+                    },
+                    onNavigateToEpisodeMemories = { sId, eId ->
+                        navController.navigate(Screen.EpisodeMemories.createRoute(sId, eId))
+                    },
+                    onNavigateToJournalDetail = { journalId ->
+                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                    }
                 )
             }
 
@@ -222,6 +239,22 @@ fun BenimDunyamNavGraph(
                 TimelineScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToJournalDetail = { journalId ->
+                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                    }
+                )
+            }
+
+            // Bölüm Anıları Sayfası
+            composable(
+                route = "episode_memories/{seasonId}/{episodeId}",
+                arguments = listOf(
+                    navArgument("seasonId") { type = NavType.StringType },
+                    navArgument("episodeId") { type = NavType.StringType }
+                )
+            ) {
+                EpisodeMemoriesScreen(
+                    onBackClick = { navController.popBackStack() },
+                    onJournalClick = { journalId ->
                         navController.navigate(Screen.JournalDetail.createRoute(journalId))
                     }
                 )

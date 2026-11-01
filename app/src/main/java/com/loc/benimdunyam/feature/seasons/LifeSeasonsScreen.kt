@@ -1,11 +1,9 @@
 package com.loc.benimdunyam.feature.seasons
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -13,17 +11,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.loc.benimdunyam.feature.seasons.components.SeasonCardItem
-import com.loc.benimdunyam.feature.seasons.dialogs.AddSeasonDialog
+import com.loc.benimdunyam.feature.seasons.episodes.AddSeasonDialogWithCover
+import com.loc.benimdunyam.feature.seasons.episodes.MovieStyleSeasonItem
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LifeSeasonsScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToEpisodes: (String) -> Unit, // 1. Parametre eklendi
+    onNavigateToEpisodes: (String) -> Unit,
     viewModel: LifeSeasonsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -32,7 +30,7 @@ fun LifeSeasonsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = "Dönemlerim") },
+                title = { Text(text = "Dönemlerim & Sezonlar") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Geri")
@@ -50,17 +48,13 @@ fun LifeSeasonsScreen(
             }
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (uiState.isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (uiState.seasonSummaries.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
@@ -70,42 +64,24 @@ fun LifeSeasonsScreen(
                     )
                 }
             } else {
-                val pagerState = rememberPagerState(pageCount = { uiState.seasonSummaries.size })
-
-                // Yatay Pager (Kaydırılabilir büyük kartlar)
-                HorizontalPager(
-                    state = pagerState,
-                    contentPadding = PaddingValues(horizontal = 32.dp),
-                    pageSpacing = 16.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(450.dp)
-                ) { page ->
-                    val summary = uiState.seasonSummaries[page]
-                    SeasonCardItem(
-                        summary = summary,
-                        onClick = { onNavigateToEpisodes(summary.season.id) } // 2. Tıklama aksiyonu bağlandı
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Sayfa Gösterge Noktaları (Pager Indicators)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    repeat(pagerState.pageCount) { iteration ->
-                        val color = if (pagerState.currentPage == iteration) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.outlineVariant
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(color)
+                    items(uiState.seasonSummaries) { summary ->
+                        val isActive = summary.season.id == uiState.activeSeasonId
+                        MovieStyleSeasonItem(
+                            summary = summary,
+                            isActive = isActive,
+                            onSelectActive = {
+                                // Sadece butona basıldığında aktif dönem olarak işaretlenir
+                                viewModel.selectSeason(summary.season.id)
+                            },
+                            onClick = {
+                                // Karta basıldığında sadece bölümler sayfasına yönlendirilir (aktiflik değişmez)
+                                onNavigateToEpisodes(summary.season.id)
+                            }
                         )
                     }
                 }
@@ -114,7 +90,7 @@ fun LifeSeasonsScreen(
     }
 
     if (showAddDialog) {
-        AddSeasonDialog(
+        AddSeasonDialogWithCover(
             onDismiss = { showAddDialog = false },
             onConfirm = { title, desc, coverUri ->
                 viewModel.createSeason(

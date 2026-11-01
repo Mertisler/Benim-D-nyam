@@ -1,114 +1,166 @@
 package com.loc.benimdunyam.feature.home.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.loc.benimdunyam.feature.home.SmartMemoryItem
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SmartMemoryCarousel(
     memories: List<SmartMemoryItem>,
     onJournalClick: (String) -> Unit,
-    onSeasonClick: () -> Unit
+    onSeasonClick: () -> Unit,
+    onSeeAllClick: () -> Unit = {}
 ) {
+    if (memories.isEmpty()) return
+
     val pagerState = rememberPagerState(pageCount = { memories.size })
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
-        Text(
-            text = "✨ Zaman Tüneli & Anılar",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "✨ Zaman Tüneli & Anılar",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = Color(0xFF332D27)
+            )
+            TextButton(
+                onClick = onSeeAllClick,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    horizontal = 3.dp,
+                    vertical = 0.dp
+                )
+            ) {
+                Text(
+                    text = "Tümü",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(0xFF63816C)
+                )
+            }
+        }
 
         HorizontalPager(
             state = pagerState,
-            contentPadding = PaddingValues(horizontal = 4.dp),
-            pageSpacing = 12.dp,
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp),
+            pageSpacing = 11.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(170.dp)
+                .height(137.dp)
         ) { page ->
             when (val memory = memories[page]) {
                 is SmartMemoryItem.OnThisDay -> {
                     Card(
                         onClick = { onJournalClick(memory.journalId) },
                         modifier = Modifier.fillMaxSize(),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(23.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            containerColor = Color(0xFFF0EAE1)
                         ),
+                        border = BorderStroke(1.dp, Color(0xFFE5DDD1)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(16.dp),
+                                .padding(horizontal = 16.dp, vertical = 13.dp),
                             verticalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer
+                                    shape = RoundedCornerShape(50),
+                                    color = Color(0xFFD8EDE1)
                                 ) {
                                     Text(
-                                        text = "📅 ${memory.yearsAgo} yıl önce bugün",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        text = "📅  ${memory.yearsAgo} yıl önce bugün",
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        color = Color(0xFF365C49)
                                     )
                                 }
                                 Text(
                                     text = memory.dateText,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color(0xFF888176)
                                 )
                             }
 
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Text(
                                     text = memory.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = Color(0xFF4B443B),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = memory.snippet,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                    maxLines = 2,
+                                    color = Color(0xFF777067),
+                                    maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
                     }
                 }
+
                 is SmartMemoryItem.SeasonInsight -> {
                     Card(
                         onClick = onSeasonClick,
                         modifier = Modifier.fillMaxSize(),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(23.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            containerColor = Color(0xFFE8E0D4)
                         ),
+                        border = BorderStroke(1.dp, Color(0xFFE1D7C9)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
@@ -119,54 +171,99 @@ fun SmartMemoryCarousel(
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
                                 )
+                            } else {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .background(
-                                            Brush.verticalGradient(
-                                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)),
-                                                startY = 50f
+                                            Brush.linearGradient(
+                                                listOf(
+                                                    Color(0xFFE8E1D8),
+                                                    Color(0xFFB9B1A7)
+                                                )
                                             )
                                         )
                                 )
                             }
 
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Black.copy(alpha = 0.05f),
+                                                Color.Black.copy(alpha = 0.68f)
+                                            )
+                                        )
+                                    )
+                            )
+
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(16.dp),
+                                    .padding(15.dp),
                                 verticalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (memory.season.coverImagePath.isNullOrBlank()) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.5f)
+                                    shape = RoundedCornerShape(50),
+                                    color = Color.Black.copy(alpha = 0.34f)
                                 ) {
                                     Text(
-                                        text = "🎓 ${memory.season.title}",
+                                        text = "✦  ${memory.season.title}",
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                                         style = MaterialTheme.typography.labelMedium,
                                         color = Color.White,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
 
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    val textColor = if (memory.season.coverImagePath.isNullOrBlank()) MaterialTheme.colorScheme.onSecondaryContainer else Color.White
+                                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    val insightText = if (memory.topPersonName != null) {
+                                        "Bu dönemin en çok anılan kişisi: ${memory.topPersonName}"
+                                    } else {
+                                        "Bu dönemde ${memory.journalCount} günlük yazıldı."
+                                    }
                                     Text(
-                                        text = if (memory.topPersonName != null) "Bu dönemin en çok anılan kişisi: ${memory.topPersonName}" else "Bu dönemde ${memory.journalCount} günlük yazıldı.",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = textColor,
+                                        text = insightText,
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        color = Color.White,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = "Detaylar için dokun →",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = textColor.copy(alpha = 0.8f)
+                                        text = "Dönemi keşfet →",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White.copy(alpha = 0.85f)
                                     )
                                 }
                             }
                         }
                     }
+                }
+            }
+        }
+
+        if (memories.size > 1) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                repeat(memories.size) { index ->
+                    val selected = pagerState.currentPage == index
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 3.dp)
+                            .width(if (selected) 15.dp else 5.dp)
+                            .height(5.dp)
+                            .background(
+                                color = if (selected) Color(0xFF6F927B) else Color(0xFFCFC6B9),
+                                shape = CircleShape
+                            )
+                    )
                 }
             }
         }

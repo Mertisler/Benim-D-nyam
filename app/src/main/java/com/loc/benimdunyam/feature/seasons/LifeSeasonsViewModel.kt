@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loc.benimdunyam.domain.model.LifeSeason
 import com.loc.benimdunyam.domain.model.Person
+import com.loc.benimdunyam.domain.repository.LifeSeasonRepository
 import com.loc.benimdunyam.domain.usecase.DeleteLifeSeasonUseCase
 import com.loc.benimdunyam.domain.usecase.ObserveJournalsUseCase
 import com.loc.benimdunyam.domain.usecase.ObserveLifeSeasonsUseCase
@@ -23,6 +24,7 @@ data class LifeSeasonSummary(
 
 data class LifeSeasonsUiState(
     val seasonSummaries: List<LifeSeasonSummary> = emptyList(),
+    val activeSeasonId: String? = null,
     val isLoading: Boolean = true
 )
 
@@ -31,13 +33,15 @@ class LifeSeasonsViewModel @Inject constructor(
     observeLifeSeasonsUseCase: ObserveLifeSeasonsUseCase,
     observeJournalsUseCase: ObserveJournalsUseCase,
     private val saveLifeSeasonUseCase: SaveLifeSeasonUseCase,
-    private val deleteLifeSeasonUseCase: DeleteLifeSeasonUseCase
+    private val deleteLifeSeasonUseCase: DeleteLifeSeasonUseCase,
+    private val lifeSeasonRepository: LifeSeasonRepository
 ) : ViewModel() {
 
     val uiState: StateFlow<LifeSeasonsUiState> = combine(
         observeLifeSeasonsUseCase(),
-        observeJournalsUseCase()
-    ) { seasons, journals ->
+        observeJournalsUseCase(),
+        lifeSeasonRepository.activeSeasonId
+    ) { seasons, journals, activeSeasonId ->
         val summaries = seasons.sortedBy { it.startDate }.map { season ->
             val seasonJournals = journals.filter { journal ->
                 val matchesId = journal.seasonId == season.id
@@ -73,6 +77,7 @@ class LifeSeasonsViewModel @Inject constructor(
 
         LifeSeasonsUiState(
             seasonSummaries = summaries,
+            activeSeasonId = activeSeasonId,
             isLoading = false
         )
     }.stateIn(
@@ -80,6 +85,10 @@ class LifeSeasonsViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = LifeSeasonsUiState(isLoading = true)
     )
+
+    fun selectSeason(seasonId: String) {
+        lifeSeasonRepository.setActiveSeasonAndEpisode(seasonId, null)
+    }
 
     fun createSeason(
         title: String,
@@ -101,6 +110,7 @@ class LifeSeasonsViewModel @Inject constructor(
                 createdAt = System.currentTimeMillis()
             )
             saveLifeSeasonUseCase(newSeason)
+            lifeSeasonRepository.setActiveSeasonAndEpisode(newSeason.id, null)
         }
     }
 

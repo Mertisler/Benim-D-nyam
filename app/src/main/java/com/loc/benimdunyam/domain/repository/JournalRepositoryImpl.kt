@@ -27,7 +27,8 @@ class JournalRepositoryImpl @Inject constructor(
                     entryDate = entity.entryDate,
                     createdAt = entity.createdAt,
                     updatedAt = entity.updatedAt,
-                    seasonId = entity.seasonId, // EKLENDİ
+                    seasonId = entity.seasonId,
+                    episodeId = entity.episodeId, // <-- EKLENDİ (DÜZELTME)
                     mentionedPeople = peopleEntities.map { p ->
                         Person(
                             id = p.id,
@@ -52,7 +53,8 @@ class JournalRepositoryImpl @Inject constructor(
             entryDate = entity.entryDate,
             createdAt = entity.createdAt,
             updatedAt = entity.updatedAt,
-            seasonId = entity.seasonId, // EKLENDİ
+            seasonId = entity.seasonId,
+            episodeId = entity.episodeId,
             mentionedPeople = peopleEntities.map { p ->
                 Person(
                     id = p.id,
@@ -73,7 +75,8 @@ class JournalRepositoryImpl @Inject constructor(
             entryDate = journal.entryDate,
             createdAt = journal.createdAt,
             updatedAt = journal.updatedAt,
-            seasonId = journal.seasonId // EKLENDİ
+            seasonId = journal.seasonId,
+            episodeId = journal.episodeId
         )
         journalDao.insertJournal(entity)
 
@@ -99,7 +102,8 @@ class JournalRepositoryImpl @Inject constructor(
             entryDate = journal.entryDate,
             createdAt = journal.createdAt,
             updatedAt = journal.updatedAt,
-            seasonId = journal.seasonId // EKLENDİ
+            seasonId = journal.seasonId,
+            episodeId = journal.episodeId // <-- EKLENDİ (DÜZELTME)
         )
         journalDao.updateJournal(entity)
 
@@ -134,6 +138,7 @@ class JournalRepositoryImpl @Inject constructor(
                     createdAt = entity.createdAt,
                     updatedAt = entity.updatedAt,
                     seasonId = entity.seasonId,
+                    episodeId = entity.episodeId,
                     mentionedPeople = peopleEntities.map { p ->
                         Person(
                             id = p.id,

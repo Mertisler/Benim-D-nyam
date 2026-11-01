@@ -7,9 +7,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loc.benimdunyam.domain.model.JournalEntry
+import com.loc.benimdunyam.domain.model.LifeEpisode
 import com.loc.benimdunyam.domain.model.LifeSeason
 import com.loc.benimdunyam.domain.model.Person
 import com.loc.benimdunyam.domain.usecase.GetJournalByIdUseCase
+import com.loc.benimdunyam.domain.usecase.ObserveEpisodesBySeasonUseCase
 import com.loc.benimdunyam.domain.usecase.ObserveLifeSeasonsUseCase
 import com.loc.benimdunyam.domain.usecase.ObservePeopleUseCase
 import com.loc.benimdunyam.domain.usecase.SaveJournalUseCase
@@ -26,7 +28,9 @@ data class JournalEditorUiState(
     val mentionedPeople: List<Person> = emptyList(),
     val allPeople: List<Person> = emptyList(),
     val allSeasons: List<LifeSeason> = emptyList(),
+    val currentSeasonEpisodes: List<LifeEpisode> = emptyList(),
     val selectedSeasonId: String? = null,
+    val selectedEpisodeId: String? = null,
     val isMentionPopupVisible: Boolean = false,
     val mentionQuery: String = "",
     val isLoading: Boolean = false,
@@ -40,10 +44,15 @@ class JournalEditorViewModel @Inject constructor(
     private val getJournalByIdUseCase: GetJournalByIdUseCase,
     private val saveJournalUseCase: SaveJournalUseCase,
     observePeopleUseCase: ObservePeopleUseCase,
-    observeLifeSeasonsUseCase: ObserveLifeSeasonsUseCase
+    observeLifeSeasonsUseCase: ObserveLifeSeasonsUseCase,
+    private val observeEpisodesBySeasonUseCase: ObserveEpisodesBySeasonUseCase
 ) : ViewModel() {
 
     private val journalId: String? = savedStateHandle.get<String>("journalId")
+
+    // Dışarıdan (Dönemler/Bölümler sayfasından) gönderilen ID'leri yakalıyoruz
+    private val initialSeasonId: String? = savedStateHandle.get<String>("seasonId")
+    private val initialEpisodeId: String? = savedStateHandle.get<String>("episodeId")
 
     var uiState by mutableStateOf(JournalEditorUiState())
         private set
@@ -60,6 +69,20 @@ class JournalEditorViewModel @Inject constructor(
         viewModelScope.launch {
             observeLifeSeasonsUseCase().collectLatest { seasons ->
                 uiState = uiState.copy(allSeasons = seasons)
+
+                // Eğer dışarıdan bir sezon ID ile gelinmediyse ve yeni kayıt modundaysak,
+                // isterseniz ilk sezonu otomatik seçili getirebilirsiniz (isteğe bağlı).
+                if (initialSeasonId.isNullOrBlank() && journalId.isNullOrBlank() && seasons.isNotEmpty()) {
+                    // onSeasonSelected(seasons.first().id) // İsterseniz ilkini varsayılan yapabilirsiniz
+                }
+            }
+        }
+
+        // Eğer dışarıdan bir sezon/bölüm ile geldiysek ve yeni kayıt modundaysak
+        if (!initialSeasonId.isNullOrBlank() && journalId.isNullOrBlank()) {
+            onSeasonSelected(initialSeasonId)
+            if (!initialEpisodeId.isNullOrBlank()) {
+                uiState = uiState.copy(selectedEpisodeId = initialEpisodeId)
             }
         }
 
@@ -74,12 +97,20 @@ class JournalEditorViewModel @Inject constructor(
             uiState = uiState.copy(isLoading = true)
             val journal = getJournalByIdUseCase(id)
             if (journal != null) {
+                if (!journal.seasonId.isNullOrBlank()) {
+                    viewModelScope.launch {
+                        observeEpisodesBySeasonUseCase(journal.seasonId).collectLatest { episodes ->
+                            uiState = uiState.copy(currentSeasonEpisodes = episodes)
+                        }
+                    }
+                }
                 uiState = uiState.copy(
                     title = journal.title,
                     content = journal.content,
                     entryDate = journal.entryDate,
                     mentionedPeople = journal.mentionedPeople,
                     selectedSeasonId = journal.seasonId,
+                    selectedEpisodeId = journal.episodeId,
                     isLoading = false
                 )
             } else {
@@ -95,14 +126,13 @@ class JournalEditorViewModel @Inject constructor(
     fun onContentChanged(newContent: String) {
         uiState = uiState.copy(content = newContent)
 
-        // @ karakteri kontrolü ile kişi öneri menüsünü tetikleme
+        // @ karakteri kontrolü ile kişi öneri menüsünü tetikleme (DÜZELTİLDİ: == newContent.length - 1)
         val lastAtIndex = newContent.lastIndexOf('@')
         if (lastAtIndex != -1 && lastAtIndex == newContent.length - 1) {
             uiState = uiState.copy(isMentionPopupVisible = true, mentionQuery = "")
         } else if (uiState.isMentionPopupVisible) {
             val query = newContent.substringAfterLast('@', "")
             if (query.contains(" ") || query.isEmpty()) {
-                // Boşluk bırakıldıysa mention modundan çık
                 if (query.isEmpty() && !newContent.endsWith("@")) {
                     uiState = uiState.copy(isMentionPopupVisible = false)
                 }
@@ -117,7 +147,23 @@ class JournalEditorViewModel @Inject constructor(
     }
 
     fun onSeasonSelected(seasonId: String?) {
-        uiState = uiState.copy(selectedSeasonId = seasonId)
+        uiState = uiState.copy(
+            selectedSeasonId = seasonId,
+            selectedEpisodeId = null,
+            currentSeasonEpisodes = emptyList()
+        )
+
+        if (seasonId != null) {
+            viewModelScope.launch {
+                observeEpisodesBySeasonUseCase(seasonId).collectLatest { episodes ->
+                    uiState = uiState.copy(currentSeasonEpisodes = episodes)
+                }
+            }
+        }
+    }
+
+    fun onEpisodeSelected(episodeId: String?) {
+        uiState = uiState.copy(selectedEpisodeId = episodeId)
     }
 
     fun selectPersonForMention(person: Person) {
@@ -154,7 +200,7 @@ class JournalEditorViewModel @Inject constructor(
         val content = uiState.content.trim()
 
         if (title.isEmpty() || content.isEmpty()) {
-            uiState = uiState.copy(errorMessage = "Başlık ve içerik boş bırakılamaz.")
+            uiState = uiState.copy(errorMessage = "Başlık dan içerik boş bırakılamaz.")
             return
         }
 
@@ -168,6 +214,7 @@ class JournalEditorViewModel @Inject constructor(
                 content = content,
                 entryDate = uiState.entryDate,
                 seasonId = uiState.selectedSeasonId,
+                episodeId = uiState.selectedEpisodeId,
                 createdAt = currentTime,
                 updatedAt = currentTime,
                 mentionedPeople = uiState.mentionedPeople

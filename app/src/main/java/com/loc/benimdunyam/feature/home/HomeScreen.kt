@@ -16,35 +16,35 @@ import com.loc.benimdunyam.feature.home.components.*
 
 @Composable
 fun HomeScreen(
-    onNavigateToCreateJournal: () -> Unit,
+    onNavigateToCreateJournal: (seasonId: String?, episodeId: String?) -> Unit,
     onNavigateToJournalDetail: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToSeasons: () -> Unit,
     onNavigateToTimeline: () -> Unit,
-    onNavigateToEpisodes: (String) -> Unit, // <-- 1. Yeni navigasyon parametresi eklendi
+    onNavigateToEpisodes: (String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Butik defter / sıcak kâğıt hissi veren özel gradyan renkleri
     val parchmentGradient = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFFFAF7F2), // En üstte hafif açık fildişi
-            Color(0xFFF3ECE1)  // Aşağıya doğru indikçe derinleşen sıcak kâğıt tonu
+            Color(0xFFFAF7F2),
+            Color(0xFFF3ECE1)
         )
     )
 
     Scaffold(
-        containerColor = Color.Transparent, // Arka planın gradyanla kaplanabilmesi için şeffaf yapıyoruz
+        containerColor = Color.Transparent,
         floatingActionButton = {
             FriendlyActionFab(
-                onClick = onNavigateToCreateJournal,
+                onClick = {
+                    onNavigateToCreateJournal(uiState.activeSeasonId, uiState.activeEpisodeId)
+                },
                 modifier = Modifier.padding(bottom = 12.dp)
             )
         }
     ) { paddingValues ->
-        // Tüm sayfayı sıcak kâğıt gradyanı ile kaplıyoruz
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -60,7 +60,6 @@ fun HomeScreen(
                     ),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Üst Başlık ve İkonlar
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
                     HomeHeader(
@@ -69,7 +68,6 @@ fun HomeScreen(
                     )
                 }
 
-                // 2. Zaman Tüneli & Anılar Karuseli
                 if (uiState.smartMemories.isNotEmpty()) {
                     item {
                         SmartMemoryCarousel(
@@ -80,27 +78,28 @@ fun HomeScreen(
                     }
                 }
 
-                    // 3. Yaşam Dönemleri Bölümü (Koşul kaldırıldı, artık her zaman görünür)
-                    item {
-                        LifeSeasonsSection(
-                            seasons = uiState.seasons,
-                            onSeeAllClick = onNavigateToSeasons,
-                            onSeasonClick = { seasonId ->
-                                onNavigateToEpisodes(seasonId)
-                            }
-                        )
-                    }
+                item {
+                    LifeSeasonsSection(
+                        seasons = uiState.seasons,
+                        activeSeasonId = uiState.activeSeasonId,
+                        onSeeAllClick = onNavigateToSeasons,
+                        onSeasonClick = { seasonId ->
+                            viewModel.updateActiveSeasonAndEpisode(seasonId, null)
+                            onNavigateToEpisodes(seasonId)
+                        }
+                    )
+                }
 
-                // 4. Son Anılar Bölümü
                 item {
                     RecentJournalsSection(
                         recentJournals = uiState.recentJournals,
                         onJournalClick = onNavigateToJournalDetail,
-                        onCreateJournalClick = onNavigateToCreateJournal
+                        onCreateJournalClick = {
+                            onNavigateToCreateJournal(uiState.activeSeasonId, uiState.activeEpisodeId)
+                        }
                     )
                 }
 
-                // Alt çubukla çakışmayı önleyen boşluk
                 item {
                     Spacer(modifier = Modifier.height(80.dp))
                 }

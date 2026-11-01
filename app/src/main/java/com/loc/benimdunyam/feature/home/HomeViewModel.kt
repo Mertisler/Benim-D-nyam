@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loc.benimdunyam.domain.model.JournalEntry
 import com.loc.benimdunyam.domain.model.LifeSeason
+import com.loc.benimdunyam.domain.repository.LifeSeasonRepository
 import com.loc.benimdunyam.domain.usecase.ObserveJournalsUseCase
 import com.loc.benimdunyam.domain.usecase.ObserveLifeSeasonsUseCase
 import com.loc.benimdunyam.domain.usecase.ObservePeopleUseCase
@@ -32,6 +33,8 @@ sealed interface SmartMemoryItem {
 data class HomeUiState(
     val recentJournals: List<JournalEntry> = emptyList(),
     val seasons: List<LifeSeason> = emptyList(),
+    val activeSeasonId: String? = null,
+    val activeEpisodeId: String? = null,
     val smartMemories: List<SmartMemoryItem> = emptyList(),
     val totalJournalsCount: Int = 0,
     val totalPeopleCount: Int = 0,
@@ -42,14 +45,18 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     observeJournalsUseCase: ObserveJournalsUseCase,
     observePeopleUseCase: ObservePeopleUseCase,
-    observeLifeSeasonsUseCase: ObserveLifeSeasonsUseCase
+    observeLifeSeasonsUseCase: ObserveLifeSeasonsUseCase,
+    private val lifeSeasonRepository: LifeSeasonRepository
 ) : ViewModel() {
 
+    // activeEpisodeId de combine içerisine dahil edilerek reaktif hale getirildi
     val uiState: StateFlow<HomeUiState> = combine(
         observeJournalsUseCase(),
         observePeopleUseCase(),
-        observeLifeSeasonsUseCase()
-    ) { journals, people, seasons ->
+        observeLifeSeasonsUseCase(),
+        lifeSeasonRepository.activeSeasonId,
+        lifeSeasonRepository.activeEpisodeId
+    ) { journals, people, seasons, activeSeasonId, activeEpisodeId ->
         val calendarToday = Calendar.getInstance()
         val currentMonth = calendarToday.get(Calendar.MONTH)
         val currentDay = calendarToday.get(Calendar.DAY_OF_MONTH)
@@ -57,7 +64,7 @@ class HomeViewModel @Inject constructor(
 
         val smartMemories = mutableListOf<SmartMemoryItem>()
 
-        // 1. "On This Day" (Geçmiş Gün Hatırlatması - 1 yıl veya daha fazla önce bugün)
+        // 1. "On This Day"
         journals.forEach { journal ->
             val entryCal = Calendar.getInstance().apply { timeInMillis = journal.entryDate }
             val entryMonth = entryCal.get(Calendar.MONTH)
@@ -79,7 +86,6 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        // Eğer tam bugün eşleşen bir anı yoksa, arşivden nostaljik bir anı sunalım
         if (smartMemories.isEmpty() && journals.isNotEmpty()) {
             val randomJournal = journals.minByOrNull { it.entryDate } ?: journals.first()
             val dateFormat = SimpleDateFormat("d MMMM yyyy", Locale("tr", "TR"))
@@ -94,7 +100,7 @@ class HomeViewModel @Inject constructor(
             )
         }
 
-        // 2. Yaşam Dönemi İçgörü Kartı (Sezon İstatistikleri ve En Çok Anılan Kişi)
+        // 2. Yaşam Dönemi İçgörü Kartı
         seasons.forEach { season ->
             val seasonJournals = journals.filter { j ->
                 j.seasonId == season.id || (j.entryDate >= season.startDate && (season.endDate == null || j.entryDate <= season.endDate))
@@ -118,9 +124,13 @@ class HomeViewModel @Inject constructor(
             }
         }
 
+        val resolvedSeasonId = activeSeasonId ?: seasons.maxByOrNull { it.startDate }?.id
+
         HomeUiState(
             recentJournals = journals.take(5),
             seasons = seasons,
+            activeSeasonId = resolvedSeasonId,
+            activeEpisodeId = activeEpisodeId, // Doğrudan akıştan gelen değer atanıyor
             smartMemories = smartMemories,
             totalJournalsCount = journals.size,
             totalPeopleCount = people.size,
@@ -131,4 +141,8 @@ class HomeViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = HomeUiState(isLoading = true)
     )
+
+    fun updateActiveSeasonAndEpisode(seasonId: String?, episodeId: String? = null) {
+        lifeSeasonRepository.setActiveSeasonAndEpisode(seasonId, episodeId)
+    }
 }
