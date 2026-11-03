@@ -1,86 +1,176 @@
+
 package com.loc.benimdunyam.feature.journals
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loc.benimdunyam.domain.model.JournalEntry
-import com.loc.benimdunyam.domain.model.Person
+import com.loc.benimdunyam.domain.usecase.DeleteJournalUseCase
 import com.loc.benimdunyam.domain.usecase.ObserveJournalsUseCase
-import com.loc.benimdunyam.domain.usecase.ObservePeopleUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 
 data class JournalsUiState(
     val journals: List<JournalEntry> = emptyList(),
-    val allPeople: List<Person> = emptyList(),
     val startDate: Long? = null,
     val endDate: Long? = null,
-    val selectedPersonIds: Set<String> = emptySet(),
-    val isLoading: Boolean = true
+    val searchQuery: String = "",
+    val isLoading: Boolean = true,
+    val deleteErrorMessage: String? = null
 )
 
 @HiltViewModel
 class JournalsViewModel @Inject constructor(
     observeJournalsUseCase: ObserveJournalsUseCase,
-    observePeopleUseCase: ObservePeopleUseCase
+    private val deleteJournalUseCase: DeleteJournalUseCase
 ) : ViewModel() {
 
+    // Tarih filtreleri
     private val _startDate = MutableStateFlow<Long?>(null)
     private val _endDate = MutableStateFlow<Long?>(null)
-    private val _selectedPersonIds = MutableStateFlow<Set<String>>(emptySet())
 
-    val uiState: StateFlow<JournalsUiState> = combine(
+    // Arama metni
+    private val _searchQuery = MutableStateFlow("")
+
+    // Silme işlemi hata durumu
+    private val _deleteErrorMessage = MutableStateFlow<String?>(null)
+
+    // Türkçe karakterlere uygun büyük/küçük harf kontrolü
+    private val turkishLocale = Locale("tr", "TR")
+
+    // Günlükleri gözlemle ve filtrele
+    private val baseUiState = combine(
         observeJournalsUseCase(),
-        observePeopleUseCase(),
         _startDate,
         _endDate,
-        _selectedPersonIds
-    ) { journals, people, startDate, endDate, selectedPersonIds ->
+        _searchQuery
+    ) { journals, startDate, endDate, searchQuery ->
 
-        // Filtreleme Mantığı
+        // Arama metnini normalize et
+        val normalizedQuery = searchQuery
+            .trim()
+            .lowercase(turkishLocale)
+
+        // Günlükleri filtrele
         val filteredJournals = journals.filter { journal ->
-            // Tarih Aralığı Filtresi
-            val matchesStart = startDate == null || journal.entryDate >= startDate
-            val matchesEnd = endDate == null || journal.entryDate <= endDate
 
-            // Kişi Filtresi (Günlüğün etiketlendiği kişilerden en az biri seçilenler arasında mı?)
-            // Not: JournalEntry modelinizde bağlı kişi ID'leri listesi tutuluyorsa burada eşleştirme yapılır.
-            // Örnek olarak temel tarih ve metin uyumu üzerinden filtreleme:
-            matchesStart && matchesEnd
+            // Başlangıç tarihi kontrolü
+            val matchesStart =
+                startDate == null ||
+                        journal.entryDate >= startDate
+
+            // Bitiş tarihi kontrolü
+            val matchesEnd =
+                endDate == null ||
+                        journal.entryDate <= endDate
+
+            // Günlük başlığında arama
+            val matchesTitle =
+                journal.title.lowercase(turkishLocale)
+                    .contains(normalizedQuery)
+
+            // Günlük içeriğinde arama
+            val matchesContent =
+                journal.content.lowercase(turkishLocale)
+                    .contains(normalizedQuery)
+
+            // Etiketlenen kişilerde arama
+            val matchesPeople =
+                journal.mentionedPeople.any { person ->
+                    person.name.lowercase(turkishLocale)
+                        .contains(normalizedQuery)
+                }
+
+            // Arama kontrolü
+            val matchesSearch =
+                normalizedQuery.isBlank() ||
+                        matchesTitle ||
+                        matchesContent ||
+                        matchesPeople
+
+            matchesStart && matchesEnd && matchesSearch
         }
 
         JournalsUiState(
             journals = filteredJournals,
-            allPeople = people,
             startDate = startDate,
             endDate = endDate,
-            selectedPersonIds = selectedPersonIds,
+            searchQuery = searchQuery,
             isLoading = false
         )
+
+    }
+
+    // Ana UI State
+    val uiState: StateFlow<JournalsUiState> = combine(
+        baseUiState,
+        _deleteErrorMessage
+    ) { state, deleteError ->
+
+        state.copy(
+            deleteErrorMessage = deleteError
+        )
+
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = JournalsUiState(isLoading = true)
     )
 
+    // Günlük silme
+    fun deleteJournal(journalId: String) {
+
+        viewModelScope.launch {
+
+            _deleteErrorMessage.value = null
+
+            try {
+
+                deleteJournalUseCase(journalId)
+
+            } catch (e: CancellationException) {
+                throw e
+
+            } catch (e: Exception) {
+
+                _deleteErrorMessage.value =
+                    e.localizedMessage ?: "Günlük silinemedi."
+            }
+        }
+    }
+
+    // Silme hatasını temizle
+    fun clearDeleteError() {
+        _deleteErrorMessage.value = null
+    }
+
+    // Tarih aralığını belirle
     fun setDateRange(start: Long?, end: Long?) {
         _startDate.value = start
         _endDate.value = end
     }
 
-    fun togglePersonFilter(personId: String) {
-        val currentSet = _selectedPersonIds.value.toMutableSet()
-        if (currentSet.contains(personId)) {
-            currentSet.remove(personId)
-        } else {
-            currentSet.add(personId)
-        }
-        _selectedPersonIds.value = currentSet
+    // Arama metnini güncelle
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
     }
 
+    // Sadece aramayı temizle
+    fun clearSearch() {
+        _searchQuery.value = ""
+    }
+
+    // Bütün filtreleri ve aramayı temizle
     fun clearFilters() {
         _startDate.value = null
         _endDate.value = null
-        _selectedPersonIds.value = emptySet()
+        _searchQuery.value = ""
     }
 }

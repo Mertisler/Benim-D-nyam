@@ -12,8 +12,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.loc.benimdunyam.feature.home.HomeScreen
 import com.loc.benimdunyam.feature.journal.JournalsScreen
-import com.loc.benimdunyam.feature.journal.JournalDetailScreen
-import com.loc.benimdunyam.feature.journal.JournalEditorScreen
+import com.loc.benimdunyam.feature.journal.journaldetail.JournalDetailScreen
+import com.loc.benimdunyam.feature.journal.journaleditor.JournalEditorScreen
 import com.loc.benimdunyam.feature.people.PeopleScreen
 import com.loc.benimdunyam.feature.people.PersonDetailScreen
 import com.loc.benimdunyam.feature.people.PersonEditorScreen
