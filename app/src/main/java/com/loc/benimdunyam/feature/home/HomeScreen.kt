@@ -1,9 +1,10 @@
+
 package com.loc.benimdunyam.feature.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.*
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,17 +40,23 @@ fun HomeScreen(
         floatingActionButton = {
             FriendlyActionFab(
                 onClick = {
-                    onNavigateToCreateJournal(uiState.activeSeasonId, uiState.activeEpisodeId)
+                    // Yeni anı oluştururken mevcut aktif dönemi kullan.
+                    onNavigateToCreateJournal(
+                        uiState.activeSeasonId,
+                        uiState.activeEpisodeId
+                    )
                 },
                 modifier = Modifier.padding(bottom = 12.dp)
             )
         }
     ) { paddingValues ->
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(parchmentGradient)
         ) {
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -60,14 +67,18 @@ fun HomeScreen(
                     ),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+
+                // HEADER
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
+
                     HomeHeader(
                         onSearchClick = onNavigateToSearch,
                         onSettingsClick = onNavigateToSettings
                     )
                 }
 
+                // SMART MEMORIES
                 if (uiState.smartMemories.isNotEmpty()) {
                     item {
                         SmartMemoryCarousel(
@@ -78,28 +89,39 @@ fun HomeScreen(
                     }
                 }
 
+                // LIFE SEASONS
                 item {
                     LifeSeasonsSection(
-                        seasons = uiState.seasons,
+                        // En son eklenen yaşam dönemi ilk sırada gösterilir.
+                        seasons = uiState.seasons.reversed(),
+
                         activeSeasonId = uiState.activeSeasonId,
+
                         onSeeAllClick = onNavigateToSeasons,
+
                         onSeasonClick = { seasonId ->
-                            viewModel.updateActiveSeasonAndEpisode(seasonId, null)
+                            // Yalnızca ilgili dönemin bölümlerine git.
+                            // Aktif yaşam dönemi değişmez.
                             onNavigateToEpisodes(seasonId)
                         }
                     )
                 }
 
+                // RECENT JOURNALS
                 item {
                     RecentJournalsSection(
                         recentJournals = uiState.recentJournals,
                         onJournalClick = onNavigateToJournalDetail,
                         onCreateJournalClick = {
-                            onNavigateToCreateJournal(uiState.activeSeasonId, uiState.activeEpisodeId)
+                            onNavigateToCreateJournal(
+                                uiState.activeSeasonId,
+                                uiState.activeEpisodeId
+                            )
                         }
                     )
                 }
 
+                // BOTTOM SPACING
                 item {
                     Spacer(modifier = Modifier.height(80.dp))
                 }

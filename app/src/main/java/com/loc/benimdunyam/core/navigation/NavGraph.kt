@@ -15,11 +15,11 @@ import com.loc.benimdunyam.feature.journal.JournalsScreen
 import com.loc.benimdunyam.feature.journal.journaldetail.JournalDetailScreen
 import com.loc.benimdunyam.feature.journal.journaleditor.JournalEditorScreen
 import com.loc.benimdunyam.feature.people.PeopleScreen
-import com.loc.benimdunyam.feature.people.PersonDetailScreen
 import com.loc.benimdunyam.feature.people.PersonEditorScreen
 import com.loc.benimdunyam.feature.search.SearchScreen
 import com.loc.benimdunyam.feature.settings.SettingsScreen
 import com.loc.benimdunyam.feature.onboarding.OnboardingScreen
+import com.loc.benimdunyam.feature.people.detail.PersonDetailScreen
 import com.loc.benimdunyam.feature.seasons.LifeSeasonsScreen
 import com.loc.benimdunyam.feature.seasons.episodes.EpisodeMemoriesScreen
 import com.loc.benimdunyam.feature.seasons.episodes.LifeEpisodesScreen

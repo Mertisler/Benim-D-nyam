@@ -10,6 +10,7 @@ import com.loc.benimdunyam.domain.model.Person
 import com.loc.benimdunyam.domain.usecase.GetPersonByIdUseCase
 import com.loc.benimdunyam.domain.usecase.SavePersonUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -18,6 +19,7 @@ data class PersonEditorUiState(
     val name: String = "",
     val note: String = "",
     val isLoading: Boolean = false,
+    val isSaving: Boolean = false,
     val errorMessage: String? = null,
     val isSaved: Boolean = false
 )
@@ -35,6 +37,9 @@ class PersonEditorViewModel @Inject constructor(
     var uiState by mutableStateOf(PersonEditorUiState())
         private set
 
+    /** Keeps existing image paths and counters when only name/note are edited. */
+    private var loadedPerson: Person? = null
+
     init {
         if (isEditing && personId != null) {
             loadPerson(personId)
@@ -43,16 +48,31 @@ class PersonEditorViewModel @Inject constructor(
 
     private fun loadPerson(id: String) {
         viewModelScope.launch {
-            uiState = uiState.copy(isLoading = true)
-            val person = getPersonByIdUseCase(id)
-            if (person != null) {
+            uiState = uiState.copy(isLoading = true, errorMessage = null)
+
+            try {
+                val person = getPersonByIdUseCase(id)
+                loadedPerson = person
+
+                if (person != null) {
+                    uiState = uiState.copy(
+                        name = person.name,
+                        note = person.note.orEmpty(),
+                        isLoading = false
+                    )
+                } else {
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        errorMessage = "Kişi bulunamadı."
+                    )
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
                 uiState = uiState.copy(
-                    name = person.name,
-                    note = person.note ?: "",
-                    isLoading = false
+                    isLoading = false,
+                    errorMessage = "Kişi bilgileri yüklenemedi."
                 )
-            } else {
-                uiState = uiState.copy(isLoading = false, errorMessage = "Kişi bulunamadı.")
             }
         }
     }
@@ -62,34 +82,62 @@ class PersonEditorViewModel @Inject constructor(
     }
 
     fun onNoteChanged(newNote: String) {
-        uiState = uiState.copy(note = newNote)
+        uiState = uiState.copy(note = newNote, errorMessage = null)
     }
 
     fun savePerson(onSuccess: () -> Unit) {
         val trimmedName = uiState.name.trim()
+
         if (trimmedName.isEmpty()) {
-            uiState = uiState.copy(errorMessage = "İsim alanı boş bırakılamaz.") // Boş isim doğrulaması[cite: 6, 7]
+            uiState = uiState.copy(errorMessage = "İsim alanı boş bırakılamaz.")
+            return
+        }
+
+        if (uiState.isLoading || uiState.isSaving) return
+
+        if (isEditing && loadedPerson == null) {
+            uiState = uiState.copy(
+                errorMessage = "Kişi bilgileri henüz yüklenmedi. Lütfen tekrar deneyin."
+            )
             return
         }
 
         viewModelScope.launch {
-            val currentTime = System.currentTimeMillis()
-            val currentId = personId ?: UUID.randomUUID().toString()
+            uiState = uiState.copy(isSaving = true, errorMessage = null)
 
-            // Eğer düzenleme modundaysa mevcut tarihleri koruyabiliriz veya güncelleyebiliriz
-            val existingPerson = if (isEditing && personId != null) getPersonByIdUseCase(personId) else null
+            try {
+                val currentTime = System.currentTimeMillis()
+                val existingPerson = loadedPerson
 
-            val person = Person(
-                id = currentId,
-                name = trimmedName,
-                note = uiState.note.ifBlank { null },
-                createdAt = existingPerson?.createdAt ?: currentTime,
-                updatedAt = currentTime
-            )
+                val person = if (existingPerson != null) {
+                    // copy() preserves profileImagePath, coverImagePath and counters.
+                    existingPerson.copy(
+                        name = trimmedName,
+                        note = uiState.note.ifBlank { null },
+                        updatedAt = currentTime
+                    )
+                } else {
+                    Person(
+                        id = UUID.randomUUID().toString(),
+                        name = trimmedName,
+                        note = uiState.note.ifBlank { null },
+                        createdAt = currentTime,
+                        updatedAt = currentTime
+                    )
+                }
 
-            savePersonUseCase(person, isUpdate = isEditing)
-            uiState = uiState.copy(isSaved = true)
-            onSuccess()
+                savePersonUseCase(person, isUpdate = isEditing)
+                loadedPerson = person
+                uiState = uiState.copy(isSaving = false, isSaved = true)
+                onSuccess()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                uiState = uiState.copy(
+                    isSaving = false,
+                    errorMessage = exception.message ?: "Kişi kaydedilemedi."
+                )
+            }
         }
     }
 }

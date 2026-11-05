@@ -7,5 +7,7 @@ data class Person(
     val createdAt: Long,
     val updatedAt: Long,
     val uniqueJournalCount: Int = 0,
-    val totalMentionCount: Int = 0
+    val totalMentionCount: Int = 0,
+    val profileImagePath: String? = null,
+    val coverImagePath: String? = null
 )

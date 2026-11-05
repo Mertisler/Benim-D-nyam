@@ -1,3 +1,4 @@
+
 package com.loc.benimdunyam.feature.seasons.episodes
 
 import androidx.compose.foundation.BorderStroke
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.loc.benimdunyam.domain.model.LifeEpisode
 import com.loc.benimdunyam.domain.model.LifeSeason
@@ -37,76 +39,178 @@ fun LifeEpisodesScreen(
     seasonId: String,
     onBackClick: () -> Unit,
     onNavigateToCreateJournal: (String, String) -> Unit,
-    onNavigateToEpisodeMemories: (String, String) -> Unit, // 1. Yeni sayfa için yönlendirme parametresi eklendi
+    onNavigateToEpisodeMemories: (String, String) -> Unit,
     onNavigateToJournalDetail: (String) -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    var showAddDialog by remember { mutableStateOf(false) }
+
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    var showAddDialog by remember {
+        mutableStateOf(false)
+    }
+
+    // Yaşam dönemi silme onayı
+    var showDeleteSeasonDialog by remember {
+        mutableStateOf(false)
+    }
+
+    val snackbarHostState = remember {
+        SnackbarHostState()
+    }
 
     val season = uiState.season
+
+    // ViewModel tarafından gönderilen silme sonuçlarını dinle.
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+
+            when (event) {
+
+                LifeEpisodesEvent.SeasonDeleted -> {
+                    // Silme başarılı olduğunda dönemler sayfasına dön.
+                    onBackClick()
+                }
+
+                LifeEpisodesEvent.SeasonDeleteFailed -> {
+                    snackbarHostState.showSnackbar(
+                        message = "Yaşam dönemi silinemedi. Lütfen tekrar deneyin."
+                    )
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(season?.title ?: "Sezon Bölümleri", color = Color.White) },
+
+                title = {
+                    Text(
+                        text = season?.title ?: "Sezon Bölümleri",
+                        color = Color.White
+                    )
+                },
+
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri", tint = Color.White)
+                    IconButton(
+                        onClick = onBackClick
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Geri",
+                            tint = Color.White
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+
+                // YAŞAM DÖNEMİ SİLME BUTONU
+                actions = {
+                    if (season != null) {
+
+                        IconButton(
+                            onClick = {
+                                showDeleteSeasonDialog = true
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Yaşam dönemini sil",
+                                tint = Color(0xFFFF6B6B)
+                            )
+                        }
+                    }
+                },
+
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Black
+                )
             )
         },
+
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState
+            )
+        },
+
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddDialog = true },
+                onClick = {
+                    showAddDialog = true
+                },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Bölüm Ekle")
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Bölüm Ekle"
+                )
             }
         },
+
         containerColor = Color(0xFF121212)
+
     ) { paddingValues ->
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+
             if (uiState.isLoading) {
+
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
                     color = MaterialTheme.colorScheme.primary
                 )
+
             } else {
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 80.dp),
+                    contentPadding = PaddingValues(
+                        bottom = 80.dp
+                    ),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+
+                    // YAŞAM DÖNEMİ KAPAK ALANI
                     if (season != null) {
+
                         item {
-                            SeasonHeroHeader(season = season, episodeCount = uiState.episodes.size)
+                            SeasonHeroHeader(
+                                season = season,
+                                episodeCount = uiState.episodes.size
+                            )
                         }
                     }
 
+                    // BÖLÜMLER BAŞLIĞI
                     item {
                         Text(
                             text = "Bölümler",
                             style = MaterialTheme.typography.titleLarge,
                             color = Color.White,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(
+                                horizontal = 16.dp,
+                                vertical = 4.dp
+                            )
                         )
                     }
 
+                    // HENÜZ BÖLÜM YOKSA
                     if (uiState.episodes.isEmpty()) {
+
                         item {
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(32.dp),
                                 contentAlignment = Alignment.Center
                             ) {
+
                                 Text(
                                     text = "Bu sezona henüz bir bölüm eklenmemiş.",
                                     style = MaterialTheme.typography.bodyMedium,
@@ -114,24 +218,56 @@ fun LifeEpisodesScreen(
                                 )
                             }
                         }
+
                     } else {
-                        items(uiState.episodes, key = { it.id }) { episode ->
-                            val isActive = episode.id == uiState.activeEpisodeId
-                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+
+                        // BÖLÜMLER
+                        items(
+                            items = uiState.episodes,
+                            key = { it.id }
+                        ) { episode ->
+
+                            val isActive =
+                                episode.id == uiState.activeEpisodeId
+
+                            Box(
+                                modifier = Modifier.padding(
+                                    horizontal = 16.dp
+                                )
+                            ) {
+
                                 NetflixStyleEpisodeItem(
                                     episode = episode,
                                     isActive = isActive,
+
                                     onSelectActive = {
-                                        viewModel.setActiveEpisode(episode.id)
+                                        viewModel.setActiveEpisode(
+                                            episode.id
+                                        )
                                     },
+
                                     onShowMemoriesClick = {
-                                        // 2. Butona tıklandığında diyalog yerine ayrı sayfaya yönlendiriyoruz
-                                        onNavigateToEpisodeMemories(seasonId, episode.id)
+                                        onNavigateToEpisodeMemories(
+                                            seasonId,
+                                            episode.id
+                                        )
                                     },
-                                    onDelete = { viewModel.deleteEpisode(episode) },
+
+                                    onDelete = {
+                                        viewModel.deleteEpisode(
+                                            episode
+                                        )
+                                    },
+
                                     onWriteJournalClick = {
-                                        viewModel.setSelectedSeasonAndEpisode(episode.id)
-                                        onNavigateToCreateJournal(seasonId, episode.id)
+                                        viewModel.setSelectedSeasonAndEpisode(
+                                            episode.id
+                                        )
+
+                                        onNavigateToCreateJournal(
+                                            seasonId,
+                                            episode.id
+                                        )
                                     }
                                 )
                             }
@@ -141,44 +277,159 @@ fun LifeEpisodesScreen(
             }
         }
 
+        // --------------------------------------------------
+        // YAŞAM DÖNEMİ SİLME ONAY PENCERESİ
+        // --------------------------------------------------
+
+        if (showDeleteSeasonDialog && season != null) {
+
+            AlertDialog(
+
+                onDismissRequest = {
+                    showDeleteSeasonDialog = false
+                },
+
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                },
+
+                title = {
+                    Text(
+                        text = "Yaşam Dönemini Sil?"
+                    )
+                },
+
+                text = {
+                    Text(
+                        text = "\"${season.title}\" yaşam dönemini silmek istediğine emin misin?\n\nBu işlem geri alınamaz."
+                    )
+                },
+
+                confirmButton = {
+
+                    TextButton(
+                        onClick = {
+
+                            viewModel.deleteSeason(season)
+
+                            showDeleteSeasonDialog = false
+                        }
+                    ) {
+
+                        Text(
+                            text = "Evet, Sil",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                },
+
+                dismissButton = {
+
+                    TextButton(
+                        onClick = {
+                            showDeleteSeasonDialog = false
+                        }
+                    ) {
+
+                        Text(
+                            text = "Vazgeç"
+                        )
+                    }
+                },
+
+                shape = RoundedCornerShape(20.dp)
+            )
+        }
+
+        // --------------------------------------------------
+        // YENİ BÖLÜM EKLEME PENCERESİ
+        // --------------------------------------------------
+
         if (showAddDialog) {
+
             AddEpisodeDialog(
-                onDismiss = { showAddDialog = false },
-                onConfirm = { title, description, orderIndex, startDate, endDate ->
-                    viewModel.createEpisode(title, description, orderIndex, startDate, endDate)
+
+                onDismiss = {
                     showAddDialog = false
                 },
+
+                onConfirm = {
+                        title,
+                        description,
+                        orderIndex,
+                        startDate,
+                        endDate ->
+
+                    viewModel.createEpisode(
+                        title = title,
+                        description = description,
+                        orderIndex = orderIndex,
+                        startDate = startDate,
+                        endDate = endDate
+                    )
+
+                    showAddDialog = false
+                },
+
                 nextOrderIndex = uiState.episodes.size + 1
             )
         }
     }
 }
 
+// --------------------------------------------------
+// YAŞAM DÖNEMİ KAPAK ALANI
+// --------------------------------------------------
+
 @Composable
-fun SeasonHeroHeader(season: LifeSeason, episodeCount: Int) {
-    val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale("tr", "TR"))
-    val startDateStr = dateFormat.format(Date(season.startDate))
-    val endDateStr = season.endDate?.let { dateFormat.format(Date(it)) } ?: "Devam Ediyor"
+fun SeasonHeroHeader(
+    season: LifeSeason,
+    episodeCount: Int
+) {
+
+    val dateFormat = SimpleDateFormat(
+        "dd.MM.yyyy",
+        Locale("tr", "TR")
+    )
+
+    val startDateStr = dateFormat.format(
+        Date(season.startDate)
+    )
+
+    val endDateStr = season.endDate?.let {
+        dateFormat.format(Date(it))
+    } ?: "Devam Ediyor"
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(280.dp)
     ) {
+
         if (!season.coverImagePath.isNullOrBlank()) {
+
             AsyncImage(
-                model = season.coverImagePath,
+                model = seasonCoverImageModel(season.coverImagePath),
                 contentDescription = season.title,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
+
         } else {
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant
+                    ),
                 contentAlignment = Alignment.Center
             ) {
+
                 Icon(
                     imageVector = Icons.Default.Image,
                     contentDescription = null,
@@ -188,12 +439,16 @@ fun SeasonHeroHeader(season: LifeSeason, episodeCount: Int) {
             }
         }
 
+        // Görselin alt kısmındaki karartma
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color(0xFF121212)),
+                        colors = listOf(
+                            Color.Transparent,
+                            Color(0xFF121212)
+                        ),
                         startY = 100f
                     )
                 )
@@ -205,6 +460,7 @@ fun SeasonHeroHeader(season: LifeSeason, episodeCount: Int) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+
             Text(
                 text = season.title,
                 style = MaterialTheme.typography.headlineMedium,
@@ -218,6 +474,7 @@ fun SeasonHeroHeader(season: LifeSeason, episodeCount: Int) {
             )
 
             if (season.description.isNotBlank()) {
+
                 Text(
                     text = season.description,
                     style = MaterialTheme.typography.bodyMedium,
@@ -229,6 +486,10 @@ fun SeasonHeroHeader(season: LifeSeason, episodeCount: Int) {
     }
 }
 
+// --------------------------------------------------
+// BÖLÜM KARTI
+// --------------------------------------------------
+
 @Composable
 fun NetflixStyleEpisodeItem(
     episode: LifeEpisode,
@@ -238,6 +499,7 @@ fun NetflixStyleEpisodeItem(
     onDelete: () -> Unit,
     onWriteJournalClick: () -> Unit
 ) {
+
     val activeRed = Color(0xFFE50914)
 
     Card(
@@ -249,27 +511,39 @@ fun NetflixStyleEpisodeItem(
                 color = if (isActive) activeRed else Color.Transparent,
                 shape = RoundedCornerShape(12.dp)
             ),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF1E1E1E)
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 4.dp
+        )
     ) {
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+
+                // BÖLÜM İKONU
                 Box(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (isActive) activeRed else Color(0xFF2C2C2C)),
+                        .background(
+                            if (isActive) activeRed
+                            else Color(0xFF2C2C2C)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
+
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
@@ -277,34 +551,45 @@ fun NetflixStyleEpisodeItem(
                     )
                 }
 
+                // BÖLÜM BİLGİLERİ
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+
                         Text(
                             text = "${episode.orderIndex}. Bölüm: ${episode.title}",
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.White
                         )
+
                         if (isActive) {
+
                             Surface(
                                 color = activeRed.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(4.dp)
                             ) {
+
                                 Text(
                                     text = "Aktif",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = activeRed,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    modifier = Modifier.padding(
+                                        horizontal = 6.dp,
+                                        vertical = 2.dp
+                                    )
                                 )
                             }
                         }
                     }
+
                     if (episode.description.isNotBlank()) {
+
                         Text(
                             text = episode.description,
                             style = MaterialTheme.typography.bodyMedium,
@@ -314,27 +599,40 @@ fun NetflixStyleEpisodeItem(
                     }
                 }
 
+                // BÖLÜM İŞLEMLERİ
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+
                     Button(
                         onClick = onSelectActive,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isActive) activeRed else Color(0xFF2C2C2C),
+                            containerColor = if (isActive) {
+                                activeRed
+                            } else {
+                                Color(0xFF2C2C2C)
+                            },
                             contentColor = Color.White
                         ),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(
+                            horizontal = 8.dp,
+                            vertical = 4.dp
+                        ),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.height(32.dp)
                     ) {
+
                         Text(
                             text = if (isActive) "Seçili" else "Seç",
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
 
-                    IconButton(onClick = onWriteJournalClick) {
+                    IconButton(
+                        onClick = onWriteJournalClick
+                    ) {
+
                         Icon(
                             imageVector = Icons.Default.Create,
                             contentDescription = "Bu Bölüme Anı Yaz",
@@ -342,33 +640,47 @@ fun NetflixStyleEpisodeItem(
                         )
                     }
 
-                    IconButton(onClick = onDelete) {
+                    // BÖLÜMÜ SİLME
+                    IconButton(
+                        onClick = onDelete
+                    ) {
+
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Sil",
+                            contentDescription = "Bölümü Sil",
                             tint = Color(0xFFCF6679)
                         )
                     }
                 }
             }
 
-            // Alt Kısım: Anıları Gör Butonu
+            // BÖLÜMÜN ANILARINI GÖR
             OutlinedButton(
                 onClick = onShowMemoriesClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(36.dp),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                border = BorderStroke(1.dp, Color(0xFF333333))
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color.White
+                ),
+                border = BorderStroke(
+                    1.dp,
+                    Color(0xFF333333)
+                )
             ) {
+
                 Icon(
                     imageVector = Icons.Default.MenuBook,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+
+                Spacer(
+                    modifier = Modifier.width(6.dp)
+                )
+
                 Text(
                     text = "Bu Bölümün Anılarını Gör",
                     style = MaterialTheme.typography.labelMedium
@@ -378,6 +690,10 @@ fun NetflixStyleEpisodeItem(
     }
 }
 
+// --------------------------------------------------
+// YENİ BÖLÜM EKLEME DİYALOĞU
+// --------------------------------------------------
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEpisodeDialog(
@@ -385,57 +701,106 @@ fun AddEpisodeDialog(
     onConfirm: (String, String, Int, Long, Long?) -> Unit,
     nextOrderIndex: Int
 ) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var orderIndexStr by remember { mutableStateOf(nextOrderIndex.toString()) }
+
+    var title by remember {
+        mutableStateOf("")
+    }
+
+    var description by remember {
+        mutableStateOf("")
+    }
+
+    var orderIndexStr by remember {
+        mutableStateOf(nextOrderIndex.toString())
+    }
 
     AlertDialog(
+
         onDismissRequest = onDismiss,
-        title = { Text("Yeni Bölüm Ekle") },
+
+        title = {
+            Text("Yeni Bölüm Ekle")
+        },
+
         text = {
+
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+
                 OutlinedTextField(
                     value = orderIndexStr,
-                    onValueChange = { orderIndexStr = it },
-                    label = { Text("Bölüm Sırası (No)") },
+                    onValueChange = {
+                        orderIndexStr = it
+                    },
+                    label = {
+                        Text("Bölüm Sırası (No)")
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+
                 OutlinedTextField(
                     value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Bölüm Adı") },
+                    onValueChange = {
+                        title = it
+                    },
+                    label = {
+                        Text("Bölüm Adı")
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+
                 OutlinedTextField(
                     value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Açıklama / Özet") },
+                    onValueChange = {
+                        description = it
+                    },
+                    label = {
+                        Text("Açıklama / Özet")
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         },
+
         confirmButton = {
+
             TextButton(
                 onClick = {
-                    val order = orderIndexStr.toIntOrNull() ?: nextOrderIndex
+
+                    val order =
+                        orderIndexStr.toIntOrNull() ?: nextOrderIndex
+
                     if (title.isNotBlank()) {
-                        onConfirm(title, description, order, System.currentTimeMillis(), null)
+
+                        onConfirm(
+                            title,
+                            description,
+                            order,
+                            System.currentTimeMillis(),
+                            null
+                        )
                     }
                 }
             ) {
+
                 Text("Kaydet")
             }
         },
+
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+
+            TextButton(
+                onClick = onDismiss
+            ) {
+
                 Text("İptal")
             }
         },
+
         shape = RoundedCornerShape(16.dp)
     )
 }
