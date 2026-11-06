@@ -8,11 +8,14 @@ import com.loc.benimdunyam.data.local.dao.JournalDao
 import com.loc.benimdunyam.data.local.dao.JournalPersonMentionDao
 import com.loc.benimdunyam.data.local.dao.LifeEpisodeDao
 import com.loc.benimdunyam.data.local.dao.LifeSeasonDao
+import com.loc.benimdunyam.data.local.dao.PersonConnectionDao
+import com.loc.benimdunyam.data.local.dao.PersonSpecialMemoryDao
 import com.loc.benimdunyam.data.local.dao.PersonDao
 import com.loc.benimdunyam.data.local.entity.JournalEntryEntity
 import com.loc.benimdunyam.data.local.entity.JournalPersonMentionEntity
 import com.loc.benimdunyam.data.local.entity.LifeEpisodeEntity
 import com.loc.benimdunyam.data.local.entity.LifeSeasonEntity
+import com.loc.benimdunyam.data.local.entity.PersonSpecialMemoryEntity
 import com.loc.benimdunyam.data.local.entity.PersonEntity
 
 @Database(
@@ -21,9 +24,10 @@ import com.loc.benimdunyam.data.local.entity.PersonEntity
         PersonEntity::class,
         JournalPersonMentionEntity::class,
         LifeSeasonEntity::class,
-        LifeEpisodeEntity::class
+        LifeEpisodeEntity::class,
+        PersonSpecialMemoryEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,6 +37,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun journalPersonMentionDao(): JournalPersonMentionDao
     abstract fun lifeSeasonDao(): LifeSeasonDao
     abstract fun lifeEpisodeDao(): LifeEpisodeDao
+    abstract fun personSpecialMemoryDao(): PersonSpecialMemoryDao
+    abstract fun personConnectionDao(): PersonConnectionDao
 
     companion object {
         const val DATABASE_NAME = "benim_dunyam_db"
@@ -49,6 +55,38 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 database.execSQL(
                     "ALTER TABLE people ADD COLUMN coverImagePath TEXT"
+                )
+            }
+        }
+
+
+        /**
+         * Version 6 -> 7: new, empty table. All existing people/journals are kept.
+         * FKs also remove the marker if its person or person-journal link is deleted.
+         */
+        val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `person_special_memories` (
+                        `personId` TEXT NOT NULL,
+                        `journalId` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `note` TEXT,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`personId`, `journalId`),
+                        FOREIGN KEY(`personId`) REFERENCES `people`(`id`)
+                            ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`journalId`, `personId`)
+                            REFERENCES `journal_person_mentions`(`journalId`, `personId`)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )""".trimIndent()
+                )
+                database.execSQL(
+                    """CREATE INDEX IF NOT EXISTS
+                        `index_person_special_memories_journalId_personId`
+                        ON `person_special_memories` (`journalId`, `personId`)
+                    """.trimIndent()
                 )
             }
         }

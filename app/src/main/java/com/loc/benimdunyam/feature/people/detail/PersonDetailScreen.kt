@@ -1,5 +1,8 @@
 package com.loc.benimdunyam.feature.people.detail
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.loc.benimdunyam.domain.model.PersonImageType
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +18,11 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Surface
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.loc.benimdunyam.feature.people.detail.analytics.PersonAnalyticsScreen
+import com.loc.benimdunyam.feature.people.detail.analytics.components.PersonAnalyticsPreviewCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,28 +32,32 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import com.loc.benimdunyam.domain.model.PersonImageType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.loc.benimdunyam.feature.people.detail.calculator.PersonTimelineGrouper
+import com.loc.benimdunyam.feature.people.detail.components.connections.PersonConnectionsFeature
 import com.loc.benimdunyam.feature.people.detail.components.AppearanceInfoCard
 import com.loc.benimdunyam.feature.people.detail.components.CinematicBadgeCard
 import com.loc.benimdunyam.feature.people.detail.components.EmptyProfileMessage
 import com.loc.benimdunyam.feature.people.detail.components.HighlightInfoCard
-import com.loc.benimdunyam.feature.people.detail.components.PersonMemoryCard
 import com.loc.benimdunyam.feature.people.detail.components.PersonProfileHero
 import com.loc.benimdunyam.feature.people.detail.components.ProfileMetricCard
 import com.loc.benimdunyam.feature.people.detail.components.ProfileSectionTitle
 import com.loc.benimdunyam.feature.people.detail.components.SeasonBreakdownCard
+import com.loc.benimdunyam.feature.people.detail.components.special.PersonSpecialMemoryFeature
+import com.loc.benimdunyam.feature.people.detail.components.timeline.PersonTimelineItem
+import com.loc.benimdunyam.feature.people.detail.components.timeline.PersonTimelineSeasonHeader
+import com.loc.benimdunyam.feature.people.detail.components.timeline.PersonTimelineYearFilter
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -55,18 +67,20 @@ fun PersonDetailScreen(
     onNavigateBack: () -> Unit,
     onNavigateToEdit: (String) -> Unit,
     onNavigateToJournalDetail: (String) -> Unit,
-    viewModel: PersonDetailViewModel = hiltViewModel()
+    viewModel: PersonDetailViewModel = hiltViewModel(),
+    onNavigateToPersonDetail: ((String) -> Unit)? = null,
+    onNavigateToAnalytics: ((String) -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showAnalyticsDialog by rememberSaveable { mutableStateOf(false) }
+    var selectedTimelineYear by rememberSaveable { mutableStateOf<Int?>(null) }
 
     val dateFormat = remember {
         SimpleDateFormat("dd MMMM yyyy", Locale("tr", "TR"))
     }
 
-    // OpenDocument grants temporary access. The ViewModel immediately copies
-    // the selected image into app-private storage, so persistable URI access
-    // is not needed.
+    // Seçilen fotoğraflar ViewModel tarafından uygulamanın özel depolamasına kopyalanır.
     val profileImagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -88,6 +102,32 @@ fun PersonDetailScreen(
             )
         }
     }
+
+    val timelineYears = remember(uiState.appearances) {
+        PersonTimelineGrouper.availableYears(uiState.appearances)
+    }
+
+    // If the selected year disappears after an entry is deleted/edited,
+    // return the timeline to the all-years view.
+    LaunchedEffect(timelineYears, selectedTimelineYear) {
+        if (selectedTimelineYear != null && selectedTimelineYear !in timelineYears) {
+            selectedTimelineYear = null
+        }
+    }
+
+    val filteredAppearances = remember(uiState.appearances, selectedTimelineYear) {
+        PersonTimelineGrouper.filterByYear(
+            appearances = uiState.appearances,
+            year = selectedTimelineYear
+        )
+    }
+
+    val timelineGroups = remember(filteredAppearances) {
+        PersonTimelineGrouper.groupBySeason(filteredAppearances)
+    }
+
+    val firstAppearanceJournalId = uiState.profileStats.firstAppearance?.journal?.id
+    val lastAppearanceJournalId = uiState.profileStats.lastAppearance?.journal?.id
 
     Scaffold(
         topBar = {
@@ -221,6 +261,50 @@ fun PersonDetailScreen(
                         }
                     }
 
+                    // A compact preview opens the standalone analytics screen.
+                    // When NavHost is not wired yet, it opens in a full-screen dialog.
+                    item(key = "person-analytics-preview") {
+                        PersonAnalyticsPreviewCard(
+                            appearances = uiState.appearances,
+                            onOpenAnalytics = {
+                                if (onNavigateToAnalytics != null) {
+                                    onNavigateToAnalytics(person.id)
+                                } else {
+                                    showAnalyticsDialog = true
+                                }
+                            }
+                        )
+                    }
+
+                    // Isolated feature: picker, editor and confirmation live in their own component.
+                    item(key = "person-special-memories") {
+                        PersonSpecialMemoryFeature(
+                            journals = uiState.associatedJournals,
+                            memories = uiState.specialMemories,
+                            isSaving = uiState.isSavingSpecialMemory,
+                            errorMessage = uiState.specialMemoryErrorMessage,
+                            onOpenJournal = onNavigateToJournalDetail,
+                            onSave = { journalId, category, note, onSaved ->
+                                viewModel.saveSpecialMemory(journalId, category, note, onSaved)
+                            },
+                            onRemove = { journalId, onRemoved ->
+                                viewModel.removeSpecialMemory(journalId, onRemoved)
+                            },
+                            onClearError = viewModel::clearSpecialMemoryError
+                        )
+                    }
+
+                    // Character co-appearances + full-screen shared-memory viewer.
+                    // Existing timeline, special memories and hero remain unchanged.
+                    item(key = "person-connections") {
+                        PersonConnectionsFeature(
+                            personName = person.name,
+                            connections = uiState.connections,
+                            onOpenJournal = onNavigateToJournalDetail,
+                            onNavigateToPersonDetail = onNavigateToPersonDetail
+                        )
+                    }
+
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             ProfileSectionTitle(
@@ -330,32 +414,83 @@ fun PersonDetailScreen(
                         }
                     }
 
+                    // --------------------------------------------------
+                    // CHRONOLOGICAL PERSON STORY
+                    // --------------------------------------------------
+
                     item {
-                        ProfileSectionTitle(
-                            title = "Birlikte Yaşanan Anılar",
-                            subtitle = "${uiState.associatedJournals.size} ortak anı"
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ProfileSectionTitle(
+                                title = "${person.name}'in Hikâyesi",
+                                subtitle = "Birlikte yaşadığınız anılar, en eskiden en yeniye."
+                            )
+                            Text(
+                                text = "Bir anıya dokunarak günlüğün tamamını açabilirsin.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    item {
+                        PersonTimelineYearFilter(
+                            years = timelineYears,
+                            selectedYear = selectedTimelineYear,
+                            onYearSelected = { selectedTimelineYear = it }
                         )
                     }
 
-                    if (uiState.associatedJournals.isEmpty()) {
+                    if (timelineGroups.isEmpty()) {
                         item {
                             EmptyProfileMessage(
-                                "Bu kişi henüz hiçbir anıyla ilişkilendirilmemiş."
+                                text = if (uiState.appearances.isEmpty()) {
+                                    "Bu kişiyle henüz ilişkilendirilmiş bir anı bulunmuyor. Günlüklerine bu kişiyi eklediğinde hikâyesi burada oluşacak."
+                                } else {
+                                    "Seçilen yılda bu kişiye ait bir anı bulunmuyor."
+                                }
                             )
                         }
                     } else {
-                        items(
-                            items = uiState.associatedJournals,
-                            key = { it.id }
-                        ) { journal ->
-                            PersonMemoryCard(
-                                journal = journal,
-                                dateFormat = dateFormat,
-                                onClick = { onNavigateToJournalDetail(journal.id) }
-                            )
+                        timelineGroups.forEach { group ->
+                            item(key = "timeline-season-${group.key}") {
+                                PersonTimelineSeasonHeader(group = group)
+                            }
+
+                            items(
+                                items = group.appearances,
+                                key = { appearance ->
+                                    "timeline-journal-${appearance.journal.id}"
+                                }
+                            ) { appearance ->
+                                PersonTimelineItem(
+                                    appearance = appearance,
+                                    dateFormat = dateFormat,
+                                    isFirstAppearance = appearance.journal.id == firstAppearanceJournalId,
+                                    isLastAppearance = appearance.journal.id == lastAppearanceJournalId,
+                                    onClick = {
+                                        onNavigateToJournalDetail(appearance.journal.id)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
+            }
+        }
+    }
+
+    if (showAnalyticsDialog) {
+        Dialog(
+            onDismissRequest = { showAnalyticsDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                PersonAnalyticsScreen(
+                    onNavigateBack = { showAnalyticsDialog = false }
+                )
             }
         }
     }
