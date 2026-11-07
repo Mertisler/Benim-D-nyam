@@ -1,3 +1,4 @@
+
 package com.loc.benimdunyam.core.navigation
 
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,7 @@ import com.loc.benimdunyam.feature.journal.journaldetail.JournalDetailScreen
 import com.loc.benimdunyam.feature.journal.journaleditor.JournalEditorScreen
 import com.loc.benimdunyam.feature.people.PeopleScreen
 import com.loc.benimdunyam.feature.people.PersonEditorScreen
+import com.loc.benimdunyam.feature.people.network.PeopleNetworkScreen
 import com.loc.benimdunyam.feature.search.SearchScreen
 import com.loc.benimdunyam.feature.settings.SettingsScreen
 import com.loc.benimdunyam.feature.onboarding.OnboardingScreen
@@ -105,6 +107,22 @@ fun BenimDunyamNavGraph(
                     },
                     onNavigateToPersonDetail = { personId ->
                         navController.navigate(Screen.PersonDetail.createRoute(personId))
+                    },
+                    onNavigateToPeopleNetwork = {
+                        navController.navigate(Screen.PeopleNetwork.route)
+                    }
+                )
+            }
+
+            // Hayatımın İnsan Haritası
+            composable(route = Screen.PeopleNetwork.route) {
+                PeopleNetworkScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToPersonDetail = { personId ->
+                        navController.navigate(Screen.PersonDetail.createRoute(personId))
+                    },
+                    onNavigateToJournalDetail = { journalId ->
+                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
                     }
                 )
             }

@@ -23,6 +23,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.loc.benimdunyam.feature.people.detail.analytics.PersonAnalyticsScreen
 import com.loc.benimdunyam.feature.people.detail.analytics.components.PersonAnalyticsPreviewCard
+import com.loc.benimdunyam.feature.people.detail.insights.PersonStoryInsightsFeature
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -273,6 +274,16 @@ fun PersonDetailScreen(
                                     showAnalyticsDialog = true
                                 }
                             }
+                        )
+                    }
+
+                    // Offline, evidence-based story insights. No new database or ViewModel.
+                    item(key = "person-story-insights") {
+                        PersonStoryInsightsFeature(
+                            personName = person.name,
+                            appearances = uiState.appearances,
+                            specialMemories = uiState.specialMemories,
+                            onOpenJournal = onNavigateToJournalDetail
                         )
                     }
 

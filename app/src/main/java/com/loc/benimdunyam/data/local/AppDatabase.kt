@@ -8,6 +8,7 @@ import com.loc.benimdunyam.data.local.dao.JournalDao
 import com.loc.benimdunyam.data.local.dao.JournalPersonMentionDao
 import com.loc.benimdunyam.data.local.dao.LifeEpisodeDao
 import com.loc.benimdunyam.data.local.dao.LifeSeasonDao
+import com.loc.benimdunyam.data.local.dao.PeopleNetworkDao
 import com.loc.benimdunyam.data.local.dao.PersonConnectionDao
 import com.loc.benimdunyam.data.local.dao.PersonSpecialMemoryDao
 import com.loc.benimdunyam.data.local.dao.PersonDao
@@ -17,6 +18,8 @@ import com.loc.benimdunyam.data.local.entity.LifeEpisodeEntity
 import com.loc.benimdunyam.data.local.entity.LifeSeasonEntity
 import com.loc.benimdunyam.data.local.entity.PersonSpecialMemoryEntity
 import com.loc.benimdunyam.data.local.entity.PersonEntity
+
+import com.loc.benimdunyam.data.local.dao.BackupRestoreDao
 
 @Database(
     entities = [
@@ -39,6 +42,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun lifeEpisodeDao(): LifeEpisodeDao
     abstract fun personSpecialMemoryDao(): PersonSpecialMemoryDao
     abstract fun personConnectionDao(): PersonConnectionDao
+    abstract fun peopleNetworkDao(): PeopleNetworkDao
+    abstract fun backupRestoreDao(): BackupRestoreDao
 
     companion object {
         const val DATABASE_NAME = "benim_dunyam_db"

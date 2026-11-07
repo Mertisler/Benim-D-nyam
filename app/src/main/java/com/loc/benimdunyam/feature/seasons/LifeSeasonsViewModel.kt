@@ -1,8 +1,8 @@
-
 package com.loc.benimdunyam.feature.seasons
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.loc.benimdunyam.data.backup.BackupWriteCoordinator
 import com.loc.benimdunyam.domain.model.LifeSeason
 import com.loc.benimdunyam.domain.model.Person
 import com.loc.benimdunyam.domain.repository.LifeSeasonRepository
@@ -11,13 +11,15 @@ import com.loc.benimdunyam.domain.usecase.ObserveJournalsUseCase
 import com.loc.benimdunyam.domain.usecase.ObserveLifeSeasonsUseCase
 import com.loc.benimdunyam.domain.usecase.SaveLifeSeasonUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.UUID
+import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.UUID
-import javax.inject.Inject
 
 data class LifeSeasonSummary(
     val season: LifeSeason,
@@ -29,7 +31,9 @@ data class LifeSeasonSummary(
 data class LifeSeasonsUiState(
     val seasonSummaries: List<LifeSeasonSummary> = emptyList(),
     val activeSeasonId: String? = null,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val isSaving: Boolean = false,
+    val errorMessage: String? = null
 )
 
 @HiltViewModel
@@ -38,75 +42,52 @@ class LifeSeasonsViewModel @Inject constructor(
     observeJournalsUseCase: ObserveJournalsUseCase,
     private val saveLifeSeasonUseCase: SaveLifeSeasonUseCase,
     private val deleteLifeSeasonUseCase: DeleteLifeSeasonUseCase,
-    private val lifeSeasonRepository: LifeSeasonRepository
+    private val lifeSeasonRepository: LifeSeasonRepository,
+    private val writeCoordinator: BackupWriteCoordinator
 ) : ViewModel() {
 
-    // --------------------------------------------------
-    // UI STATE
-    // --------------------------------------------------
+    private val isSaving = MutableStateFlow(false)
+    private val errorMessage = MutableStateFlow<String?>(null)
 
-    val uiState: StateFlow<LifeSeasonsUiState> = combine(
+    private val dataFlow = combine(
         observeLifeSeasonsUseCase(),
         observeJournalsUseCase(),
         lifeSeasonRepository.activeSeasonId
     ) { seasons, journals, activeSeasonId ->
 
-        // En son oluşturulan yaşam dönemi ilk sırada.
         val summaries = seasons
             .sortedByDescending { it.createdAt }
             .map { season ->
 
-                // İlgili yaşam döneminin anıları
-                val seasonJournals = journals.filter { journal ->
-
-                    val matchesId = journal.seasonId == season.id
-
-                    val matchesDate =
-                        journal.entryDate >= season.startDate &&
-                                (
-                                        season.endDate == null ||
-                                                journal.entryDate <= season.endDate
-                                        )
-
-                    matchesId || matchesDate
+                val seasonJournals = journals.filter {
+                    it.seasonId == season.id
                 }
 
-                // Toplam anı sayısı
-                val journalCount = seasonJournals.size
-
-                // Toplam kelime sayısı
-                val totalWords = seasonJournals.sumOf { journal ->
-
-                    journal.content
-                        .trim()
-                        .split(Regex("\\s+"))
-                        .filter { it.isNotBlank() }
-                        .size
-                }
-
-                // En çok bahsedilen kişiler
-                val personCounts = mutableMapOf<Person, Int>()
+                val peopleCounts = mutableMapOf<Person, Int>()
 
                 seasonJournals.forEach { journal ->
-
-                    journal.mentionedPeople.forEach { person ->
-
-                        personCounts[person] =
-                            (personCounts[person] ?: 0) + 1
-                    }
+                    journal.mentionedPeople
+                        .distinctBy { it.id }
+                        .forEach { person ->
+                            peopleCounts[person] =
+                                (peopleCounts[person] ?: 0) + 1
+                        }
                 }
 
-                // İlk 3 kişi
-                val topPeople = personCounts.entries
-                    .sortedByDescending { it.value }
-                    .take(3)
-                    .map { it.key }
+                val words = seasonJournals.sumOf { journal ->
+                    journal.content.trim()
+                        .split(Regex("\\s+"))
+                        .count { it.isNotBlank() }
+                }
 
                 LifeSeasonSummary(
                     season = season,
-                    journalCount = journalCount,
-                    totalWordCount = totalWords,
-                    topMentionedPeople = topPeople
+                    journalCount = seasonJournals.size,
+                    totalWordCount = words,
+                    topMentionedPeople = peopleCounts.entries
+                        .sortedByDescending { it.value }
+                        .take(3)
+                        .map { it.key }
                 )
             }
 
@@ -115,28 +96,42 @@ class LifeSeasonsViewModel @Inject constructor(
             activeSeasonId = activeSeasonId,
             isLoading = false
         )
+    }
+
+    val uiState: StateFlow<LifeSeasonsUiState> = combine(
+        dataFlow,
+        isSaving,
+        errorMessage
+    ) { data, saving, error ->
+
+        data.copy(
+            isSaving = saving,
+            errorMessage = error
+        )
 
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = LifeSeasonsUiState(isLoading = true)
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = LifeSeasonsUiState()
     )
 
-    // --------------------------------------------------
-    // AKTİF YAŞAM DÖNEMİ SEÇME
-    // --------------------------------------------------
-
     fun selectSeason(seasonId: String) {
-
-        lifeSeasonRepository.setActiveSeasonAndEpisode(
-            seasonId,
-            null
-        )
+        viewModelScope.launch {
+            try {
+                writeCoordinator.withRegularWrite {
+                    lifeSeasonRepository.setActiveSeasonAndEpisode(
+                        seasonId,
+                        null
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                errorMessage.value =
+                    e.localizedMessage ?: "Sezon seçilemedi."
+            }
+        }
     }
-
-    // --------------------------------------------------
-    // YENİ YAŞAM DÖNEMİ OLUŞTURMA
-    // --------------------------------------------------
 
     fun createSeason(
         title: String,
@@ -146,39 +141,83 @@ class LifeSeasonsViewModel @Inject constructor(
         colorHex: String,
         coverImagePath: String?
     ) {
+        if (isSaving.value) return
+
+        val cleanedTitle = title.trim()
+
+        if (cleanedTitle.isEmpty()) {
+            errorMessage.value = "Sezon başlığı boş olamaz."
+            return
+        }
+
+        if (endDate != null && endDate < startDate) {
+            errorMessage.value =
+                "Bitiş tarihi başlangıç tarihinden önce olamaz."
+            return
+        }
+
+        isSaving.value = true
+        errorMessage.value = null
 
         viewModelScope.launch {
+            try {
+                val season = LifeSeason(
+                    id = UUID.randomUUID().toString(),
+                    title = cleanedTitle,
+                    description = description.trim(),
+                    startDate = startDate,
+                    endDate = endDate,
+                    colorHex = colorHex,
+                    coverImagePath = coverImagePath,
+                    createdAt = System.currentTimeMillis()
+                )
 
-            val newSeason = LifeSeason(
-                id = UUID.randomUUID().toString(),
-                title = title,
-                description = description,
-                startDate = startDate,
-                endDate = endDate,
-                colorHex = colorHex,
-                coverImagePath = coverImagePath,
-                createdAt = System.currentTimeMillis()
-            )
+                writeCoordinator.withRegularWrite {
+                    saveLifeSeasonUseCase(season)
 
-            saveLifeSeasonUseCase(newSeason)
+                    lifeSeasonRepository.setActiveSeasonAndEpisode(
+                        season.id,
+                        null
+                    )
+                }
 
-            // Yeni oluşturulan dönemi aktif yap.
-            lifeSeasonRepository.setActiveSeasonAndEpisode(
-                newSeason.id,
-                null
-            )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                errorMessage.value =
+                    e.localizedMessage ?: "Sezon oluşturulamadı."
+            } finally {
+                isSaving.value = false
+            }
         }
     }
 
-    // --------------------------------------------------
-    // YAŞAM DÖNEMİ SİLME
-    // --------------------------------------------------
-
+    // Önceki çağrılarla uyumluluk için korunuyor.
+    // Sezon listesinde silme butonu gerekmiyor.
     fun deleteSeason(season: LifeSeason) {
+        if (isSaving.value) return
+
+        isSaving.value = true
+        errorMessage.value = null
 
         viewModelScope.launch {
+            try {
+                writeCoordinator.withRegularWrite {
+                    deleteLifeSeasonUseCase(season)
+                }
 
-            deleteLifeSeasonUseCase(season)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                errorMessage.value =
+                    e.localizedMessage ?: "Sezon silinemedi."
+            } finally {
+                isSaving.value = false
+            }
         }
+    }
+
+    fun dismissError() {
+        errorMessage.value = null
     }
 }

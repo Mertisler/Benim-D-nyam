@@ -21,4 +21,7 @@ interface LifeEpisodeDao {
 
     @Delete
     suspend fun deleteEpisode(episode: LifeEpisodeEntity)
+
+    @Query("SELECT * FROM life_episodes ORDER BY seasonId, orderIndex")
+    suspend fun getAllEpisodeEntities(): List<LifeEpisodeEntity>
 }

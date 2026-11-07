@@ -84,5 +84,6 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
 
     implementation("com.airbnb.android:lottie-compose:6.3.0") // En güncel kararlı sürüm
+    implementation(kotlin("test"))
 
 }

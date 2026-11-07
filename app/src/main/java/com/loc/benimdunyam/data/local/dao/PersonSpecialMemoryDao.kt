@@ -20,4 +20,7 @@ interface PersonSpecialMemoryDao {
 
     @Query("DELETE FROM person_special_memories WHERE personId = :personId AND journalId = :journalId")
     suspend fun delete(personId: String, journalId: String)
+
+    @Query("SELECT * FROM person_special_memories")
+    suspend fun getAllSpecialMemoryEntities(): List<PersonSpecialMemoryEntity>
 }

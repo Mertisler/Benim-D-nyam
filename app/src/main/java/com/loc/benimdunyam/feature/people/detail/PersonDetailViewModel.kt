@@ -1,5 +1,9 @@
 package com.loc.benimdunyam.feature.people.detail
-
+
+import java.util.concurrent.atomic.AtomicBoolean
+import com.loc.benimdunyam.domain.model.PersonSpecialMemoryCategory
+import com.loc.benimdunyam.data.repository.PersonSpecialMemoryRepositoryImpl
+import com.loc.benimdunyam.data.backup.BackupWriteCoordinator
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,24 +12,13 @@ import com.loc.benimdunyam.domain.model.LifeEpisode
 import com.loc.benimdunyam.domain.model.LifeSeason
 import com.loc.benimdunyam.domain.model.Person
 import com.loc.benimdunyam.domain.model.PersonImageType
-import com.loc.benimdunyam.domain.model.PersonSpecialMemory
-import com.loc.benimdunyam.domain.model.PersonSpecialMemoryCategory
-import com.loc.benimdunyam.domain.usecase.DeletePersonImageUseCase
-import com.loc.benimdunyam.domain.usecase.DeletePersonSpecialMemoryUseCase
-import com.loc.benimdunyam.domain.usecase.DeletePersonUseCase
 import com.loc.benimdunyam.domain.usecase.GetPersonByIdUseCase
-import com.loc.benimdunyam.domain.usecase.ObservePersonConnectionsUseCase
+import com.loc.benimdunyam.domain.usecase.PersonImageMutationUseCase
 import com.loc.benimdunyam.domain.usecase.ObserveEpisodesBySeasonUseCase
 import com.loc.benimdunyam.domain.usecase.ObserveJournalsForPersonUseCase
 import com.loc.benimdunyam.domain.usecase.ObserveLifeSeasonsUseCase
-import com.loc.benimdunyam.domain.usecase.ObservePersonSpecialMemoriesUseCase
-import com.loc.benimdunyam.domain.usecase.SavePersonImageUseCase
-import com.loc.benimdunyam.domain.usecase.SavePersonUseCase
-import com.loc.benimdunyam.domain.usecase.SavePersonSpecialMemoryUseCase
 import com.loc.benimdunyam.feature.people.detail.calculator.PersonProfileCalculator
-import com.loc.benimdunyam.feature.people.detail.model.asUiItem
 import com.loc.benimdunyam.feature.people.detail.model.PersonAppearance
-import com.loc.benimdunyam.feature.people.detail.model.PersonSpecialMemoryItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -43,16 +36,7 @@ private data class PersonProfileSourceData(
     val person: Person?,
     val journals: List<JournalEntry>,
     val seasons: List<LifeSeason>,
-    val episodes: List<LifeEpisode>,
-    val specialMemories: List<PersonSpecialMemory>
-)
-
-private data class PersonDetailFeedback(
-    val isLoading: Boolean,
-    val isSavingImage: Boolean,
-    val isSavingSpecialMemory: Boolean,
-    val errorMessage: String?,
-    val specialMemoryErrorMessage: String?
+    val episodes: List<LifeEpisode>
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -60,17 +44,12 @@ private data class PersonDetailFeedback(
 class PersonDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getPersonByIdUseCase: GetPersonByIdUseCase,
-    private val deletePersonUseCase: DeletePersonUseCase,
-    private val savePersonUseCase: SavePersonUseCase,
-    private val savePersonImageUseCase: SavePersonImageUseCase,
-    private val deletePersonImageUseCase: DeletePersonImageUseCase,
-    private val savePersonSpecialMemoryUseCase: SavePersonSpecialMemoryUseCase,
-    private val deletePersonSpecialMemoryUseCase: DeletePersonSpecialMemoryUseCase,
-    observePersonSpecialMemoriesUseCase: ObservePersonSpecialMemoriesUseCase,
-    observePersonConnectionsUseCase: ObservePersonConnectionsUseCase,
+    private val personImageMutationUseCase: PersonImageMutationUseCase,
     observeJournalsForPersonUseCase: ObserveJournalsForPersonUseCase,
     observeLifeSeasonsUseCase: ObserveLifeSeasonsUseCase,
-    observeEpisodesBySeasonUseCase: ObserveEpisodesBySeasonUseCase
+    observeEpisodesBySeasonUseCase: ObserveEpisodesBySeasonUseCase,
+    private val specialMemoryMutationRepository: PersonSpecialMemoryRepositoryImpl,
+    private val specialMemoryWriteCoordinator: BackupWriteCoordinator
 ) : ViewModel() {
 
     private val personId: String = checkNotNull(savedStateHandle["personId"])
@@ -78,25 +57,9 @@ class PersonDetailViewModel @Inject constructor(
     private val person = MutableStateFlow<Person?>(null)
     private val isLoading = MutableStateFlow(true)
     private val isSavingImage = MutableStateFlow(false)
-    private val isSavingSpecialMemory = MutableStateFlow(false)
-    private val specialMemoryErrorMessage = MutableStateFlow<String?>(null)
     private val errorMessage = MutableStateFlow<String?>(null)
 
     private val journals = observeJournalsForPersonUseCase(personId).stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = emptyList()
-    )
-
-    private val specialMemories = observePersonSpecialMemoriesUseCase(personId).stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = emptyList()
-    )
-
-
-    // All co-appearances are queried in a single reactive Room JOIN.
-    private val connections = observePersonConnectionsUseCase(personId).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList()
@@ -132,35 +95,22 @@ class PersonDetailViewModel @Inject constructor(
         person,
         journals,
         seasons,
-        episodes,
-        specialMemories
-    ) { currentPerson, currentJournals, currentSeasons, currentEpisodes, pinned ->
+        episodes
+    ) { currentPerson, currentJournals, currentSeasons, currentEpisodes ->
         PersonProfileSourceData(
             person = currentPerson,
             journals = currentJournals,
             seasons = currentSeasons,
-            episodes = currentEpisodes,
-            specialMemories = pinned
+            episodes = currentEpisodes
         )
     }
 
-    private val feedback = combine(
+    private val uiSources = combine(
+        profileSource,
         isLoading,
         isSavingImage,
-        isSavingSpecialMemory,
-        errorMessage,
-        specialMemoryErrorMessage
-    ) { loading, savingImage, savingSpecial, error, specialError ->
-        PersonDetailFeedback(
-            isLoading = loading,
-            isSavingImage = savingImage,
-            isSavingSpecialMemory = savingSpecial,
-            errorMessage = error,
-            specialMemoryErrorMessage = specialError
-        )
-    }
-
-    private val uiSources = combine(profileSource, feedback) { source, status ->
+        errorMessage
+    ) { source, loading, savingImage, error ->
         val appearances = PersonProfileCalculator.buildAppearances(
             journals = source.journals,
             seasons = source.seasons,
@@ -171,47 +121,18 @@ class PersonDetailViewModel @Inject constructor(
                 .thenBy { it.journal.id }
         )
 
-        val journalsById = source.journals.associateBy { it.id }
-        val pinnedItems = source.specialMemories.mapNotNull { memory ->
-            val journal = journalsById[memory.journalId] ?: return@mapNotNull null
-            PersonSpecialMemoryItem(journal = journal, memory = memory)
-        }.sortedWith(
-            compareByDescending<PersonSpecialMemoryItem> { it.memory.createdAt }
-                .thenByDescending { it.journal.entryDate }
-        )
-
         PersonDetailUiState(
             person = source.person,
             associatedJournals = source.journals.sortedByDescending { it.entryDate },
             appearances = appearances,
             profileStats = PersonProfileCalculator.calculateProfileStats(appearances),
-            specialMemories = pinnedItems,
-            isLoading = status.isLoading,
-            isSavingImage = status.isSavingImage,
-            isSavingSpecialMemory = status.isSavingSpecialMemory,
-            errorMessage = status.errorMessage,
-            specialMemoryErrorMessage = status.specialMemoryErrorMessage
+            isLoading = loading,
+            isSavingImage = savingImage,
+            errorMessage = error
         )
     }
 
-
-    // Reuse journals already loaded for this person. No per-connection journal queries.
-    // Also protects the UI from transient missing or deleted journal links.
-    private val completeUiSource = combine(uiSources, connections) { state, related ->
-        val journalsById = state.associatedJournals.associateBy { it.id }
-        val appearancesByJournalId = state.appearances.associateBy { it.journal.id }
-        val items = related.map { it.asUiItem(journalsById, appearancesByJournalId) }
-            .filter { it.sharedJournals.isNotEmpty() }
-            .sortedWith(
-                compareByDescending<com.loc.benimdunyam.feature.people.detail.model.PersonConnectionItem> {
-                    it.sharedMemoryCount
-                }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
-                    .thenBy { it.personId }
-            )
-        state.copy(connections = items)
-    }
-
-    val uiState: StateFlow<PersonDetailUiState> = completeUiSource.stateIn(
+    val uiState: StateFlow<PersonDetailUiState> = uiSources.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = PersonDetailUiState(isLoading = true)
@@ -241,158 +162,144 @@ class PersonDetailViewModel @Inject constructor(
         }
     }
 
-    /** Copies the selected content URI into app-private storage, then persists its path. */
+    /** Fotoğrafı ve Room yolunu aynı korumalı işlemde günceller. */
     fun updatePersonImage(sourceUri: String, imageType: PersonImageType) {
-        val currentPerson = person.value ?: return
         if (isSavingImage.value) return
 
         viewModelScope.launch {
             isSavingImage.value = true
             errorMessage.value = null
 
-            var newPath: String? = null
-            var databaseUpdated = false
-
-            val oldPath = when (imageType) {
-                PersonImageType.PROFILE -> currentPerson.profileImagePath
-                PersonImageType.COVER -> currentPerson.coverImagePath
-            }
-
             try {
-                newPath = savePersonImageUseCase(
-                    personId = currentPerson.id,
+                val updated = personImageMutationUseCase.updateImage(
+                    personId = personId,
                     sourceUri = sourceUri,
                     imageType = imageType
                 )
 
-                val updatedPerson = when (imageType) {
-                    PersonImageType.PROFILE -> currentPerson.copy(profileImagePath = newPath)
-                    PersonImageType.COVER -> currentPerson.copy(coverImagePath = newPath)
-                }.copy(updatedAt = System.currentTimeMillis())
-
-                savePersonUseCase(updatedPerson, isUpdate = true)
-                databaseUpdated = true
-                person.value = updatedPerson
-
-                // Old image is removed only after the new path is safely stored.
-                if (oldPath != newPath) {
-                    runCatching { deletePersonImageUseCase(oldPath) }
-                }
+                person.value = updated
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
-                errorMessage.value = exception.message
+                errorMessage.value = exception.localizedMessage
                     ?: "Fotoğraf kaydedilemedi. Lütfen tekrar deneyin."
             } finally {
-                if (!databaseUpdated && newPath != null) {
-                    runCatching { deletePersonImageUseCase(newPath) }
-                }
                 isSavingImage.value = false
             }
         }
     }
 
+    /** Fotoğraf referansını Room'dan kaldırır; sonra eski dosyayı temizler. */
     fun removePersonImage(imageType: PersonImageType) {
-        val currentPerson = person.value ?: return
         if (isSavingImage.value) return
 
         viewModelScope.launch {
             isSavingImage.value = true
             errorMessage.value = null
 
-            val oldPath = when (imageType) {
-                PersonImageType.PROFILE -> currentPerson.profileImagePath
-                PersonImageType.COVER -> currentPerson.coverImagePath
-            }
-
             try {
-                val updatedPerson = when (imageType) {
-                    PersonImageType.PROFILE -> currentPerson.copy(profileImagePath = null)
-                    PersonImageType.COVER -> currentPerson.copy(coverImagePath = null)
-                }.copy(updatedAt = System.currentTimeMillis())
+                val updated = personImageMutationUseCase.removeImage(
+                    personId = personId,
+                    imageType = imageType
+                )
 
-                savePersonUseCase(updatedPerson, isUpdate = true)
-                person.value = updatedPerson
-                runCatching { deletePersonImageUseCase(oldPath) }
+                person.value = updated
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
-                errorMessage.value = "Fotoğraf kaldırılamadı. Lütfen tekrar deneyin."
+                errorMessage.value = exception.localizedMessage
+                    ?: "Fotoğraf kaldırılamadı. Lütfen tekrar deneyin."
             } finally {
                 isSavingImage.value = false
             }
         }
     }
 
-    /** Add or edit an unforgettable memory for THIS person only. */
+    /** Kişi ve fotoğraflarını geri yükleme kilidiyle siler. */
+    fun deletePerson(onDeleted: () -> Unit) {
+        if (isSavingImage.value) return
+
+        viewModelScope.launch {
+            isSavingImage.value = true
+            errorMessage.value = null
+
+            try {
+                personImageMutationUseCase.deletePersonAndImages(personId)
+                person.value = null
+                onDeleted()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                errorMessage.value = exception.localizedMessage
+                    ?: "Kişi silinemedi. Lütfen tekrar deneyin."
+            } finally {
+                isSavingImage.value = false
+            }
+        }
+    }
+
+    // Unutulmaz Anilar: islemler geri yukleme kilidi altinda gerceklestirilir.
+    private val specialMemoryMutationBusy = AtomicBoolean(false)
+
     fun saveSpecialMemory(
         journalId: String,
         category: PersonSpecialMemoryCategory,
         note: String?,
         onSaved: () -> Unit
     ) {
-        if (isSavingSpecialMemory.value) return
-        if (journals.value.none { it.id == journalId }) {
-            specialMemoryErrorMessage.value = "Bu anı artık bu kişiyle ilişkili değil."
-            return
-        }
+        if (!specialMemoryMutationBusy.compareAndSet(false, true)) return
 
         viewModelScope.launch {
-            isSavingSpecialMemory.value = true
-            specialMemoryErrorMessage.value = null
+            errorMessage.value = null
             try {
-                savePersonSpecialMemoryUseCase(personId, journalId, category, note)
+                specialMemoryWriteCoordinator.withRegularWrite {
+                    specialMemoryMutationRepository.save(
+                        personId = personId,
+                        journalId = journalId,
+                        category = category,
+                        note = note?.trim()?.takeIf { it.isNotEmpty() }
+                    )
+                }
                 onSaved()
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (exception: IllegalArgumentException) {
-                specialMemoryErrorMessage.value = exception.message
             } catch (exception: Exception) {
-                specialMemoryErrorMessage.value =
-                    "Anı işaretlenemedi. Kişi–anı bağlantısını ve veritabanını kontrol et."
+                errorMessage.value = exception.localizedMessage
+                    ?: "Unutulmaz ani kaydedilemedi."
             } finally {
-                isSavingSpecialMemory.value = false
+                specialMemoryMutationBusy.set(false)
             }
         }
     }
 
-    /** Only deletes the person's highlight marker, never the journal itself. */
-    fun removeSpecialMemory(journalId: String, onRemoved: () -> Unit) {
-        if (isSavingSpecialMemory.value) return
+    fun removeSpecialMemory(
+        journalId: String,
+        onRemoved: () -> Unit
+    ) {
+        if (!specialMemoryMutationBusy.compareAndSet(false, true)) return
+
         viewModelScope.launch {
-            isSavingSpecialMemory.value = true
-            specialMemoryErrorMessage.value = null
+            errorMessage.value = null
             try {
-                deletePersonSpecialMemoryUseCase(personId, journalId)
+                specialMemoryWriteCoordinator.withRegularWrite {
+                    specialMemoryMutationRepository.remove(
+                        personId = personId,
+                        journalId = journalId
+                    )
+                }
                 onRemoved()
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
-                specialMemoryErrorMessage.value = "Unutulmaz anı işareti kaldırılamadı."
+                errorMessage.value = exception.localizedMessage
+                    ?: "Unutulmaz ani kaldirilamadi."
             } finally {
-                isSavingSpecialMemory.value = false
+                specialMemoryMutationBusy.set(false)
             }
         }
     }
 
     fun clearSpecialMemoryError() {
-        specialMemoryErrorMessage.value = null
-    }
-
-    fun deletePerson(onDeleted: () -> Unit) {
-        val currentPerson = person.value
-
-        viewModelScope.launch {
-            try {
-                deletePersonUseCase(personId)
-                currentPerson?.profileImagePath?.let { deletePersonImageUseCase(it) }
-                currentPerson?.coverImagePath?.let { deletePersonImageUseCase(it) }
-                onDeleted()
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                errorMessage.value = "Kişi silinemedi. Lütfen tekrar deneyin."
-            }
-        }
+        errorMessage.value = null
     }
 }
