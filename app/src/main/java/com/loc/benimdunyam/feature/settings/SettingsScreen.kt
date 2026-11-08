@@ -563,6 +563,20 @@ fun SettingsScreen(
                 }
             }
 
+            // Geri yükleme / sıfırlama başarılı; ama ayrı taslak DB'sinin
+            // temizlenmesi başarısız olduysa kullanıcı buradan tekrar dener.
+            if (uiState.isDraftCleanupPending) {
+                OutlinedButton(
+                    onClick = viewModel::retryDraftCleanup,
+                    enabled = !isBusy,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Taslak Temizliğini Tekrar Dene")
+                }
+            }
+
             // HATA / BAŞARI MESAJLARI
             uiState.errorMessage?.let { error ->
                 Card(
@@ -857,7 +871,9 @@ fun SettingsScreen(
                                 "kayıtlarla değiştirecek.\n\n" +
                                 "Önce mevcut anıların için ayrı " +
                                 "bir şifreli güvenlik yedeği " +
-                                "oluşturulacak.",
+                                "oluşturulacak.\n\n" +
+                                "Kaydedilmemiş taslaklar bu yedeğe dahil değildir " +
+                                "ve geri yükleme başarılı olursa silinir.",
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -935,6 +951,8 @@ fun SettingsScreen(
                 Text(
                     "Room veritabanındaki günlükler, kişiler, " +
                             "sezonlar ve ilişkileri silinecek. " +
+                            "Ayrı taslak veritabanındaki kaydedilmemiş " +
+                            "anı taslakları da silinecek. " +
                             "Fotoğraf dosyaları ayrıca temizlenmeyebilir.\n\n" +
                             "İşlem geri alınamaz. " +
                             "Önce şifreli yedek oluşturman önerilir."

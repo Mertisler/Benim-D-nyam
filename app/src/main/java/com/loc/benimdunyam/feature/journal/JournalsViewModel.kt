@@ -1,5 +1,4 @@
-
-package com.loc.benimdunyam.feature.journals
+package com.loc.benimdunyam.feature.journal
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

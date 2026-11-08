@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loc.benimdunyam.feature.home.components.*
+import com.loc.benimdunyam.feature.home.insights.LifeStoryInsightsFeature
 
 @Composable
 fun HomeScreen(
@@ -92,18 +93,20 @@ fun HomeScreen(
                 // LIFE SEASONS
                 item {
                     LifeSeasonsSection(
-                        // En son eklenen yaşam dönemi ilk sırada gösterilir.
                         seasons = uiState.seasons.reversed(),
-
                         activeSeasonId = uiState.activeSeasonId,
-
                         onSeeAllClick = onNavigateToSeasons,
-
                         onSeasonClick = { seasonId ->
-                            // Yalnızca ilgili dönemin bölümlerine git.
-                            // Aktif yaşam dönemi değişmez.
                             onNavigateToEpisodes(seasonId)
                         }
+                    )
+                }
+
+                // AKILLI HİKÂYE İÇGÖRÜLERİ
+                item(key = "life-story-insights") {
+                    LifeStoryInsightsFeature(
+                        onNavigateToJournalDetail = onNavigateToJournalDetail,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
 

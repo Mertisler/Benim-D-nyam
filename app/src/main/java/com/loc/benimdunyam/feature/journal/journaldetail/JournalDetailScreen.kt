@@ -1,33 +1,22 @@
+
 package com.loc.benimdunyam.feature.journal.journaldetail
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.loc.benimdunyam.feature.journal.journaldetail.components.JournalDeleteDialog
-import com.loc.benimdunyam.feature.journal.journaldetail.components.JournalDetailBackground
-import com.loc.benimdunyam.feature.journal.journaldetail.components.JournalDetailColors
-import com.loc.benimdunyam.feature.journal.journaldetail.components.JournalDetailContent
-import com.loc.benimdunyam.feature.journal.journaldetail.components.JournalDetailNavigationBar
-import com.loc.benimdunyam.feature.journal.journaldetail.components.JournalDetailPersonUi
-import com.loc.benimdunyam.feature.journal.journaldetail.components.JournalDetailTopBar
+
+import com.loc.benimdunyam.feature.journal.journaldetail.components.*
+import com.loc.benimdunyam.feature.journal.journalphotos.JournalPhotoGallery
+
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -39,23 +28,45 @@ fun JournalDetailScreen(
     viewModel: JournalDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    var showDeleteDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var showPhotoGallery by remember {
+        mutableStateOf(false)
+    }
 
     val dateFormat = remember {
         SimpleDateFormat("dd MMMM yyyy", Locale("tr", "TR"))
     }
+
     val timeFormat = remember {
         SimpleDateFormat("HH:mm", Locale("tr", "TR"))
     }
+
     val dayFormat = remember {
         SimpleDateFormat("dd", Locale("tr", "TR"))
     }
+
     val monthFormat = remember {
         SimpleDateFormat("MMMM yyyy", Locale("tr", "TR"))
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        JournalDetailBackground(modifier = Modifier.fillMaxSize())
+    val currentJournal = uiState.journal
+
+    // Önceki/sonraki anıya geçildiğinde
+    // açık olan fotoğraf penceresini kapat.
+    LaunchedEffect(currentJournal?.id) {
+        showPhotoGallery = false
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        JournalDetailBackground(
+            modifier = Modifier.fillMaxSize()
+        )
 
         Column(
             modifier = Modifier
@@ -63,15 +74,22 @@ fun JournalDetailScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
+
+            // ÜST MENÜ
             JournalDetailTopBar(
-                showActions = uiState.journal != null,
+                showActions = currentJournal != null,
+
                 onNavigateBack = onNavigateBack,
+
                 onEdit = {
-                    uiState.journal?.let { journal ->
+                    currentJournal?.let { journal ->
                         onNavigateToEdit(journal.id)
                     }
                 },
-                onDelete = { showDeleteDialog = true }
+
+                onDelete = {
+                    showDeleteDialog = true
+                }
             )
 
             when {
@@ -88,28 +106,37 @@ fun JournalDetailScreen(
                     }
                 }
 
-                uiState.journal != null -> {
-                    val journal = uiState.journal!!
+                currentJournal != null -> {
+
+                    val journal = currentJournal
+
                     val entryDate = remember(journal.entryDate) {
                         Date(journal.entryDate)
                     }
 
-                    // İçerik kaydırılabilir alanı kaplar; gezinme çubuğu ekranın altında sabit kalır.
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
                     ) {
+
+                        // GÜNLÜK İÇERİĞİ
                         JournalDetailContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f),
+
                             title = journal.title,
                             content = journal.content,
+
                             day = dayFormat.format(entryDate),
+
                             monthYear = monthFormat.format(entryDate),
+
                             time = timeFormat.format(entryDate),
+
                             fullDate = dateFormat.format(entryDate),
+
                             mentionedPeople = journal.mentionedPeople.map { person ->
                                 JournalDetailPersonUi(
                                     id = person.id.toString(),
@@ -118,6 +145,27 @@ fun JournalDetailScreen(
                             }
                         )
 
+                        // FOTOĞRAF GALERİSİNİ AÇ
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp),
+
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    showPhotoGallery = true
+                                }
+                            ) {
+                                Text(
+                                    text = "📷 Anı Fotoğrafları",
+                                    color = JournalDetailColors.Green
+                                )
+                            }
+                        }
+
+                        // ÖNCEKİ / SONRAKİ ANI
                         JournalDetailNavigationBar(
                             modifier = Modifier.padding(
                                 start = 20.dp,
@@ -125,15 +173,27 @@ fun JournalDetailScreen(
                                 top = 8.dp,
                                 bottom = 10.dp
                             ),
-                            canGoPrevious = uiState.previousJournalId != null,
-                            canGoNext = uiState.nextJournalId != null,
+
+                            canGoPrevious =
+                                uiState.previousJournalId != null,
+
+                            canGoNext =
+                                uiState.nextJournalId != null,
+
                             currentPosition = uiState.currentPosition,
+
                             totalJournals = uiState.totalJournals,
+
                             onPrevious = {
-                                uiState.previousJournalId?.let(viewModel::openJournal)
+                                uiState.previousJournalId?.let(
+                                    viewModel::openJournal
+                                )
                             },
+
                             onNext = {
-                                uiState.nextJournalId?.let(viewModel::openJournal)
+                                uiState.nextJournalId?.let(
+                                    viewModel::openJournal
+                                )
                             }
                         )
                     }
@@ -156,8 +216,11 @@ fun JournalDetailScreen(
                                 color = JournalDetailColors.Green,
                                 fontSize = 34.sp
                             )
+
                             Text(
-                                text = uiState.errorMessage ?: "Günlük bulunamadı.",
+                                text = uiState.errorMessage
+                                    ?: "Günlük bulunamadı.",
+
                                 color = JournalDetailColors.Ink,
                                 fontSize = 18.sp
                             )
@@ -166,14 +229,94 @@ fun JournalDetailScreen(
                 }
             }
         }
+
+        // FOTOĞRAF GALERİSİ PENCERESİ
+        if (
+            showPhotoGallery &&
+            currentJournal != null
+        ) {
+            Dialog(
+                onDismissRequest = {
+                    showPhotoGallery = false
+                },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false
+                )
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .navigationBarsPadding()
+                    ) {
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = 16.dp,
+                                    vertical = 8.dp
+                                ),
+
+                            horizontalArrangement =
+                                Arrangement.SpaceBetween,
+
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+
+                            Text(
+                                text = "Anı Fotoğrafları",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+
+                            TextButton(
+                                onClick = {
+                                    showPhotoGallery = false
+                                }
+                            ) {
+                                Text("Kapat")
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                                .padding(
+                                    horizontal = 16.dp,
+                                    vertical = 8.dp
+                                )
+                        ) {
+
+                            JournalPhotoGallery(
+                                journalId = currentJournal.id,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
+    // GÜNLÜK SİLME PENCERESİ
     if (showDeleteDialog) {
         JournalDeleteDialog(
-            onDismiss = { showDeleteDialog = false },
+            onDismiss = {
+                showDeleteDialog = false
+            },
+
             onConfirm = {
                 showDeleteDialog = false
-                viewModel.deleteJournal(onDeleted = onNavigateBack)
+
+                viewModel.deleteJournal(
+                    onDeleted = onNavigateBack
+                )
             }
         )
     }

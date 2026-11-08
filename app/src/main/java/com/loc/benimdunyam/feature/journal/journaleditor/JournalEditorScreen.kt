@@ -2,6 +2,20 @@
 package com.loc.benimdunyam.feature.journal.journaleditor
 
 import android.app.DatePickerDialog
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -18,6 +32,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,13 +48,18 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 import com.loc.benimdunyam.domain.model.JournalMood
+import com.loc.benimdunyam.data.local.media.JournalPhotoStore
 
 import com.loc.benimdunyam.feature.journal.JournalMoodPicker
 
 import com.loc.benimdunyam.feature.journal.journaleditor.components.JournalBottomToolbar
 import com.loc.benimdunyam.feature.journal.journaleditor.components.JournalEditorHeader
+import com.loc.benimdunyam.feature.journal.journaleditor.components.JournalEditorPhotoSection
 import com.loc.benimdunyam.feature.journal.journaleditor.components.JournalEditorTextSection
 import com.loc.benimdunyam.feature.journal.journaleditor.components.ParchmentBackground
 
@@ -60,6 +80,41 @@ fun JournalEditorScreen(
     // =================================================
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Tek bir galeri seçicisi: hem editör içindeki düğme hem alt fotoğraf ikonu kullanır.
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { selectedUris ->
+        if (selectedUris.isNotEmpty()) viewModel.addPhotos(selectedUris)
+    }
+
+    val canAddPhotos = !uiState.isLoading && !uiState.isSaving &&
+            !uiState.isLeaving && !uiState.isSaved && !uiState.isPhotoWorking &&
+            !uiState.showRestoreDraftDialog &&
+            (uiState.savedPhotos.size + uiState.draftPhotos.size < JournalPhotoStore.MAX_PHOTOS_PER_JOURNAL)
+
+    val openPhotoPicker = {
+        if (canAddPhotos) {
+            photoPicker.launch(arrayOf("image/jpeg", "image/png", "image/webp"))
+        }
+    }
+
+    // Sistem geri tusu: bekleyen taslak diske yazilmadan ekran kapanmaz.
+    BackHandler {
+        viewModel.requestExit(onNavigateBack)
+    }
+
+    // Uygulama arka plana giderken son degisiklikleri kaydetmeyi dener.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                viewModel.flushOnBackground()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
 
     // =================================================
@@ -288,7 +343,9 @@ fun JournalEditorScreen(
                     },
 
                     // GERİ DÖN
-                    onNavigateBack = onNavigateBack,
+                    onNavigateBack = {
+                        viewModel.requestExit(onNavigateBack)
+                    },
 
                     // GÜNLÜĞÜ KAYDET
                     onSaveClick = {
@@ -298,6 +355,41 @@ fun JournalEditorScreen(
                         )
                     }
                 )
+
+                // Taslak durumu: var olan header tasarimini degistirmeden kucuk bilgi.
+                val draftLabel = when (val status = uiState.draftSaveState) {
+                    DraftSaveState.Idle -> null
+                    DraftSaveState.Pending -> "Taslak kaydedilecek..."
+                    DraftSaveState.Saving -> "Taslak kaydediliyor..."
+                    DraftSaveState.Saved -> "Taslak kaydedildi"
+                    is DraftSaveState.Error -> "Taslak kaydedilemedi: ${status.message}"
+                }
+                if (draftLabel != null && !uiState.isSaved) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (uiState.draftSaveState == DraftSaveState.Saving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.width(12.dp).height(12.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(Modifier.width(6.dp))
+                        }
+                        Text(
+                            text = draftLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (uiState.draftSaveState is DraftSaveState.Error) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
 
 
                 // -----------------------------------------
@@ -343,6 +435,22 @@ fun JournalEditorScreen(
 
                     // ETİKETLENEN KİŞİYİ KALDIRMA
                     onMentionRemoved = viewModel::removeMentionedPerson
+                )
+
+                // Fotoğraf seçimi artık Anı Yazma / Düzenleme ekranında.
+                // Günlük henüz oluşturulmamışsa görseller taslakta korunur.
+                JournalEditorPhotoSection(
+                    savedPhotos = uiState.savedPhotos,
+                    draftPhotos = uiState.draftPhotos,
+                    isWorking = uiState.isPhotoWorking,
+                    enabled = !uiState.isLoading && !uiState.isSaving &&
+                            !uiState.isLeaving && !uiState.isSaved &&
+                            !uiState.showRestoreDraftDialog,
+                    errorMessage = uiState.photoErrorMessage,
+                    onPickPhotos = openPhotoPicker,
+                    onRemoveDraftPhoto = viewModel::removeDraftPhoto,
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 6.dp)
                 )
             }
 
@@ -421,7 +529,10 @@ fun JournalEditorScreen(
             // ALT ARAÇ ÇUBUĞU
             // =============================================
 
-            JournalBottomToolbar()
+            JournalBottomToolbar(
+                onImageClick = openPhotoPicker,
+                imageEnabled = canAddPhotos
+            )
         }
 
 
@@ -444,6 +555,39 @@ fun JournalEditorScreen(
                     }
                 }
             )
+        }
+    }
+
+
+    if (uiState.showRestoreDraftDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.requestExit(onNavigateBack) },
+            title = { Text("Yarım kalan anın bulundu") },
+            text = {
+                Column {
+                    Text("Daha önce yazdığın, henüz yayınlamadığın bir anı var. Kaldığın yerden devam edebilirsin.")
+                    uiState.errorMessage?.let { error ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(error, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::restoreDraft, enabled = !uiState.isLoading) {
+                    Text("Devam Et")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::discardDraft, enabled = !uiState.isLoading) {
+                    Text("Taslağı Sil")
+                }
+            }
+        )
+    }
+
+    if (uiState.isLoading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
         }
     }
 }

@@ -15,6 +15,7 @@ import com.loc.benimdunyam.data.backup.BackupWriteCoordinator
 import com.loc.benimdunyam.data.backup.BackupSelfCheckManager
 import com.loc.benimdunyam.data.backup.BackupSelfCheckReport
 import com.loc.benimdunyam.data.local.AppDatabase
+import com.loc.benimdunyam.data.local.draft.JournalDraftStore
 import com.loc.benimdunyam.domain.usecase.backup.BackupPreview
 import com.loc.benimdunyam.domain.usecase.backup.CreateBackupUseCase
 import com.loc.benimdunyam.domain.usecase.backup.RestoreBackupUseCase
@@ -36,7 +37,8 @@ data class SettingsUiState(
     val databaseIntegrityReport: DatabaseIntegrityReport? = null,
     val isBackupHealthLoading: Boolean = false,
     val isBackupSelfCheckLoading: Boolean = false,
-    val backupSelfCheckReport: BackupSelfCheckReport? = null
+    val backupSelfCheckReport: BackupSelfCheckReport? = null,
+    val isDraftCleanupPending: Boolean = false
 )
 
 @HiltViewModel
@@ -47,7 +49,8 @@ class SettingsViewModel @Inject constructor(
     private val backupMaintenanceManager: BackupMaintenanceManager,
     private val databaseIntegrityVerifier: BackupDatabaseIntegrityVerifier,
     private val writeCoordinator: BackupWriteCoordinator,
-    private val backupSelfCheckManager: BackupSelfCheckManager
+    private val backupSelfCheckManager: BackupSelfCheckManager,
+    private val journalDraftStore: JournalDraftStore
 ) : ViewModel() {
 
     var uiState by mutableStateOf(SettingsUiState())
@@ -239,6 +242,10 @@ class SettingsViewModel @Inject constructor(
                         passphrase = password.toCharArray()
                     )
 
+                // Ana arşiv geri yüklendi; bu işlem artık başarıyla tamamlandı.
+                // Taslak silme başarısızlığı, tamamlanmış geri yüklemeyi
+                // "başarısız" gibi göstermemeli.
+                val draftCleanupError = deleteDraftsSafely()
                 selectedRestoreUri = null
 
                 uiState = uiState.copy(
@@ -246,6 +253,11 @@ class SettingsViewModel @Inject constructor(
                     backupHealthReport = null,
                     databaseIntegrityReport = null,
                     backupSelfCheckReport = null,
+                    isDraftCleanupPending = draftCleanupError != null,
+                    errorMessage = draftCleanupError?.let { reason ->
+                        "Geri yükleme BAŞARILI, ancak eski taslaklar temizlenemedi: " +
+                                "$reason. Aşağıdaki 'Taslak Temizliğini Tekrar Dene' düğmesini kullan."
+                    },
                     successMessage =
                         "Geri yükleme tamamlandı. " +
                                 "${summary.journalCount} anı, " +
@@ -253,8 +265,9 @@ class SettingsViewModel @Inject constructor(
                                 "${summary.imageCount} fotoğraf aktarıldı."
                 )
 
-                // Navigasyon ve UI işlemleri Main thread'de.
-                onSuccess()
+                // Eski taslakların yeni arşive karışma ihtimali kalmadıysa
+                // diğer ekranlara geç. Aksi halde ayarlarda uyarı göster.
+                if (draftCleanupError == null) onSuccess()
 
             } catch (e: CancellationException) {
                 throw e
@@ -444,6 +457,60 @@ class SettingsViewModel @Inject constructor(
     }
 
     // ----------------------------------------
+    // DRAFT CLEANUP
+    // ----------------------------------------
+
+    /**
+     * Yedekleme biçimimiz taslakları içermiyor. Kullanıcı açıkça
+     * geri yükleme / sıfırlama onayı verdiyse eski taslakları da siler.
+     *
+     * Bu fonksiyon yalnızca ana işlem BAŞARILI OLDUGUNDA çağrılır.
+     * Başarısızlık, ana işlemin sonucunu geri almaz.
+     */
+    private suspend fun deleteDraftsSafely(): String? {
+        return try {
+            withContext(Dispatchers.IO) {
+                writeCoordinator.withRegularWrite {
+                    journalDraftStore.deleteAll()
+                }
+            }
+            null
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            error.localizedMessage ?: "Taslak veritabanına erişilemedi"
+        }
+    }
+
+    /** Temizleme kısmen başarısız olursa Settings ekranındaki tekrar dene butonu. */
+    fun retryDraftCleanup() {
+        if (!uiState.isDraftCleanupPending || uiState.isLoading ||
+            uiState.isBackupHealthLoading || uiState.isBackupSelfCheckLoading) return
+
+        viewModelScope.launch {
+            uiState = uiState.copy(
+                isLoading = true,
+                loadingMessage = "Eski taslaklar temizleniyor...",
+                errorMessage = null
+            )
+            try {
+                val error = deleteDraftsSafely()
+                uiState = uiState.copy(
+                    isDraftCleanupPending = error != null,
+                    errorMessage = error?.let { "Taslaklar hâlâ temizlenemedi: $it" },
+                    successMessage = if (error == null) {
+                        "Eski taslaklar başarıyla temizlendi."
+                    } else uiState.successMessage
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } finally {
+                uiState = uiState.copy(isLoading = false, loadingMessage = null)
+            }
+        }
+    }
+
+    // ----------------------------------------
     // CLEAR ALL DATABASE DATA
     // ----------------------------------------
 
@@ -461,9 +528,15 @@ class SettingsViewModel @Inject constructor(
             )
 
             try {
-                withContext(Dispatchers.IO) {
+                // Tek koordinatör altında sıralı olarak ana veritabanını ve
+                // ayrı taslak veritabanını temizle. İki Room DB arasında
+                // atomik transaction YOKTUR; bu nedenle kısmi başarıyı
+                // kullanıcıya açıkça bildirmeliyiz.
+                val draftCleanupError = withContext(Dispatchers.IO) {
                     writeCoordinator.withRegularWrite {
                         appDatabase.clearAllTables()
+                        // Aynı koordinatörün yeniden girişli çağrısı.
+                        deleteDraftsSafely()
                     }
                 }
 
@@ -473,10 +546,16 @@ class SettingsViewModel @Inject constructor(
                     restorePreview = null,
                     backupHealthReport = null,
                     databaseIntegrityReport = null,
-                    backupSelfCheckReport = null
+                    backupSelfCheckReport = null,
+                    isDraftCleanupPending = draftCleanupError != null,
+                    errorMessage = draftCleanupError?.let { reason ->
+                        "Ana veriler SİLİNDİ, ancak taslaklar temizlenemedi: " +
+                                "$reason. Aşağıdaki tekrar dene düğmesini kullan."
+                    },
+                    successMessage = "Ana Room kayıtları temizlendi."
                 )
 
-                onSuccess()
+                if (draftCleanupError == null) onSuccess()
 
             } catch (e: CancellationException) {
                 throw e

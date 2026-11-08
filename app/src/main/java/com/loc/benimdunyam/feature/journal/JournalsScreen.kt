@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.loc.benimdunyam.feature.journal.components.SwipeToDeleteJournalItem
-import com.loc.benimdunyam.feature.journals.JournalsViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

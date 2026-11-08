@@ -1,183 +1,106 @@
 package com.loc.benimdunyam.feature.journal.journaleditor.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.TextFields
-
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-
 import androidx.compose.runtime.Composable
-
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 
-
+/**
+ * Eski beş ikonlu araç çubuğuyla aynı çağrı biçimini korur.
+ * Artık Görsel Ekle butonuna gerçek callback bağlanabilir.
+ * Diğer ikonlar ileride kendi özelliklerine bağlanabilir.
+ */
 @Composable
-fun JournalBottomToolbar() {
-
+fun JournalBottomToolbar(
+    modifier: Modifier = Modifier,
+    onImageClick: () -> Unit = {},
+    imageEnabled: Boolean = true,
+    onTextFormatClick: () -> Unit = {},
+    onStarClick: () -> Unit = {},
+    onEmojiClick: () -> Unit = {},
+    onInsertTextClick: () -> Unit = {}
+) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(70.dp)
     ) {
-
-        Canvas(
-            modifier = Modifier.fillMaxSize()
-        ) {
-
-            val tornTop = Path().apply {
-
-                moveTo(0f, 9.dp.toPx())
-
-                val segments = 34
-
-                for (index in 0..segments) {
-
-                    val x = size.width * index / segments
-
-                    val wobble = when (index % 4) {
-                        0 -> 3.dp.toPx()
-                        1 -> 0.dp.toPx()
-                        2 -> 5.dp.toPx()
-                        else -> 1.dp.toPx()
-                    }
-
-                    lineTo(
-                        x,
-                        7.dp.toPx() + wobble
-                    )
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val edge = 6.dp.toPx()
+            val step = 12.dp.toPx()
+            val path = Path().apply {
+                moveTo(0f, edge)
+                var x = 0f
+                var high = false
+                while (x < size.width) {
+                    x = (x + step).coerceAtMost(size.width)
+                    lineTo(x, if (high) edge * 0.3f else edge)
+                    high = !high
                 }
-
                 lineTo(size.width, size.height)
                 lineTo(0f, size.height)
-
                 close()
             }
-
-            drawPath(
-                path = tornTop,
-                color = JournalEditorPalette.TapeColor
-            )
-
-            drawLine(
-                color = Color(0xFFB7A78F).copy(alpha = 0.45f),
-
-                start = Offset(
-                    0f,
-                    9.dp.toPx()
-                ),
-
-                end = Offset(
-                    size.width,
-                    9.dp.toPx()
-                ),
-
-                strokeWidth = 1.dp.toPx()
-            )
+            drawPath(path, Color(0xFFF5EEE3))
         }
 
         Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 10.dp)
-                .padding(
-                    top = 6.dp,
-                    bottom = 1.dp
-                ),
-
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-
-            ToolbarIcon(
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.TextFields,
-                    contentDescription = "Metin biçimi",
-                    tint = JournalEditorPalette.PaperInk
-                )
+            ToolbarAction("Metin biçimi", onTextFormatClick) {
+                Icon(Icons.Outlined.TextFields, contentDescription = "Metin biçimi", tint = Color(0xFF496B5B))
             }
-
-            ToolbarIcon(
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Image,
-                    contentDescription = "Görsel ekle",
-                    tint = JournalEditorPalette.PaperInk
-                )
+            ToolbarAction("Görsel ekle", onImageClick, imageEnabled) {
+                Icon(Icons.Outlined.Image, contentDescription = "Görsel ekle", tint = Color(0xFF496B5B))
             }
-
-            ToolbarIcon(
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Star,
-                    contentDescription = "Yıldız ekle",
-                    tint = JournalEditorPalette.PaperInk
-                )
+            ToolbarAction("Yıldız ekle", onStarClick) {
+                Icon(Icons.Outlined.Star, contentDescription = "Yıldız ekle", tint = Color(0xFF496B5B))
             }
-
-            ToolbarIcon(
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.EmojiEmotions,
-                    contentDescription = "Emoji ekle",
-                    tint = JournalEditorPalette.PaperInk
-                )
+            ToolbarAction("Emoji ekle", onEmojiClick) {
+                Icon(Icons.Outlined.EmojiEmotions, contentDescription = "Emoji ekle", tint = Color(0xFF496B5B))
             }
-
-            ToolbarIcon(
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.TextFields,
-                    contentDescription = "Metin ekle",
-                    tint = JournalEditorPalette.PaperInk
-                )
+            ToolbarAction("Metin ekle", onInsertTextClick) {
+                Icon(Icons.Outlined.TextFields, contentDescription = "Metin ekle", tint = Color(0xFF496B5B))
             }
         }
     }
 }
 
-
 @Composable
-private fun ToolbarIcon(
-    modifier: Modifier = Modifier,
-    image: @Composable () -> Unit
+private fun ToolbarAction(
+    description: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    icon: @Composable () -> Unit
 ) {
-
     IconButton(
-        onClick = {
-            // Araçların işlevleri daha sonra eklenecek.
-        },
-
-        modifier = modifier.size(42.dp)
+        onClick = onClick,
+        modifier = Modifier.size(48.dp),
+        enabled = enabled
     ) {
-
-        Box(
-            modifier = Modifier.size(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-
-            image()
+        Box(modifier = Modifier.size(27.dp), contentAlignment = Alignment.Center) {
+            icon()
         }
     }
 }
