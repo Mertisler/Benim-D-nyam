@@ -36,7 +36,8 @@ class JournalPhotoViewModel @Inject constructor(
     /** Navigation ekranı değişmeden önceki/sonraki anıya geçilebilir. */
     fun loadForJournal(journalId: String) {
         if (journalId.isBlank()) return
-        if (currentJournalId == journalId) return
+        if (currentJournalId == journalId && _uiState.value.isWorking) return
+        // Gallery can be re-opened after editing the same journal: always reload.
         currentJournalId = journalId
         loadJob?.cancel()
         _uiState.value = JournalPhotoUiState(journalId = journalId, isLoading = true)
@@ -125,6 +126,42 @@ class JournalPhotoViewModel @Inject constructor(
                 if (currentJournalId == journalId) {
                     _uiState.update {
                         it.copy(isWorking = false, errorMessage = "Fotoğraf silinemedi: ${error.localizedMessage}")
+                    }
+                }
+            }
+        }
+    }
+
+    fun move(photoId: String, journalId: String, delta: Int) {
+        updateLayout(journalId, "Fotoğraf sırası güncellendi.") {
+            store.movePublishedPhoto(journalId, photoId, delta)
+        }
+    }
+
+    fun setCover(photoId: String, journalId: String) {
+        updateLayout(journalId, "Kapak fotoğrafı seçildi.") {
+            store.setPublishedCover(journalId, photoId)
+        }
+    }
+
+    private fun updateLayout(journalId: String, message: String, action: suspend () -> Unit) {
+        if (currentJournalId != journalId || _uiState.value.isWorking) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isWorking = true, errorMessage = null, resultMessage = null) }
+            try {
+                action()
+                val updated = store.list(journalId)
+                if (currentJournalId == journalId) {
+                    _uiState.update {
+                        it.copy(photos = updated, isWorking = false, resultMessage = message)
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (currentJournalId == journalId) {
+                    _uiState.update {
+                        it.copy(isWorking = false, errorMessage = "Fotoğraf düzenlenemedi: ${error.localizedMessage}")
                     }
                 }
             }

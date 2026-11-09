@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.loc.benimdunyam.domain.model.LifeEpisode
 import com.loc.benimdunyam.domain.model.LifeSeason
+import com.loc.benimdunyam.feature.seasons.summary.SeasonStorySummaryFeature
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -175,16 +176,56 @@ fun LifeEpisodesScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
 
+
                     // YAŞAM DÖNEMİ KAPAK ALANI
                     if (season != null) {
 
-                        item {
+                        item(key = "season-hero") {
                             SeasonHeroHeader(
                                 season = season,
                                 episodeCount = uiState.episodes.size
                             )
                         }
+
+                        // YENİ: SİNEMATİK SEZON HİKÂYESİ
+                        item(key = "cinematic-season-summary") {
+
+                            SeasonStorySummaryFeature(
+                                season = season,
+
+                                episodes = uiState.episodes,
+
+                                journals = uiState.allJournals,
+
+                                onJournalClick = { journalId ->
+                                    onNavigateToJournalDetail(journalId)
+                                },
+
+                                onEpisodeClick = { episodeId ->
+                                    onNavigateToEpisodeMemories(
+                                        seasonId,
+                                        episodeId
+                                    )
+                                },
+
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                            )
+                        }
+                    } // BÖLÜMLER BAŞLIĞI
+                    item {
+                        Text(
+                            text = "Bölümler",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            modifier = Modifier.padding(
+                                horizontal = 16.dp,
+                                vertical = 4.dp
+                            )
+                        )
                     }
+
 
                     // BÖLÜMLER BAŞLIĞI
                     item {

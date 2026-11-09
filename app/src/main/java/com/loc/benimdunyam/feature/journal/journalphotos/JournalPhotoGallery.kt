@@ -126,37 +126,18 @@ fun JournalPhotoGallery(
                 )
             }
         } else if (photos.isNotEmpty()) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(photos, key = { it.id }) { photo ->
-                    Box(modifier = Modifier.size(116.dp)) {
-                        AsyncImage(
-                            model = File(photo.absolutePath),
-                            contentDescription = "Anı fotoğrafını büyüt",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable { selectedPhoto = photo }
-                        )
-                        IconButton(
-                            onClick = { photoPendingDelete = photo },
-                            modifier = Modifier.align(Alignment.TopEnd)
-                                .padding(3.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                                    RoundedCornerShape(30.dp)
-                                )
-                                .size(32.dp),
-                            enabled = !isWorking
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = "Fotoğrafı sil",
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                }
-            }
+            Text("Sırala: ← →  •  Kapak seç: ★",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            JournalPhotoManageStrip(
+                photos = photos,
+                enabled = !isWorking,
+                onPreview = { selectedPhoto = it },
+                onMove = { id, delta -> viewModel.move(id, journalId, delta) },
+                onSelectCover = { id -> viewModel.setCover(id, journalId) },
+                onDelete = { photoPendingDelete = it },
+                canDelete = { true }
+            )
         }
 
         uiState.errorMessage?.takeIf { uiState.journalId == journalId }?.let {

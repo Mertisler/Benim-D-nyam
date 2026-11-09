@@ -13,22 +13,33 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import coil.compose.AsyncImage
+import com.loc.benimdunyam.feature.journal.cover.JournalArchiveCoverViewModel
+import java.io.File
 import com.loc.benimdunyam.feature.journal.components.SwipeToDeleteJournalItem
+import com.loc.benimdunyam.feature.journal.components.JournalArchiveFiltersSheet
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -63,10 +74,37 @@ fun JournalsScreen(
 
     val uiState by viewModel.uiState.collectAsState()
 
+    // Kapaklar ayrı bir ViewModel'de; mevcut JournalsViewModel ve arşiv filtresi değişmez.
+    val coverViewModel: JournalArchiveCoverViewModel = hiltViewModel()
+    val coverPaths by coverViewModel.coverPaths.collectAsState()
+    val coverVersion by coverViewModel.refreshVersion.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Detay / düzenleme ekranından dönüldüğünde değişen kapakları yenile.
+    DisposableEffect(lifecycleOwner, coverViewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                coverViewModel.invalidateVisibleCovers()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(uiState.deleteErrorMessage) {
+        uiState.deleteErrorMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearDeleteError()
+        }
+    }
+
     // Tarih biçimi
     val dateFormat = remember {
         SimpleDateFormat("dd MMMM yyyy", Locale("tr", "TR"))
     }
+
+    var showFiltersSheet by remember { mutableStateOf(false) }
 
     // Arama alanının açık/kapalı durumu
     var showSearchField by remember {
@@ -77,12 +115,16 @@ fun JournalsScreen(
     val hasActiveSearch = uiState.searchQuery.isNotBlank()
 
     // Tarih filtresi aktif mi?
+    val hasFacetFilter = uiState.selectedSeasonId != null ||
+            uiState.selectedEpisodeId != null || uiState.selectedPersonId != null
+
     val hasActiveDateFilter =
         uiState.startDate != null || uiState.endDate != null
 
 
     Scaffold(
         containerColor = JournalCanvas,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
 
         // -------------------------------------------------
         // ÜST BAR
@@ -130,7 +172,16 @@ fun JournalsScreen(
 
                     actions = {
 
-                        // TEK ARAMA BUTONU
+                        // Filtrelerin tamamını ayrı bir panelde göster; liste yüksekliği korunur.
+                        IconButton(onClick = { showFiltersSheet = true }) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = "Gelişmiş filtreler",
+                                tint = if (uiState.hasActiveFilters) JournalGreen else JournalMuted
+                            )
+                        }
+
+                        // ARAMA BUTONU
                         Surface(
                             modifier = Modifier
                                 .padding(end = 16.dp)
@@ -315,7 +366,7 @@ fun JournalsScreen(
                     ) {
 
                         Text(
-                            text = if (hasActiveSearch) {
+                            text = if (uiState.hasActiveFilters) {
                                 "${uiState.journals.size} SONUÇ"
                             } else {
                                 "${uiState.journals.size} ANI"
@@ -400,6 +451,24 @@ fun JournalsScreen(
         ) {
 
 
+            // Aktif filtreleri kullanıcının kolayca temizleyebilmesi için.
+            if (uiState.hasActiveFilters) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "${uiState.journals.size} / ${uiState.totalJournals} anı",
+                        color = JournalMuted,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    TextButton(onClick = viewModel::clearFilters) {
+                        Text("Filtreleri sıfırla", color = JournalGreen)
+                    }
+                }
+            }
+
             // -------------------------------------------------
             // YÜKLENİYOR / BOŞ / GÜNLÜK LİSTESİ
             // -------------------------------------------------
@@ -438,10 +507,12 @@ fun JournalsScreen(
 
                         hasActiveDateFilter = hasActiveDateFilter,
 
+                        hasOtherFilters = hasFacetFilter,
+
                         onCreateJournal = onNavigateToCreateJournal,
 
                         onClearSearch = {
-                            viewModel.clearSearch()
+                            viewModel.clearFilters()
                         },
 
                         onClearFilters = {
@@ -452,7 +523,7 @@ fun JournalsScreen(
 
 
 
-                    // GÜNLÜKLER
+                // GÜNLÜKLER
                 else -> {
 
                     LazyColumn(
@@ -480,6 +551,11 @@ fun JournalsScreen(
 
                         ) { index, journal ->
 
+                            // LazyColumn sadece görünen satırlarda dosya okuması başlatır.
+                            LaunchedEffect(journal.id, coverVersion) {
+                                coverViewModel.ensureCoverLoaded(journal.id, coverVersion)
+                            }
+
                             val formattedDate = dateFormat.format(
                                 Date(journal.entryDate)
                             )
@@ -506,6 +582,8 @@ fun JournalsScreen(
 
                                     content = journal.content,
 
+                                    coverPath = coverPaths[journal.id],
+
                                     onClick = {
                                         onNavigateToJournalDetail(journal.id)
                                     }
@@ -524,6 +602,20 @@ fun JournalsScreen(
             }
         }
     }
+
+    if (showFiltersSheet) {
+        JournalArchiveFiltersSheet(
+            state = uiState,
+            onDismiss = { showFiltersSheet = false },
+            onSearchChanged = viewModel::updateSearchQuery,
+            onSeasonChanged = viewModel::selectSeason,
+            onEpisodeChanged = viewModel::selectEpisode,
+            onPersonChanged = viewModel::selectPerson,
+            onStartDateChanged = viewModel::setStartDate,
+            onEndDateChanged = viewModel::setEndDate,
+            onClearAll = viewModel::clearFilters
+        )
+    }
 }
 
 
@@ -537,6 +629,7 @@ private fun JournalArchiveCard(
     date: String,
     title: String,
     content: String,
+    coverPath: String?,
     onClick: () -> Unit
 ) {
 
@@ -564,21 +657,67 @@ private fun JournalArchiveCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
 
-            // SOL DEFTER ŞERİDİ
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(86.dp)
-                    .background(
-                        JournalGreen.copy(alpha = 0.75f),
-                        RoundedCornerShape(50)
+            if (coverPath != null) {
+                // Seçilen kapak görseli: dosya cihaz içindeki JournalPhotoStore'a aittir.
+                Box(
+                    modifier = Modifier
+                        .width(94.dp)
+                        .height(114.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(JournalTape)
+                ) {
+                    Text(
+                        text = "✦",
+                        color = JournalMuted,
+                        style = MaterialTheme.typography.headlineLarge,
+                        modifier = Modifier.align(Alignment.Center)
                     )
-            )
 
+                    AsyncImage(
+                        model = remember(coverPath) { File(coverPath) },
+                        contentDescription = "Anının kapak fotoğrafı",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
 
-            Spacer(
-                modifier = Modifier.width(14.dp)
-            )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(32.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f))
+                                )
+                            )
+                    )
+                    Text(
+                        text = "✦ KAPAK",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.sp,
+                            letterSpacing = 0.6.sp
+                        ),
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = 8.dp, bottom = 7.dp)
+                    )
+                }
+            } else {
+                // Fotoğrafı olmayan anıların eski defter şeridi korunur.
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .height(86.dp)
+                        .background(
+                            JournalGreen.copy(alpha = 0.75f),
+                            RoundedCornerShape(50)
+                        )
+                )
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
 
 
             Column(
@@ -594,6 +733,9 @@ private fun JournalArchiveCard(
 
                     Text(
                         text = date,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
 
                         style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.Medium
@@ -602,9 +744,7 @@ private fun JournalArchiveCard(
                         color = JournalGreen
                     )
 
-                    Spacer(
-                        modifier = Modifier.weight(1f)
-                    )
+                    Spacer(modifier = Modifier.width(5.dp))
 
                     Surface(
                         shape = RoundedCornerShape(50.dp),
@@ -744,6 +884,8 @@ private fun JournalEmptyState(
 
     hasActiveDateFilter: Boolean,
 
+    hasOtherFilters: Boolean,
+
     onCreateJournal: () -> Unit,
 
     onClearSearch: () -> Unit,
@@ -752,7 +894,7 @@ private fun JournalEmptyState(
 ) {
 
     val hasAnyCondition =
-        hasActiveSearch || hasActiveDateFilter
+        hasActiveSearch || hasActiveDateFilter || hasOtherFilters
 
     Box(
         modifier = modifier,
@@ -826,6 +968,9 @@ private fun JournalEmptyState(
                         hasActiveDateFilter ->
                             "Bu tarihte bir anı yok"
 
+                        hasOtherFilters ->
+                            "Bu filtrelerde bir anı yok"
+
                         else ->
                             "Hikâyen burada başlıyor"
                     },
@@ -854,6 +999,9 @@ private fun JournalEmptyState(
 
                         hasActiveDateFilter ->
                             "Seçilen tarih aralığında henüz bir günlük bulunmuyor."
+
+                        hasOtherFilters ->
+                            "Kişi, sezon veya bölüm filtrelerini değiştirmeyi deneyebilirsin."
 
                         else ->
                             "Güzel anları, küçük detayları ve unutmak istemediğin günleri burada biriktir."

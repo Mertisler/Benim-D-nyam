@@ -228,29 +228,39 @@ class JournalEditorViewModel @Inject constructor(
     }
 
     private suspend fun offerExistingDraftIfNeeded(journalUpdatedAt: Long?) {
-        // Fotoğrafları ekranda her zaman güncel günlük kimliğinden okuyalım.
-        val saved = journalId?.let { photoStore.list(it) }.orEmpty()
-        val staged = photoStore.listDraft(draftKey)
-        _uiState.update { it.copy(savedPhotos = saved, draftPhotos = staged) }
+        // Editör sıra/kapak metadata'sını da yükle.
+        val snapshot = photoStore.editorSnapshot(draftKey, journalId)
+        val staged = snapshot.draftPhotos
+        val hasPhotoLayout = photoStore.hasDraftPhotoLayout(draftKey)
+        val savedOrder = snapshot.savedPhotos.map { it.id }
+        val savedCoverId = journalId?.let { id ->
+            photoStore.list(id).firstOrNull { it.isCover }?.id
+        }
+        val layoutDiffersFromSaved = hasPhotoLayout &&
+                (snapshot.photos.map { it.id } != savedOrder || snapshot.coverId != savedCoverId)
+        val hasUnsavedPhotoChanges = staged.isNotEmpty() || layoutDiffersFromSaved
+        applyPhotoSnapshot(snapshot)
 
         val draft = draftAutosave.load()
         val current = _uiState.value
         if (draft != null) {
             val stale = journalUpdatedAt != null && draft.updatedAt <= journalUpdatedAt
-            if (staged.isEmpty() && (stale || draftMatchesState(draft, current))) {
+            if (!hasUnsavedPhotoChanges && (stale || draftMatchesState(draft, current))) {
                 draftAutosave.discard()
                 // Eski yayımlanma kimliği dosyası da varsa temizle.
                 photoStore.discardDraftPhotos(draftKey)
+                applyPhotoSnapshot(photoStore.editorSnapshot(draftKey, journalId))
             } else {
                 pendingRestore = draft
             }
-        } else if (staged.isNotEmpty()) {
+        } else if (hasUnsavedPhotoChanges) {
             // Uygulama, fotoğraf diske yazıldıktan hemen sonra kapanmış olabilir.
             // Fotoğraf içerdiği için boş metinli taslağı da kurtarmayı teklif et.
             pendingRestore = createDraft(current)
         } else {
             // Taslak kaydı yoksa olası eski yayın kimliği dosyasını temizle.
             photoStore.discardDraftPhotos(draftKey)
+            applyPhotoSnapshot(photoStore.editorSnapshot(draftKey, journalId))
         }
 
         _uiState.update {
@@ -296,6 +306,7 @@ class JournalEditorViewModel @Inject constructor(
                 draftAutosave.discard()
                 pendingRestore = null
                 restoredMentionIds = null
+                applyPhotoSnapshot(photoStore.editorSnapshot(draftKey, journalId))
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -398,6 +409,50 @@ class JournalEditorViewModel @Inject constructor(
         }
     }
 
+    /** Tek noktadan fotoğraf sırasını ve seçili kapağı günceller. */
+    private fun applyPhotoSnapshot(snapshot: com.loc.benimdunyam.data.local.media.JournalEditorPhotoSnapshot) {
+        _uiState.update { state ->
+            state.copy(
+                savedPhotos = snapshot.savedPhotos,
+                draftPhotos = snapshot.draftPhotos,
+                orderedPhotos = snapshot.photos,
+                coverPhotoId = snapshot.coverId
+            )
+        }
+    }
+
+    /** Sıralama ve kapak seçimi, anı kaydedilene kadar TASLAK metadata'sındadır. */
+    private fun updatePhotoLayout(operation: suspend () -> Unit) {
+        val state = _uiState.value
+        if (state.isPhotoWorking || state.isLoading || state.isSaving || state.isLeaving ||
+            state.isSaved || state.showRestoreDraftDialog) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isPhotoWorking = true, photoErrorMessage = null) }
+            try {
+                operation()
+                applyPhotoSnapshot(photoStore.editorSnapshot(draftKey, journalId))
+                draftAutosave.schedule(createDraft(_uiState.value))
+                if (!draftAutosave.flush()) {
+                    _uiState.update { it.copy(photoErrorMessage = "Fotoğraf düzeni saklandı ancak metin taslağı yazılamadı.") }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _uiState.update { it.copy(photoErrorMessage = "Fotoğraf düzeni değiştirilemedi: ${error.localizedMessage}") }
+            } finally {
+                _uiState.update { it.copy(isPhotoWorking = false) }
+            }
+        }
+    }
+
+    fun movePhoto(photoId: String, delta: Int) = updatePhotoLayout {
+        photoStore.moveDraftPhoto(draftKey, journalId, photoId, delta)
+    }
+
+    fun selectCoverPhoto(photoId: String) = updatePhotoLayout {
+        photoStore.setDraftCover(draftKey, journalId, photoId)
+    }
+
     /** Fotoğraflar, "Anıyı Kaydet" basılmadan önce taslak klasörüne kopyalanır. */
     fun addPhotos(uris: List<Uri>) {
         val state = _uiState.value
@@ -420,10 +475,10 @@ class JournalEditorViewModel @Inject constructor(
                         if (firstError == null) firstError = error.localizedMessage
                     }
                 }
-                val photos = photoStore.listDraft(draftKey)
+                applyPhotoSnapshot(photoStore.editorSnapshot(draftKey, journalId))
+                val photos = _uiState.value.draftPhotos
                 _uiState.update { stateNow ->
                     stateNow.copy(
-                        draftPhotos = photos,
                         isPhotoWorking = false,
                         photoErrorMessage = if (failed > 0) {
                             "$failed fotoğraf eklenemedi: ${firstError ?: "Bilinmeyen hata"}"
@@ -460,13 +515,8 @@ class JournalEditorViewModel @Inject constructor(
             _uiState.update { it.copy(isPhotoWorking = true, photoErrorMessage = null) }
             try {
                 photoStore.deleteDraftPhoto(draftKey, photoId)
-                val remaining = photoStore.listDraft(draftKey)
-                _uiState.update {
-                    it.copy(
-                        draftPhotos = remaining,
-                        isPhotoWorking = false
-                    )
-                }
+                applyPhotoSnapshot(photoStore.editorSnapshot(draftKey, journalId))
+                _uiState.update { it.copy(isPhotoWorking = false) }
                 draftAutosave.schedule(createDraft(_uiState.value))
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -590,6 +640,7 @@ class JournalEditorViewModel @Inject constructor(
                 // Bu adım başarısızsa kullanıcı aynı kimlikle tekrar deneyebilir.
                 try {
                     photoStore.publishDraftPhotos(draftKey, currentId)
+                    photoStore.applyDraftLayoutAfterPublish(draftKey, currentId)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (photoError: Exception) {

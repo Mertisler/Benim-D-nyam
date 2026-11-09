@@ -440,8 +440,8 @@ fun JournalEditorScreen(
                 // Fotoğraf seçimi artık Anı Yazma / Düzenleme ekranında.
                 // Günlük henüz oluşturulmamışsa görseller taslakta korunur.
                 JournalEditorPhotoSection(
-                    savedPhotos = uiState.savedPhotos,
-                    draftPhotos = uiState.draftPhotos,
+                    photos = uiState.orderedPhotos,
+                    coverPhotoId = uiState.coverPhotoId,
                     isWorking = uiState.isPhotoWorking,
                     enabled = !uiState.isLoading && !uiState.isSaving &&
                             !uiState.isLeaving && !uiState.isSaved &&
@@ -449,6 +449,8 @@ fun JournalEditorScreen(
                     errorMessage = uiState.photoErrorMessage,
                     onPickPhotos = openPhotoPicker,
                     onRemoveDraftPhoto = viewModel::removeDraftPhoto,
+                    onMovePhoto = viewModel::movePhoto,
+                    onSelectCover = viewModel::selectCoverPhoto,
                     modifier = Modifier.fillMaxWidth()
                         .padding(horizontal = 20.dp, vertical = 6.dp)
                 )

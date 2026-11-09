@@ -3,173 +3,200 @@ package com.loc.benimdunyam.feature.journal
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loc.benimdunyam.domain.model.JournalEntry
-import com.loc.benimdunyam.domain.usecase.DeleteJournalUseCase
+import com.loc.benimdunyam.domain.model.LifeEpisode
+import com.loc.benimdunyam.domain.model.LifeSeason
+import com.loc.benimdunyam.domain.model.Person
+import com.loc.benimdunyam.domain.usecase.DeleteJournalWithPhotosUseCase
+import com.loc.benimdunyam.domain.usecase.ObserveEpisodesBySeasonUseCase
 import com.loc.benimdunyam.domain.usecase.ObserveJournalsUseCase
+import com.loc.benimdunyam.domain.usecase.ObserveLifeSeasonsUseCase
+import com.loc.benimdunyam.domain.usecase.ObservePeopleUseCase
+import com.loc.benimdunyam.feature.journal.filter.JournalArchiveFilterEngine
+import com.loc.benimdunyam.feature.journal.filter.JournalArchiveFilters
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.Locale
+import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.Locale
-import javax.inject.Inject
 
 data class JournalsUiState(
     val journals: List<JournalEntry> = emptyList(),
+    val totalJournals: Int = 0,
+    val seasons: List<LifeSeason> = emptyList(),
+    val episodes: List<LifeEpisode> = emptyList(),
+    val people: List<Person> = emptyList(),
     val startDate: Long? = null,
     val endDate: Long? = null,
     val searchQuery: String = "",
+    val selectedSeasonId: String? = null,
+    val selectedEpisodeId: String? = null,
+    val selectedPersonId: String? = null,
+    val hasActiveFilters: Boolean = false,
     val isLoading: Boolean = true,
     val deleteErrorMessage: String? = null
 )
 
+private data class JournalArchiveData(
+    val journals: List<JournalEntry>,
+    val seasons: List<LifeSeason>,
+    val people: List<Person>,
+    val episodes: List<LifeEpisode>
+)
+
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class JournalsViewModel @Inject constructor(
     observeJournalsUseCase: ObserveJournalsUseCase,
-    private val deleteJournalUseCase: DeleteJournalUseCase
+    observeLifeSeasonsUseCase: ObserveLifeSeasonsUseCase,
+    observePeopleUseCase: ObservePeopleUseCase,
+    observeEpisodesBySeasonUseCase: ObserveEpisodesBySeasonUseCase,
+    private val deleteJournalUseCase: DeleteJournalWithPhotosUseCase
 ) : ViewModel() {
 
-    // Tarih filtreleri
-    private val _startDate = MutableStateFlow<Long?>(null)
-    private val _endDate = MutableStateFlow<Long?>(null)
+    private val filters = MutableStateFlow(JournalArchiveFilters())
+    private val deleteError = MutableStateFlow<String?>(null)
+    private val turkishLocale = Locale.forLanguageTag("tr-TR")
 
-    // Arama metni
-    private val _searchQuery = MutableStateFlow("")
-
-    // Silme işlemi hata durumu
-    private val _deleteErrorMessage = MutableStateFlow<String?>(null)
-
-    // Türkçe karakterlere uygun büyük/küçük harf kontrolü
-    private val turkishLocale = Locale("tr", "TR")
-
-    // Günlükleri gözlemle ve filtrele
-    private val baseUiState = combine(
-        observeJournalsUseCase(),
-        _startDate,
-        _endDate,
-        _searchQuery
-    ) { journals, startDate, endDate, searchQuery ->
-
-        // Arama metnini normalize et
-        val normalizedQuery = searchQuery
-            .trim()
-            .lowercase(turkishLocale)
-
-        // Günlükleri filtrele
-        val filteredJournals = journals.filter { journal ->
-
-            // Başlangıç tarihi kontrolü
-            val matchesStart =
-                startDate == null ||
-                        journal.entryDate >= startDate
-
-            // Bitiş tarihi kontrolü
-            val matchesEnd =
-                endDate == null ||
-                        journal.entryDate <= endDate
-
-            // Günlük başlığında arama
-            val matchesTitle =
-                journal.title.lowercase(turkishLocale)
-                    .contains(normalizedQuery)
-
-            // Günlük içeriğinde arama
-            val matchesContent =
-                journal.content.lowercase(turkishLocale)
-                    .contains(normalizedQuery)
-
-            // Etiketlenen kişilerde arama
-            val matchesPeople =
-                journal.mentionedPeople.any { person ->
-                    person.name.lowercase(turkishLocale)
-                        .contains(normalizedQuery)
-                }
-
-            // Arama kontrolü
-            val matchesSearch =
-                normalizedQuery.isBlank() ||
-                        matchesTitle ||
-                        matchesContent ||
-                        matchesPeople
-
-            matchesStart && matchesEnd && matchesSearch
+    // Episodes are only collected for the selected season. Switching seasons
+    // cancels the previous observation and clears the selected episode.
+    private val selectedEpisodes = filters
+        .map { it.selectedSeasonId }
+        .distinctUntilChanged()
+        .flatMapLatest { seasonId ->
+            if (seasonId == null) flowOf(emptyList())
+            else observeEpisodesBySeasonUseCase(seasonId)
         }
 
-        JournalsUiState(
-            journals = filteredJournals,
-            startDate = startDate,
-            endDate = endDate,
-            searchQuery = searchQuery,
-            isLoading = false
-        )
-
+    private val archiveData = combine(
+        observeJournalsUseCase(),
+        observeLifeSeasonsUseCase(),
+        observePeopleUseCase(),
+        selectedEpisodes
+    ) { journals, seasons, people, episodes ->
+        JournalArchiveData(journals, seasons, people, episodes)
     }
 
-    // Ana UI State
     val uiState: StateFlow<JournalsUiState> = combine(
-        baseUiState,
-        _deleteErrorMessage
-    ) { state, deleteError ->
+        archiveData,
+        filters,
+        deleteError
+    ) { data, active, warning ->
+        // Filter menu only lists people actually mentioned in at least one entry.
+        // This avoids creating thousands of menu items after contact import.
+        val mentionedIds = data.journals.flatMap { journal ->
+            journal.mentionedPeople.map { it.id }
+        }.toSet()
+        val missingPeople = data.journals.flatMap { it.mentionedPeople }
+        val choices = (data.people.filter { it.id in mentionedIds } + missingPeople)
+            .distinctBy { it.id }
+            .sortedBy { it.name.lowercase(turkishLocale) }
 
-        state.copy(
-            deleteErrorMessage = deleteError
+        JournalsUiState(
+            journals = JournalArchiveFilterEngine.filter(data.journals, active),
+            totalJournals = data.journals.size,
+            seasons = data.seasons,
+            episodes = data.episodes.filter { it.seasonId == active.selectedSeasonId }
+                .sortedBy { it.orderIndex },
+            people = choices,
+            startDate = active.startDate,
+            endDate = active.endDate,
+            searchQuery = active.searchQuery,
+            selectedSeasonId = active.selectedSeasonId,
+            selectedEpisodeId = active.selectedEpisodeId,
+            selectedPersonId = active.selectedPersonId,
+            hasActiveFilters = active.hasAny,
+            isLoading = false,
+            deleteErrorMessage = warning
         )
-
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = JournalsUiState(isLoading = true)
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = JournalsUiState()
     )
 
-    // Günlük silme
+    fun updateSearchQuery(query: String) {
+        filters.update { it.copy(searchQuery = query) }
+    }
+
+    fun clearSearch() {
+        filters.update { it.copy(searchQuery = "") }
+    }
+
+    fun selectPerson(personId: String?) {
+        filters.update { it.copy(selectedPersonId = personId) }
+    }
+
+    fun selectSeason(seasonId: String?) {
+        filters.update {
+            it.copy(selectedSeasonId = seasonId, selectedEpisodeId = null)
+        }
+    }
+
+    fun selectEpisode(episodeId: String?) {
+        filters.update {
+            it.copy(selectedEpisodeId = if (it.selectedSeasonId == null) null else episodeId)
+        }
+    }
+
+    /** Dates passed from the UI are midnight (start) / 23:59:59.999 (end). */
+    fun setStartDate(date: Long?) {
+        filters.update { old ->
+            old.copy(
+                startDate = date,
+                endDate = old.endDate?.takeUnless { date != null && it < date }
+            )
+        }
+    }
+
+    fun setEndDate(date: Long?) {
+        filters.update { old ->
+            old.copy(
+                endDate = date,
+                startDate = old.startDate?.takeUnless { date != null && it > date }
+            )
+        }
+    }
+
+    // Keep the old API for compatibility with other parts of the project.
+    fun setDateRange(start: Long?, end: Long?) {
+        filters.update { old ->
+            old.copy(
+                startDate = start,
+                endDate = end?.takeUnless { start != null && it < start }
+            )
+        }
+    }
+
+    fun clearFilters() {
+        filters.value = JournalArchiveFilters()
+    }
+
     fun deleteJournal(journalId: String) {
-
         viewModelScope.launch {
-
-            _deleteErrorMessage.value = null
-
+            deleteError.value = null
             try {
-
-                deleteJournalUseCase(journalId)
-
-            } catch (e: CancellationException) {
-                throw e
-
-            } catch (e: Exception) {
-
-                _deleteErrorMessage.value =
-                    e.localizedMessage ?: "Günlük silinemedi."
+                val result = deleteJournalUseCase(journalId)
+                deleteError.value = result.cleanupWarning
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                deleteError.value = error.localizedMessage ?: "Günlük silinemedi."
             }
         }
     }
 
-    // Silme hatasını temizle
     fun clearDeleteError() {
-        _deleteErrorMessage.value = null
-    }
-
-    // Tarih aralığını belirle
-    fun setDateRange(start: Long?, end: Long?) {
-        _startDate.value = start
-        _endDate.value = end
-    }
-
-    // Arama metnini güncelle
-    fun updateSearchQuery(query: String) {
-        _searchQuery.value = query
-    }
-
-    // Sadece aramayı temizle
-    fun clearSearch() {
-        _searchQuery.value = ""
-    }
-
-    // Bütün filtreleri ve aramayı temizle
-    fun clearFilters() {
-        _startDate.value = null
-        _endDate.value = null
-        _searchQuery.value = ""
+        deleteError.value = null
     }
 }

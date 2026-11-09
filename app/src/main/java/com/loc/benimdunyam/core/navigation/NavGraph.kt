@@ -27,6 +27,7 @@ import com.loc.benimdunyam.feature.seasons.episodes.EpisodeMemoriesScreen
 import com.loc.benimdunyam.feature.seasons.episodes.LifeEpisodesScreen
 import com.loc.benimdunyam.feature.seasons.episodes.LifeEpisodesViewModel
 import com.loc.benimdunyam.feature.timeline.TimelineScreen
+import com.loc.benimdunyam.feature.yearreview.YearReviewScreen
 
 @Composable
 fun BenimDunyamNavGraph(
@@ -83,6 +84,9 @@ fun BenimDunyamNavGraph(
                     },
                     onNavigateToEpisodes = { seasonId ->
                         navController.navigate(Screen.LifeEpisodes.createRoute(seasonId))
+                    },
+                    onNavigateToYearReview = {
+                        navController.navigate("year_review")
                     }
                 )
             }
@@ -258,6 +262,19 @@ fun BenimDunyamNavGraph(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToJournalDetail = { journalId ->
                         navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                    }
+                )
+            }
+
+            composable(route = "year_review") {
+                YearReviewScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
+                    onNavigateToJournalDetail = { journalId ->
+                        navController.navigate(
+                            Screen.JournalDetail.createRoute(journalId)
+                        )
                     }
                 )
             }

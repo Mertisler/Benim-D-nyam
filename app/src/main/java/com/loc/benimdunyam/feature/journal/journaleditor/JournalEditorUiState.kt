@@ -35,6 +35,8 @@ data class JournalEditorUiState(
     // Editördeki fotoğraflar: seçilenler önce taslağa kopyalanır.
     val savedPhotos: List<JournalPhoto> = emptyList(),
     val draftPhotos: List<JournalPhoto> = emptyList(),
+    val orderedPhotos: List<JournalPhoto> = emptyList(),
+    val coverPhotoId: String? = null,
     val isPhotoWorking: Boolean = false,
     val photoErrorMessage: String? = null
 )

@@ -20,6 +20,8 @@ sealed class Screen(val route: String) {
         fun createRoute(journalId: String) = "journal_detail/$journalId"
     }
 
+
+
     object JournalCreateEdit : Screen(
         "journal_create_edit?journalId={journalId}&seasonId={seasonId}&episodeId={episodeId}"
     ) {
