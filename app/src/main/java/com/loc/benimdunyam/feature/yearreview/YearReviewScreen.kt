@@ -15,6 +15,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -40,6 +44,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
+import com.loc.benimdunyam.feature.yearreview.mood.YearMoodMapSection
+import com.loc.benimdunyam.feature.yearreview.poster.YearPosterScreen
+import com.loc.benimdunyam.feature.yearreview.video.YearMovieVideoExportScreen
 import com.loc.benimdunyam.domain.model.JournalEntry
 import java.io.File
 import java.text.SimpleDateFormat
@@ -66,6 +73,8 @@ fun YearReviewScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var showMovie by rememberSaveable { mutableStateOf(false) }
+    var showPoster by rememberSaveable { mutableStateOf(false) }
+    var showVideoExport by rememberSaveable { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
@@ -81,14 +90,43 @@ fun YearReviewScreen(
     if (showMovie && state.report != null && state.report!!.journalCount > 0) {
         val movieReport = remember(state.report!!.year) { state.report!! }
         val movieCovers = remember(state.report!!.year) { state.coverPaths.toMap() }
+        val movieFeatured = remember(state.report!!.year) { state.featuredMemories.toList() }
+        val movieMoods = remember(state.report!!.year) {
+            state.moodReport?.takeIf { it.year == state.report!!.year }
+        }
         YearMovieScreen(
             report = movieReport,
             coverPaths = movieCovers,
+            featuredMemories = movieFeatured,
+            moodReport = movieMoods,
             onClose = { showMovie = false },
             onJournalClick = { journalId ->
                 showMovie = false
                 onNavigateToJournalDetail(journalId)
             }
+        )
+        return
+    }
+
+    // Aynı rapor ve fotoğraf yolları kullanılır; ikinci rota/ViewModel gerekmez.
+    if (showPoster && state.report != null && state.report!!.journalCount > 0) {
+        YearPosterScreen(
+            report = state.report!!,
+            coverPaths = state.coverPaths,
+            featuredMemories = state.featuredMemories,
+            onClose = { showPoster = false }
+        )
+        return
+    }
+
+    // Yıl özeti, poster ve film içerikleri zaten mevcut ViewModel'de bulunuyor.
+    // İkinci Hilt ViewModel veya Navigation rotası açmadan MP4 ekranına geçiyoruz.
+    if (showVideoExport && state.report != null && state.report!!.journalCount > 0) {
+        YearMovieVideoExportScreen(
+            report = state.report!!,
+            coverPaths = state.coverPaths,
+            featuredMemories = state.featuredMemories,
+            onClose = { showVideoExport = false }
         )
         return
     }
@@ -167,6 +205,50 @@ fun YearReviewScreen(
                                 }
                             }
                         }
+                        if (report.journalCount > 0) {
+                            item(key = "year-poster-export") {
+                                OutlinedButton(
+                                    onClick = { showPoster = true },
+                                    modifier = Modifier.fillMaxWidth()
+                                        .padding(horizontal = 18.dp).height(52.dp),
+                                    shape = RoundedCornerShape(18.dp),
+                                    border = BorderStroke(1.dp, Pine),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Pine)
+                                ) {
+                                    Icon(Icons.Default.Star, contentDescription = null)
+                                    Spacer(Modifier.width(10.dp))
+                                    Text("Yılımın Posterini Oluştur", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        if (report.journalCount > 0) {
+                            item(key = "year-movie-mp4-export") {
+                                OutlinedButton(
+                                    onClick = { showVideoExport = true },
+                                    modifier = Modifier.fillMaxWidth()
+                                        .padding(horizontal = 18.dp).height(52.dp),
+                                    shape = RoundedCornerShape(18.dp),
+                                    border = BorderStroke(1.dp, Pine),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Pine)
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                    Spacer(Modifier.width(10.dp))
+                                    Text("Yılımın Filmini MP4 Olarak Kaydet", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        if (report.journalCount > 0) {
+                            item(key = "featured-memories-${report.year}") {
+                                YearFeaturedMemoriesSection(
+                                    year = report.year,
+                                    memories = state.featuredMemories,
+                                    onOpen = onNavigateToJournalDetail,
+                                    onMove = viewModel::moveFeatured,
+                                    onRemove = viewModel::removeFeatured,
+                                    modifier = Modifier.padding(horizontal = 18.dp)
+                                )
+                            }
+                        }
                         if (report.journalCount == 0) {
                             item(key = "empty") {
                                 Column(
@@ -181,6 +263,14 @@ fun YearReviewScreen(
                         } else {
                             item(key = "months") {
                                 YearMonthlyScene(report, Modifier.padding(horizontal = 18.dp))
+                            }
+                            state.moodReport?.let { moodReport ->
+                                item(key = "mood-map-${report.year}") {
+                                    YearMoodMapSection(
+                                        report = moodReport,
+                                        modifier = Modifier.padding(horizontal = 18.dp)
+                                    )
+                                }
                             }
                             if (report.topPeople.isNotEmpty()) {
                                 item(key = "people") {
@@ -458,3 +548,71 @@ private fun YearEndingCard(year: Int, modifier: Modifier = Modifier) {
 
 private fun formatYearReviewDate(time: Long): String =
     SimpleDateFormat("d MMMM yyyy", Turkish).format(Date(time))
+
+
+/** Filmde görünecek 3–5 kişisel seçimi yıllık rapordan yönetme alanı. */
+@Composable
+private fun YearFeaturedMemoriesSection(
+    year: Int,
+    memories: List<JournalEntry>,
+    onOpen: (String) -> Unit,
+    onMove: (String, Int) -> Unit,
+    onRemove: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Default.Star, contentDescription = null, tint = Gold)
+            Text("Unutulmaz Sahneler", color = Ink,
+                style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Serif)
+        }
+        Text(
+            "${year} filmine seçtiğin ${memories.size}/5 anı. " +
+                    "Anı detayına giderek yıldızla işaretleyebilirsin.",
+            color = Muted, style = MaterialTheme.typography.bodySmall
+        )
+        if (memories.isEmpty()) {
+            Surface(color = Pale, shape = RoundedCornerShape(16.dp)) {
+                Text("Henüz özel bir sahne seçmedin. Bir anıyı aç ve 'Unutulmaz anı olarak seç' düğmesine bas.",
+                    modifier = Modifier.padding(18.dp), color = Ink)
+            }
+        }
+        memories.forEachIndexed { index, journal ->
+            Surface(
+                color = Pale,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("${index + 1}.", color = Gold,
+                        fontFamily = FontFamily.Serif, fontSize = 21.sp)
+                    Column(
+                        modifier = Modifier.weight(1f).clickable { onOpen(journal.id) },
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(journal.title.ifBlank { "Adsız anı" }, color = Ink,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Anıyı aç", color = Muted, fontSize = 11.sp)
+                    }
+                    IconButton(
+                        onClick = { onMove(journal.id, -1) }, enabled = index > 0,
+                        modifier = Modifier.size(34.dp)
+                    ) { Icon(Icons.Default.ArrowUpward, contentDescription = "Öne taşı", tint = Pine) }
+                    IconButton(
+                        onClick = { onMove(journal.id, 1) }, enabled = index < memories.lastIndex,
+                        modifier = Modifier.size(34.dp)
+                    ) { Icon(Icons.Default.ArrowDownward, contentDescription = "Arkaya taşı", tint = Pine) }
+                    IconButton(
+                        onClick = { onRemove(journal.id) }, modifier = Modifier.size(34.dp)
+                    ) { Icon(Icons.Default.Close, contentDescription = "Özel anılardan çıkar", tint = Muted) }
+                }
+            }
+        }
+    }
+}

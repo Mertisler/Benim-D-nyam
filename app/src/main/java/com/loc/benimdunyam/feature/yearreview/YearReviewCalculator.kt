@@ -18,6 +18,17 @@ data class YearReviewSeason(
     val journalCount: Int
 )
 
+/** Tek bir ayın gerçek anı kayıtlarından türetilen, kalıcı veri gerektirmeyen özeti. */
+data class YearReviewMonthStory(
+    val monthIndex: Int, // 0 = Ocak, 11 = Aralık
+    val journalCount: Int,
+    val uniquePeopleCount: Int,
+    val topPeople: List<YearReviewPerson>,
+    val firstJournal: JournalEntry?,
+    val lastJournal: JournalEntry?,
+    val coverCandidates: List<JournalEntry>
+)
+
 data class YearReviewReport(
     val year: Int,
     val journalCount: Int,
@@ -31,7 +42,8 @@ data class YearReviewReport(
     val firstJournal: JournalEntry?,
     val lastJournal: JournalEntry?,
     val selectedMemories: List<JournalEntry>,
-    val coverCandidates: List<JournalEntry>
+    val coverCandidates: List<JournalEntry>,
+    val monthlyStories: List<YearReviewMonthStory> = emptyList()
 )
 
 /** Android framework'ünden bağımsız hesaplayıcı; kullanıcı cihazının yerel takvimi kullanılır. */
@@ -89,6 +101,38 @@ object YearReviewCalculator {
             }.sortedWith(compareByDescending<YearReviewSeason> { it.journalCount }
                 .thenBy { it.title.lowercase(turkish) })
 
+        // Tam olarak 12 ay: anı olmayan ayların sayısı sıfırdır; sahte anı üretilmez.
+        // Bir kişiyi aynı günlükte tekrar etiketlemek yalnızca bir kez sayılır.
+        val byMonth = selected.groupBy { localMonth(it.entryDate) }
+        val monthlyStories = (0..11).map { monthIndex ->
+            val entries = byMonth[monthIndex].orEmpty()
+            val monthlyPeople = linkedMapOf<String, YearReviewPerson>()
+            entries.forEach { journal ->
+                journal.mentionedPeople.distinctBy { it.id }.forEach { person ->
+                    val current = monthlyPeople[person.id]
+                    monthlyPeople[person.id] = YearReviewPerson(
+                        id = person.id,
+                        name = person.name,
+                        journalCount = (current?.journalCount ?: 0) + 1
+                    )
+                }
+            }
+            val leadingPeople = monthlyPeople.values.sortedWith(
+                compareByDescending<YearReviewPerson> { it.journalCount }
+                    .thenBy { it.name.lowercase(turkish) }
+                    .thenBy { it.id }
+            )
+            YearReviewMonthStory(
+                monthIndex = monthIndex,
+                journalCount = entries.size,
+                uniquePeopleCount = leadingPeople.size,
+                topPeople = leadingPeople.take(3),
+                firstJournal = entries.firstOrNull(),
+                lastJournal = entries.lastOrNull(),
+                coverCandidates = entries.asReversed().take(3)
+            )
+        }
+
         val memoryIndexes = when (selected.size) {
             0 -> emptyList()
             1 -> listOf(0)
@@ -109,7 +153,8 @@ object YearReviewCalculator {
             firstJournal = selected.firstOrNull(),
             lastJournal = selected.lastOrNull(),
             selectedMemories = memoryIndexes.map { selected[it] }.distinctBy { it.id },
-            coverCandidates = selected.asReversed().take(48)
+            coverCandidates = selected.asReversed().take(48),
+            monthlyStories = monthlyStories
         )
     }
 

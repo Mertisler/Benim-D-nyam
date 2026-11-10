@@ -1,5 +1,9 @@
 package com.loc.benimdunyam.feature.yearreview
 
+import android.content.Context
+import com.loc.benimdunyam.domain.model.JournalEntry
+import com.loc.benimdunyam.feature.yearreview.mood.YearMoodReport
+import android.view.accessibility.AccessibilityManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
@@ -8,6 +12,8 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -40,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -52,8 +59,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import android.content.Context
-import android.view.accessibility.AccessibilityManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,7 +66,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlin.math.roundToInt
 
 private val MovieGreen = Color(0xFF11291F)
 private val MovieGold = Color(0xFFE7C68A)
@@ -76,11 +80,15 @@ private val MovieCream = Color(0xFFFAF5E9)
 fun YearMovieScreen(
     report: YearReviewReport,
     coverPaths: Map<String, String>,
+    featuredMemories: List<JournalEntry> = emptyList(),
+    moodReport: YearMoodReport? = null,
     onClose: () -> Unit,
     onJournalClick: (String) -> Unit
 ) {
     // Filmin başında gelen snapshot sabittir: yükleme sırasında sahne sayısı zıplamaz.
-    val frames = remember(report, coverPaths) { YearMovieStoryboard.build(report, coverPaths) }
+    val frames = remember(report, coverPaths, featuredMemories, moodReport) {
+        YearMovieStoryboard.build(report, coverPaths, featuredMemories, moodReport)
+    }
     if (frames.isEmpty()) {
         LaunchedEffect(Unit) { onClose() }
         return
@@ -89,17 +97,15 @@ fun YearMovieScreen(
     var frameIndex by remember(report.year) { mutableIntStateOf(0) }
     var replayVersion by remember(report.year) { mutableIntStateOf(0) }
     val context = LocalContext.current
-
     val accessibilityManager = remember(context) {
-        context.getSystemService(
-            Context.ACCESSIBILITY_SERVICE
-        ) as? AccessibilityManager
+        context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
     }
-
     var paused by remember(report.year) {
-        mutableStateOf(
-            accessibilityManager?.isTouchExplorationEnabled == true
-        )
+        mutableStateOf(accessibilityManager?.isTouchExplorationEnabled == true)
+    }
+    // Film içi tercihtir; kalıcı ayar veya yeni DataStore bağımlılığı istemez.
+    var reducedMotion by remember(report.year) {
+        mutableStateOf(accessibilityManager?.isTouchExplorationEnabled == true)
     }
     val progress = remember(report.year) { Animatable(0f) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -140,19 +146,24 @@ fun YearMovieScreen(
 
     BackHandler(onBack = onClose)
 
-    // Önce sahnenin yüzdesini sıfırla, sonra geri sayımı başlat.
-    LaunchedEffect(safeIndex, replayVersion) {
-        progress.snapTo(0f)
-    }
-    LaunchedEffect(safeIndex, replayVersion, paused, foreground) {
+    // Tek coroutine: sahne sıfırlama ve sayaç asla birbirleriyle yarışmaz.
+    // Duraklat / arka plana geç / devam et: aynı sahnede kalan süre korunur.
+    var lastPlaybackKey by remember(report.year) { mutableStateOf<Pair<Int, Int>?>(null) }
+    val playbackKey = safeIndex to replayVersion
+    LaunchedEffect(playbackKey, paused, foreground) {
+        if (lastPlaybackKey != playbackKey) {
+            progress.snapTo(0f)
+            lastPlaybackKey = playbackKey
+        }
         if (paused || !foreground) return@LaunchedEffect
-        val left = ((1f - progress.value) * frame.durationMillis)
-            .roundToInt().coerceAtLeast(1)
-        progress.animateTo(1f, animationSpec = tween(left, easing = LinearEasing))
-        if (frameIndex == safeIndex) {
+        val remaining = MovieMotionRules.remainingMillis(frame.durationMillis, progress.value)
+        progress.animateTo(1f, animationSpec = tween(remaining, easing = LinearEasing))
+        // Kullanıcı sahne değiştirmişse eski coroutine başka sahneyi atlatamaz.
+        if (playbackKey == (frameIndex to replayVersion)) {
             if (frameIndex < frames.lastIndex) frameIndex++ else paused = true
         }
     }
+    val visibleProgress = if (lastPlaybackKey == playbackKey) progress.value else 0f
 
     Box(
         modifier = Modifier.fillMaxSize().background(
@@ -160,6 +171,10 @@ fun YearMovieScreen(
                 when (frame.chapter) {
                     YearMovieChapter.OPENING, YearMovieChapter.FINALE ->
                         listOf(Color(0xFF10261F), Color(0xFF244A36), Color(0xFF0E221B))
+                    YearMovieChapter.MOOD ->
+                        listOf(Color(0xFF152C29), Color(0xFF35524D), Color(0xFF162C29))
+                    YearMovieChapter.MONTH_STORY ->
+                        listOf(Color(0xFF142D24), Color(0xFF36513C), Color(0xFF12251C))
                     YearMovieChapter.PHOTOS ->
                         listOf(Color(0xFF16251F), Color(0xFF384534), Color(0xFF15221C))
                     else -> listOf(MovieGreen, Color(0xFF253E31), MovieGreen)
@@ -167,19 +182,26 @@ fun YearMovieScreen(
             )
         )
     ) {
+        MovieAtmosphere(frame.chapter, visibleProgress, reducedMotion)
         Column(
             modifier = Modifier.fillMaxSize()
                 .statusBarsPadding().navigationBarsPadding()
                 .padding(top = 12.dp, bottom = 14.dp)
         ) {
+            // Uzun filmde 20+ ince çizgi yerine aktif sahnenin çevresindeki 7 adım.
+            val firstVisible = (safeIndex - 3).coerceIn(
+                0, (frames.size - 7).coerceAtLeast(0)
+            )
+            val visibleFrameIndices = (firstVisible until
+                    (firstVisible + 7).coerceAtMost(frames.size))
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                frames.forEachIndexed { index, _ ->
+                visibleFrameIndices.forEach { index ->
                     val filled = when {
                         index < safeIndex -> 1f
-                        index == safeIndex -> progress.value
+                        index == safeIndex -> visibleProgress
                         else -> 0f
                     }.coerceIn(0f, 1f)
                     Box(
@@ -240,22 +262,39 @@ fun YearMovieScreen(
                     })
             ) {
                 AnimatedContent(
-                    targetState = frame.chapter,
+                    // index kullanıyoruz: ardışık FEATURED sahneleri aynı enum olsa da geçiş yapmalı.
+                    targetState = safeIndex,
                     modifier = Modifier.fillMaxSize(),
                     transitionSpec = {
-                        (fadeIn(tween(450)) + slideInVertically(tween(450)) { it / 10 })
-                            .togetherWith(fadeOut(tween(250)) + slideOutVertically(tween(250)) { -it / 12 })
+                        if (reducedMotion) {
+                            fadeIn(tween(120)).togetherWith(fadeOut(tween(120)))
+                        } else {
+                            (fadeIn(tween(620)) + scaleIn(initialScale = 0.955f, animationSpec = tween(620)) +
+                                    slideInVertically(tween(620)) { it / 14 })
+                                .togetherWith(
+                                    fadeOut(tween(320)) + scaleOut(targetScale = 1.025f, animationSpec = tween(320))
+                                )
+                        }
                     },
                     label = "Yılın filmi sahne geçişi"
-                ) { chapter ->
-                    YearMovieSceneContent(
-                        chapter = chapter,
-                        report = report,
-                        coverPaths = coverPaths,
-                        onJournalClick = onJournalClick,
-                        onReplay = ::replay,
-                        onClose = onClose
-                    )
+                ) { visibleIndex ->
+                    val visibleFrame = frames[visibleIndex.coerceIn(0, frames.lastIndex)]
+                    CompositionLocalProvider(LocalMovieReducedMotion provides reducedMotion) {
+                        YearMovieSceneContent(
+                            chapter = visibleFrame.chapter,
+                            featuredMemory = featuredMemories.firstOrNull { it.id == visibleFrame.journalId },
+                            moodReport = moodReport,
+                            monthStory = report.monthlyStories.firstOrNull {
+                                it.monthIndex == visibleFrame.monthIndex
+                            },
+                            sceneProgress = if (visibleIndex == safeIndex) visibleProgress else 0f,
+                            report = report,
+                            coverPaths = coverPaths,
+                            onJournalClick = onJournalClick,
+                            onReplay = ::replay,
+                            onClose = onClose
+                        )
+                    }
                 }
 
                 // Ortadaki içerik/dokunulabilir anı kartları engellenmesin diye
@@ -295,12 +334,25 @@ fun YearMovieScreen(
                         fontWeight = FontWeight.SemiBold)
                 }
             }
-            Text(
-                text = "Kenarlarla ilerle • Sahnelerde kaydır • Duraklat",
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                color = MovieCream.copy(alpha = 0.58f),
-                fontSize = 10.sp
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Kaydır • Dokun • Duraklat",
+                    modifier = Modifier.weight(1f),
+                    color = MovieCream.copy(alpha = 0.65f),
+                    fontSize = 10.sp
+                )
+                TextButton(onClick = { reducedMotion = !reducedMotion }) {
+                    Text(
+                        text = if (reducedMotion) "Efektleri aç" else "Efektleri azalt",
+                        color = MovieGold,
+                        fontSize = 11.sp
+                    )
+                }
+            }
         }
     }
 }

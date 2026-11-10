@@ -16,6 +16,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 
 import com.loc.benimdunyam.feature.journal.journaldetail.components.*
 import com.loc.benimdunyam.feature.journal.journalphotos.JournalPhotoGallery
+import com.loc.benimdunyam.feature.yearreview.featured.YearFeaturedMemoryToggle
 
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -119,6 +120,15 @@ fun JournalDetailScreen(
                             .fillMaxWidth()
                             .weight(1f)
                     ) {
+
+                        YearFeaturedMemoryToggle(
+                            journalId = journal.id,
+                            entryDate = journal.entryDate,
+                            modifier = Modifier.padding(
+                                horizontal = 16.dp,
+                                vertical = 8.dp
+                            )
+                        )
 
                         // GÜNLÜK İÇERİĞİ
                         JournalDetailContent(

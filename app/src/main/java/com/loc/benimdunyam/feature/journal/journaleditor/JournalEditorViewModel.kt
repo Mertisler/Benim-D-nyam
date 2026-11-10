@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.loc.benimdunyam.data.local.mood.JournalMoodRepository
 import com.loc.benimdunyam.data.local.media.JournalPhotoStore
 import com.loc.benimdunyam.data.local.draft.JournalDraftEntity
 import com.loc.benimdunyam.data.local.draft.JournalDraftStore
@@ -43,7 +44,8 @@ class JournalEditorViewModel @Inject constructor(
     private val observeLifeSeasonsUseCase: ObserveLifeSeasonsUseCase,
     private val observeEpisodesBySeasonUseCase: ObserveEpisodesBySeasonUseCase,
     draftStore: JournalDraftStore,
-    private val photoStore: JournalPhotoStore
+    private val photoStore: JournalPhotoStore,
+    private val journalMoodRepository: JournalMoodRepository
 ) : ViewModel() {
 
     private val journalId: String? =
@@ -203,15 +205,17 @@ class JournalEditorViewModel @Inject constructor(
                 }
 
                 originalCreatedAt = journal.createdAt
+                // Yayımlanmış anının duygu seçimini taslak kontrolünden ÖNCE yükle.
+                val persistedMood = journalMoodRepository.getMood(id)
                 _uiState.update { state ->
                     state.copy(
                         title = journal.title,
                         content = journal.content,
                         entryDate = journal.entryDate,
                         mentionedPeople = journal.mentionedPeople,
+                        selectedMood = persistedMood,
                         selectedSeasonId = journal.seasonId,
                         selectedEpisodeId = journal.episodeId,
-                        // Mevcut JournalEntry yazma/yukleme akisina burada dokunmuyoruz.
                         isLoading = true,
                         errorMessage = null
                     )
@@ -635,6 +639,24 @@ class JournalEditorViewModel @Inject constructor(
                 // normal kaydin basarisiz oldugu anlamina gelmez.
                 publishedJournalId = currentId
                 originalCreatedAt = createdAt
+
+                // Room günlüğü kaydolduktan sonra gerçek anı ID'siyle ruh halini kaydet.
+                // Başarısızlıkta taslak/fotoğrafları temizleme; aynı ID ile tekrar denenebilir.
+                try {
+                    journalMoodRepository.saveMood(currentId, state.selectedMood)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (moodError: Exception) {
+                    _uiState.update {
+                        it.copy(
+                            isSaving = false,
+                            isSaved = false,
+                            errorMessage = "Anı kaydedildi ancak ruh hali diske yazılamadı. " +
+                                    "Tekrar Kaydet'e bas: ${moodError.localizedMessage}"
+                        )
+                    }
+                    return@launch
+                }
 
                 // Önce fotoğrafları taslaktan gerçek anıya taşı.
                 // Bu adım başarısızsa kullanıcı aynı kimlikle tekrar deneyebilir.

@@ -1,4 +1,3 @@
-
 package com.loc.benimdunyam.core.navigation
 
 import androidx.compose.foundation.layout.padding
@@ -174,6 +173,9 @@ fun BenimDunyamNavGraph(
                     },
                     onNavigateToJournalDetail = { journalId ->
                         navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                    },
+                    onNavigateToPersonDetail = { otherPersonId ->
+                        navController.navigate(Screen.PersonDetail.createRoute(otherPersonId))
                     }
                 )
             }
@@ -297,3 +299,4 @@ fun BenimDunyamNavGraph(
         }
     }
 }
+
