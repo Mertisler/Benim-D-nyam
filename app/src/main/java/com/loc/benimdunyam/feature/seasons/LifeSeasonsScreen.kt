@@ -21,6 +21,7 @@ import com.loc.benimdunyam.feature.seasons.episodes.MovieStyleSeasonItem
 fun LifeSeasonsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToEpisodes: (String) -> Unit,
+    showBackButton: Boolean = true,
     viewModel: LifeSeasonsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -36,13 +37,13 @@ fun LifeSeasonsScreen(
                     Text(text = "Dönemlerim & Sezonlar")
                 },
                 navigationIcon = {
-                    IconButton(
-                        onClick = onNavigateBack
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Geri"
-                        )
+                    if (showBackButton) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Geri"
+                            )
+                        }
                     }
                 }
             )

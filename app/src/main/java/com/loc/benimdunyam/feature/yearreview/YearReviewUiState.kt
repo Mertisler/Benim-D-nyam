@@ -1,6 +1,7 @@
 package com.loc.benimdunyam.feature.yearreview
 
 import android.util.Log
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loc.benimdunyam.data.local.media.JournalPhotoStore
@@ -38,12 +39,15 @@ data class YearReviewUiState(
     val coverPaths: Map<String, String> = emptyMap(),
     val featuredMemories: List<com.loc.benimdunyam.domain.model.JournalEntry> = emptyList(),
     val moodReport: YearMoodReport? = null,
+    val seasonId: String? = null,
+    val seasonTitle: String? = null,
     val error: String? = null
 )
 
 @HiltViewModel
 @OptIn(ExperimentalCoroutinesApi::class)
 class YearReviewViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     observeJournalsUseCase: ObserveJournalsUseCase,
     observeLifeSeasonsUseCase: ObserveLifeSeasonsUseCase,
     private val photoStore: JournalPhotoStore,
@@ -51,6 +55,7 @@ class YearReviewViewModel @Inject constructor(
     private val journalMoodRepository: JournalMoodRepository
 ) : ViewModel() {
     // null: varsayılan olarak anı içeren en güncel yıl (yoksa mevcut yıl).
+    private val seasonId: String? = savedStateHandle["seasonId"]
     private val requestedYear = MutableStateFlow<Int?>(null)
     private val refreshSignal = MutableStateFlow(0)
 
@@ -116,24 +121,55 @@ class YearReviewViewModel @Inject constructor(
                 }
             }
             ?: years.first()
-        val journalById = journals.associateBy { it.id }
+        val season = seasonId?.let { targetId -> seasons.firstOrNull { it.id == targetId } }
+        if (seasonId != null && season == null) {
+            return@combine YearReviewUiState(
+                isLoading = false,
+                seasonId = seasonId,
+                error = "Bu dönem artık bulunamıyor."
+            )
+        }
+        val inScope = if (season != null) {
+            journals.filter { it.seasonId == season.id }
+        } else {
+            journals.filter { YearFeaturedMemoryRepository.yearOf(it.entryDate) == selected }
+        }
+        val journalById = inScope.associateBy { it.id }
         val featured = selections.asSequence()
-            .filter { it.year == selected }
+            .filter { item ->
+                val journal = journalById[item.journalId]
+                journal != null && item.year == YearFeaturedMemoryRepository.yearOf(journal.entryDate)
+            }
             .sortedWith(compareBy({ it.position }, { it.addedAt }, { it.journalId }))
             .mapNotNull { item -> journalById[item.journalId] }
-            .filter { YearFeaturedMemoryRepository.yearOf(it.entryDate) == selected }
+            .distinctBy { it.id }
             .take(YearFeaturedMemoryRepository.MAX_PER_YEAR)
             .toList()
+        val report = if (season != null) {
+            YearReviewCalculator.calculateForSeason(season, inScope)
+        } else {
+            YearReviewCalculator.calculate(selected, journals, seasons)
+        }
         YearReviewUiState(
             isLoading = false,
             years = years,
-            selectedYear = selected,
-            report = YearReviewCalculator.calculate(selected, journals, seasons),
-            moodReport = YearMoodCalculator.calculate(
-                year = selected,
-                journals = journals,
-                moodNamesByJournalId = moods.associate { it.journalId to it.moodName }
-            ),
+            selectedYear = report.year,
+            report = report,
+            moodReport = if (season != null) {
+                YearMoodCalculator.calculateForEntries(
+                    year = report.year,
+                    entries = inScope,
+                    moodNamesByJournalId = moods.associate { it.journalId to it.moodName }
+                )
+            } else {
+                YearMoodCalculator.calculate(
+                    year = selected,
+                    journals = journals,
+                    moodNamesByJournalId = moods.associate { it.journalId to it.moodName }
+                )
+            },
+            seasonId = season?.id,
+            seasonTitle = season?.title,
             featuredMemories = featured
         )
     }.flatMapLatest { base ->

@@ -126,7 +126,7 @@ fun YearMovieVideoExportScreen(
                         val intent = withContext(Dispatchers.IO) {
                             YearMovieVideoExporter.createShareIntent(context, temporary, report.year)
                         }
-                        context.startActivity(Intent.createChooser(intent, "Yılımın filmini paylaş"))
+                        context.startActivity(Intent.createChooser(intent, if (report.seasonId == null) "Yılımın filmini paylaş" else "Sezonumun filmini paylaş"))
                         stage = "Paylaşım açıldı"
                     }
                     is VideoDestination.Document -> {
@@ -177,8 +177,8 @@ fun YearMovieVideoExportScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Yılımın Filmini Kaydet", color = Ink, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
-                        Text("${report.year} • MP4 video", color = Pine, fontSize = 11.sp)
+                        Text(if (report.seasonId == null) "Yılımın Filmini Kaydet" else "Sezonumun Filmini Kaydet", color = Ink, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                        Text("${report.seasonTitle ?: report.year.toString()} • MP4 video", color = Pine, fontSize = 11.sp)
                     }
                 },
                 navigationIcon = { IconButton(onClick = ::back) {
@@ -237,7 +237,7 @@ fun YearMovieVideoExportScreen(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Gold)
-                    Text("${report.year} — BENİM HİKÂYEM", color = Gold,
+                    Text("${report.seasonTitle ?: report.year.toString()} — BENİM HİKÂYEM", color = Gold,
                         fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 25.sp)
                     Text("${report.journalCount} anı · ${report.activeMonthCount} aktif ay · ${featuredMemories.size} özel sahne",
                         color = Color.White, fontSize = 13.sp)
@@ -251,7 +251,8 @@ fun YearMovieVideoExportScreen(
             PrivacySwitch("Anı fotoğrafları", "Seçilmiş kapak fotoğrafları videoya dahil edilir.",
                 includePhotos, busy) { includePhotos = it }
             HorizontalDivider()
-            PrivacySwitch("Kişi adları", "Yılın oyuncu kadrosu ve aylardaki isimler görünür.",
+            PrivacySwitch("Kişi adları", if (report.seasonId == null) "Yılın oyuncu kadrosu ve aylardaki isimler görünür."
+            else "Bu dönemin oyuncu kadrosu ve anılardaki isimler görünür.",
                 includePersonNames, busy) { includePersonNames = it }
             HorizontalDivider()
             PrivacySwitch("Anı başlıkları ve metinleri", "Özel anılar, aylık seçkiler ve sezon başlıkları görünür.",

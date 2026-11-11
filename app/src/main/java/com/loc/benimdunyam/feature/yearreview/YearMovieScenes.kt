@@ -89,9 +89,10 @@ internal fun YearMovieSceneContent(
             YearMovieChapter.OPENING -> OpeningScene(report, coverPaths, sceneProgress)
             YearMovieChapter.MONTHS -> MonthsScene(report)
             YearMovieChapter.MONTH_STORY -> monthStory?.let {
-                MonthStoryScene(it, report.year, coverPaths, sceneProgress, onJournalClick)
+                MonthStoryScene(it, if (report.seasonId == null) report.year else null,
+                    coverPaths, sceneProgress, onJournalClick)
             }
-            YearMovieChapter.MOOD -> moodReport?.let { YearMoodMovieScene(it, sceneProgress) }
+            YearMovieChapter.MOOD -> moodReport?.let { YearMoodMovieScene(it, sceneProgress, report.seasonTitle) }
             YearMovieChapter.CAST -> CastScene(report)
             YearMovieChapter.SEASONS -> SeasonsScene(report)
             YearMovieChapter.MEMORIES -> MemoriesScene(report, onJournalClick)
@@ -163,24 +164,30 @@ private fun OpeningScene(report: YearReviewReport, paths: Map<String, String>, s
             }
         }
         MovieReveal(delayMillis = 160) {
-            Text(report.year.toString(), color = Champagne,
-                fontSize = 82.sp, lineHeight = 88.sp, fontFamily = FontFamily.Serif)
+            Text(report.seasonTitle ?: report.year.toString(), color = Champagne,
+                fontSize = if (report.seasonId == null) 82.sp else 36.sp,
+                lineHeight = if (report.seasonId == null) 88.sp else 44.sp,
+                fontFamily = FontFamily.Serif)
         }
         MovieReveal(delayMillis = 380) {
             Text("Benim Hikâyem", color = Ivory,
                 fontSize = 31.sp, lineHeight = 36.sp, fontFamily = FontFamily.Serif,
                 fontWeight = FontWeight.Bold)
         }
-        Text("Bir yılı gün gün yaşadın. Şimdi bıraktığın izlere bakma zamanı.",
+        Text(if (report.seasonId != null)
+            "Bu dönemde biriktirdiğin anılar, şimdi kendi filmini oluşturuyor."
+        else "Bir yılı gün gün yaşadın. Şimdi bıraktığın izlere bakma zamanı.",
             color = SoftWhite, fontSize = 15.sp, lineHeight = 23.sp)
         MovieGlassCard {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 YearNumber(report.journalCount, "ANI")
                 YearNumber(report.uniquePeopleCount, "İNSAN")
-                YearNumber(report.seasonCount, "SEZON")
+                YearNumber(if (report.seasonId == null) report.seasonCount else report.activeMonthCount,
+                    if (report.seasonId == null) "SEZON" else "AY")
             }
         }
-        Text("OYUNCULAR • ANILAR • SEZONLAR", color = LightGreen,
+        Text(if (report.seasonId == null) "OYUNCULAR • ANILAR • SEZONLAR"
+        else "OYUNCULAR • ANILAR • HATIRALAR", color = LightGreen,
             fontSize = 10.sp, letterSpacing = 2.sp)
     }
 }
@@ -210,8 +217,10 @@ private fun YearNumber(value: Int, label: String) {
 @Composable
 private fun MonthsScene(report: YearReviewReport) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(23.dp)) {
-        SceneHeading("SAHNE 01  /  ZAMAN", "On iki ay.\nTek bir hikâye.",
-            "Yılın boyunca yazdığın anıların ritmi.")
+        SceneHeading("SAHNE 01  /  ZAMAN",
+            if (report.seasonId == null) "On iki ay.\nTek bir hikâye." else "Döneminin\nizleri.",
+            if (report.seasonId == null) "Yılın boyunca yazdığın anıların ritmi."
+            else "Bu dönemde farklı aylarda biriktirdiğin anılar.")
         MovieGlassCard {
             val reveal = movieRevealFraction(delayMillis = 250, durationMillis = 1_200)
             val top = (report.monthlyCounts.maxOrNull() ?: 0).coerceAtLeast(1)
@@ -252,7 +261,8 @@ private fun MonthsScene(report: YearReviewReport) {
 @Composable
 private fun CastScene(report: YearReviewReport) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(19.dp)) {
-        SceneHeading("SAHNE 02  /  İNSANLAR", "Bu yılın\noyuncu kadrosu.",
+        SceneHeading("SAHNE 02  /  İNSANLAR",
+            if (report.seasonId == null) "Bu yılın\noyuncu kadrosu." else "Bu dönemin\noyuncu kadrosu.",
             "Hikâyendeki yerleri, anılarında ne sıklıkla geçtiklerine göre.")
         val head = report.topPeople.firstOrNull()
         if (head != null) {
@@ -400,11 +410,12 @@ private fun FinaleScene(
             Text("✦", fontSize = 44.sp, color = Champagne)
         }
         MovieReveal(delayMillis = 360) {
-            Text("VE BİR YIL\nBÖYLE GEÇTİ.", color = Champagne, fontSize = 11.sp,
+            Text(if (report.seasonId == null) "VE BİR YIL\nBÖYLE GEÇTİ."
+            else "VE BİR DÖNEM\nBÖYLE GEÇTİ.", color = Champagne, fontSize = 11.sp,
                 letterSpacing = 3.sp, lineHeight = 20.sp, textAlign = TextAlign.Center)
         }
         MovieReveal(delayMillis = 560) {
-            Text("${report.year}\nBenim Hikâyem", color = Ivory,
+            Text("${report.seasonTitle ?: report.year.toString()}\nBenim Hikâyem", color = Ivory,
                 fontFamily = FontFamily.Serif, fontSize = 34.sp,
                 lineHeight = 43.sp, textAlign = TextAlign.Center)
         }
@@ -415,7 +426,8 @@ private fun FinaleScene(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 YearNumber(report.journalCount, "ANI")
                 YearNumber(report.uniquePeopleCount, "İNSAN")
-                YearNumber(report.seasonCount, "SEZON")
+                YearNumber(if (report.seasonId == null) report.seasonCount else report.activeMonthCount,
+                    if (report.seasonId == null) "SEZON" else "AY")
             }
             report.firstJournal?.let { first ->
                 HorizontalDivider(color = Ivory.copy(alpha = 0.18f))
@@ -521,7 +533,7 @@ private fun JournalEntry.movieDate(): String =
 @Composable
 private fun MonthStoryScene(
     month: YearReviewMonthStory,
-    year: Int,
+    year: Int?,
     paths: Map<String, String>,
     sceneProgress: Float,
     onJournalClick: (String) -> Unit
@@ -533,7 +545,9 @@ private fun MonthStoryScene(
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         MovieReveal(delayMillis = 80) {
             Text(
-                "12 AY  /  ${String.format(Tr, "%02d", month.monthIndex + 1)}. BÖLÜM",
+                if (year == null)
+                    "DÖNEMİN AYLARI  /  ${String.format(Tr, "%02d", month.monthIndex + 1)}"
+                else "12 AY  /  ${String.format(Tr, "%02d", month.monthIndex + 1)}. BÖLÜM",
                 fontSize = 10.sp, color = Champagne, letterSpacing = 2.1.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -544,13 +558,15 @@ private fun MonthStoryScene(
                 fontSize = 52.sp, lineHeight = 56.sp, fontWeight = FontWeight.Bold
             )
         }
-        Text(year.toString(), color = LightGreen, fontSize = 13.sp, letterSpacing = 2.sp)
+        Text(year?.toString() ?: month.storyYear?.toString() ?: "DÖNEMİN ANI ARŞİVİ", color = LightGreen,
+            fontSize = 13.sp, letterSpacing = 2.sp)
 
         if (month.journalCount == 0) {
             MovieGlassCard {
                 Text("Bu ayın sayfaları henüz boş.", color = Ivory,
                     fontFamily = FontFamily.Serif, fontSize = 22.sp)
-                Text("${monthName} $year için kaydedilmiş bir anı bulunmuyor.",
+                Text(if (year == null) "Bu dönemde ${monthName} ayında kaydedilmiş bir anı yok."
+                else "${monthName} $year için kaydedilmiş bir anı bulunmuyor.",
                     color = SoftWhite, fontSize = 13.sp, lineHeight = 19.sp)
                 Text("Yeni anılar eklendiğinde bu bölüm de hikâyene katılacak.",
                     color = LightGreen, fontSize = 12.sp)

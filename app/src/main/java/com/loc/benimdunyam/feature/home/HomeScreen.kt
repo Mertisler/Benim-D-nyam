@@ -1,8 +1,16 @@
 package com.loc.benimdunyam.feature.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -12,11 +20,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.loc.benimdunyam.feature.home.components.*
-import com.loc.benimdunyam.feature.home.insights.LifeStoryInsightsFeature
+import com.loc.benimdunyam.feature.home.components.HomeCompactHeader
+import com.loc.benimdunyam.feature.home.components.SmartMemoryCarousel
+import com.loc.benimdunyam.feature.home.components.RecentJournalsSection
+import com.loc.benimdunyam.feature.home.components.FriendlyActionFab
 import com.loc.benimdunyam.feature.home.onthisday.OnThisDayFeature
-import com.loc.benimdunyam.feature.yearreview.YearReviewHomeCard
+import com.loc.benimdunyam.feature.home.insights.LifeStoryInsightsViewModel
 
+/**
+ * Ana sayfa: Keşifler için ayrı bir kart/diyalog yoktur.
+ * Kişisel içgörüler mevcut Zaman Tüneli & Anılar yatay kartlarına eklenir.
+ * Sezonlar alt menüde, Sezonun Filmi ise dönemin içindedir.
+ * Navigation imzası ve diğer ekranların davranışı korunur.
+ */
 @Composable
 fun HomeScreen(
     onNavigateToCreateJournal: (seasonId: String?, episodeId: String?) -> Unit,
@@ -26,113 +42,99 @@ fun HomeScreen(
     onNavigateToSeasons: () -> Unit,
     onNavigateToTimeline: () -> Unit,
     onNavigateToEpisodes: (String) -> Unit,
-    viewModel: HomeViewModel = hiltViewModel(),
-    onNavigateToYearReview: () -> Unit
+    viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val listState = rememberLazyListState()
 
-    val parchmentGradient = Brush.verticalGradient(
-        colors = listOf(Color(0xFFFAF7F2), Color(0xFFF3ECE1))
+    // Mevcut içgörü hesaplama ViewModel'ini doğrudan zaman tünelinde kullan.
+    // Tekrar hesaplama, yeni tablo veya veri taşıma gerekmez.
+    val insightsViewModel: LifeStoryInsightsViewModel = hiltViewModel()
+    val insightsState by insightsViewModel.uiState.collectAsStateWithLifecycle()
+    val visibleInsights = insightsState.report.insights.filterNot { insight ->
+        insight.id == "on_this_day" || (
+                insight.id == "rediscover" &&
+                        uiState.smartMemories.any { memory ->
+                            memory is SmartMemoryItem.OnThisDay && memory.journalId == insight.journalId
+                        }
+                )
+    }
+
+    val background = Brush.verticalGradient(
+        listOf(Color(0xFFFAF7F2), Color(0xFFF3ECE1))
     )
+
+    val onCreateJournal = {
+        onNavigateToCreateJournal(
+            uiState.activeSeasonId,
+            uiState.activeEpisodeId
+        )
+    }
 
     Scaffold(
         containerColor = Color.Transparent,
         floatingActionButton = {
             FriendlyActionFab(
-                onClick = {
-                    onNavigateToCreateJournal(
-                        uiState.activeSeasonId,
-                        uiState.activeEpisodeId
-                    )
-                },
+                onClick = onCreateJournal,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
         }
-    ) { paddingValues ->
+    ) { scaffoldPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(parchmentGradient)
+                .background(background)
         ) {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(
-                        top = paddingValues.calculateTopPadding(),
-                        start = 16.dp,
-                        end = 16.dp
-                    ),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = scaffoldPadding.calculateTopPadding() + 12.dp,
+                    bottom = scaffoldPadding.calculateBottomPadding() + 28.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
                 item(key = "home-header") {
-                    Column {
-                        Spacer(Modifier.height(4.dp))
-                        HomeHeader(
-                            onSearchClick = onNavigateToSearch,
-                            onSettingsClick = onNavigateToSettings
-                        )
-                    }
-                }
-
-                if (uiState.smartMemories.isNotEmpty()) {
-                    item(key = "home-smart-memories") {
-                        SmartMemoryCarousel(
-                            memories = uiState.smartMemories,
-                            onJournalClick = onNavigateToJournalDetail,
-                            onSeasonClick = onNavigateToSeasons
-                        )
-                    }
-                }
-                item(key = "home-year-review") {
-                    YearReviewHomeCard(
-                        onClick = onNavigateToYearReview,
-                        modifier = Modifier.fillMaxWidth()
+                    HomeCompactHeader(
+                        onSearch = onNavigateToSearch,
+                        onSettings = onNavigateToSettings
                     )
                 }
 
-                // YENİ: geçmiş yılların bugüne denk gelen tüm anıları.
-                // Veri yoksa bileşen kendi içinde gizlenir.
-                item(key = "on-this-day") {
+                item(key = "home-story-hub") {
+                    SmartMemoryCarousel(
+                        memories = uiState.smartMemories,
+                        insights = visibleInsights,
+                        onJournalClick = onNavigateToJournalDetail,
+                        onSeasonClick = onNavigateToSeasons
+                    )
+                }
+
+                // Yalnızca eski yılların bugünün tarihine denk düşen anıları varsa görünür.
+                // Aksi halde boş kart oluşturmaz; mevcut V1 davranışı korunur.
+                item(key = "home-on-this-day") {
                     OnThisDayFeature(
                         onNavigateToJournalDetail = onNavigateToJournalDetail,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
 
-                item(key = "home-seasons") {
-                    LifeSeasonsSection(
-                        // Mevcut ekranındaki sıralamayı koruyoruz.
-                        seasons = uiState.seasons.reversed(),
-                        activeSeasonId = uiState.activeSeasonId,
-                        onSeeAllClick = onNavigateToSeasons,
-                        onSeasonClick = onNavigateToEpisodes
-                    )
-                }
-
-                item(key = "home-story-insights") {
-                    LifeStoryInsightsFeature(
-                        onNavigateToJournalDetail = onNavigateToJournalDetail,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                item(key = "recent-journals") {
+                item(key = "home-recent-memories") {
                     RecentJournalsSection(
-                        recentJournals = uiState.recentJournals,
+                        recentJournals = uiState.recentJournals.take(5),
                         onJournalClick = onNavigateToJournalDetail,
-                        onCreateJournalClick = {
-                            onNavigateToCreateJournal(
-                                uiState.activeSeasonId,
-                                uiState.activeEpisodeId
-                            )
-                        }
+                        onCreateJournalClick = onCreateJournal
                     )
                 }
 
-                item(key = "home-bottom-space") {
-                    Spacer(Modifier.height(80.dp))
+                item(key = "home-footer-space") {
+                    // Kedi FAB kartların üstünde kalabilir; kaydırma sonunda alan bırak.
+                    Spacer(Modifier.height(84.dp))
                 }
             }
         }
     }
+
 }

@@ -9,8 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Create
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -136,9 +134,9 @@ fun FriendlyActionFab(
                                 )
                         )
 
-                        // Mevcut hareketli kedi
+                        // Daha güler yüzlü, doğal hareket eden yeni maskot.
                         AnimatedCatMascot(
-                            modifier = Modifier.size(68.dp)
+                            modifier = Modifier.size(72.dp)
                         )
 
                         // Dekoratif parıltılar
@@ -178,10 +176,11 @@ fun FriendlyActionFab(
                         minHeight = 28.dp
                     )
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Create,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                    // Selamlama bitse bile minik kedi butonun kimliğini korur.
+                    // Kompakt halde animasyonu kapatıyoruz: pil dostu ve sakin.
+                    AnimatedCatMascot(
+                        modifier = Modifier.size(32.dp),
+                        animated = false
                     )
 
                     Spacer(

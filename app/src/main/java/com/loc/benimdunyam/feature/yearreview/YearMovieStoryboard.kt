@@ -18,7 +18,8 @@ data class YearMovieFrame(
     val title: String,
     val durationMillis: Int,
     val journalId: String? = null,
-    val monthIndex: Int? = null
+    val monthIndex: Int? = null,
+    val monthYear: Int? = null
 )
 
 object YearMovieStoryboard {
@@ -35,22 +36,26 @@ object YearMovieStoryboard {
 
         return buildList {
             add(YearMovieFrame(YearMovieChapter.OPENING, "Açılış", 7_500))
-            add(YearMovieFrame(YearMovieChapter.MONTHS, "On iki ay", 8_500))
+            add(YearMovieFrame(YearMovieChapter.MONTHS,
+                if (report.seasonId != null) "Ayların izleri" else "On iki ay", 8_500))
             val monthNames = listOf(
                 "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
                 "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
             )
             // Her ay ayrı kare. Boş aylar kısa tutulur; yıllık hikâyede atlanmaz.
             report.monthlyStories.asSequence()
-                .filter { it.monthIndex in 0..11 }
-                .distinctBy { it.monthIndex }
-                .sortedBy { it.monthIndex }
+                .filter { it.monthIndex in 0..11 &&
+                        (report.seasonId == null || it.journalCount > 0) }
+                .distinctBy { it.storyYear to it.monthIndex }
+                .sortedWith(compareBy({ it.storyYear ?: report.year }, { it.monthIndex }))
                 .forEach { month ->
                     add(YearMovieFrame(
                         chapter = YearMovieChapter.MONTH_STORY,
-                        title = monthNames[month.monthIndex],
+                        title = if (report.seasonId == null) monthNames[month.monthIndex]
+                        else "${monthNames[month.monthIndex]} ${month.storyYear ?: ""}",
                         durationMillis = if (month.journalCount == 0) 4_500 else 8_800,
-                        monthIndex = month.monthIndex
+                        monthIndex = month.monthIndex,
+                        monthYear = month.storyYear
                     ))
                 }
             // Kullanıcı tarafından gerçekten işaretlenen ruh halleri varsa filmde göster.
@@ -63,7 +68,7 @@ object YearMovieStoryboard {
             if (report.topPeople.isNotEmpty()) {
                 add(YearMovieFrame(YearMovieChapter.CAST, "Oyuncu kadrosu", 9_000))
             }
-            if (report.topSeasons.any { it.id != null }) {
+            if (report.seasonId == null && report.topSeasons.any { it.id != null }) {
                 add(YearMovieFrame(YearMovieChapter.SEASONS, "Yılın perdeleri", 8_000))
             }
             if (report.selectedMemories.isNotEmpty()) {
@@ -72,8 +77,12 @@ object YearMovieStoryboard {
             // Her özel anı bağımsız kare: aynı chapter'daki sahneler de animasyonla değişir.
             featuredMemories.asSequence()
                 .filter { journal ->
-                    Calendar.getInstance().apply { timeInMillis = journal.entryDate }
-                        .get(Calendar.YEAR) == report.year
+                    if (report.seasonId != null) {
+                        journal.seasonId == report.seasonId
+                    } else {
+                        Calendar.getInstance().apply { timeInMillis = journal.entryDate }
+                            .get(Calendar.YEAR) == report.year
+                    }
                 }
                 .distinctBy { it.id }
                 .take(5)

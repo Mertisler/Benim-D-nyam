@@ -51,7 +51,7 @@ private val Months = listOf("Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "A
  * Bu ekran yalnızca uygulama içi filmde görünür; MP4 dışa aktarımı bu veriyi almaz.
  */
 @Composable
-internal fun YearMoodMovieScene(report: YearMoodReport, sceneProgress: Float) {
+internal fun YearMoodMovieScene(report: YearMoodReport, sceneProgress: Float, seasonTitle: String? = null) {
     val reducedMotion = LocalMovieReducedMotion.current
     val progress = if (reducedMotion) 1f else (sceneProgress * 2.7f).coerceIn(0.02f, 1f)
     val peak = max(1, report.monthlyTaggedCounts.maxOrNull() ?: 0)
@@ -61,14 +61,15 @@ internal fun YearMoodMovieScene(report: YearMoodReport, sceneProgress: Float) {
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         MovieReveal(delayMillis = 40) {
-            Text("BİR YIL • BİRÇOK HİS", color = Gold, fontWeight = FontWeight.Bold,
+            Text(if (seasonTitle == null) "BİR YIL • BİRÇOK HİS" else "BİR DÖNEM • BİRÇOK HİS", color = Gold, fontWeight = FontWeight.Bold,
                 fontSize = 10.sp, letterSpacing = 2.3.sp)
         }
         MovieReveal(delayMillis = 160) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Duygu Yolculuğum", color = White, fontFamily = FontFamily.Serif,
                     fontSize = 32.sp, lineHeight = 37.sp, fontWeight = FontWeight.SemiBold)
-                Text("${report.year} boyunca anılarına bıraktığın duygu izleri.",
+                Text(if (seasonTitle == null) "${report.year} boyunca anılarına bıraktığın duygu izleri."
+                else "$seasonTitle döneminde anılarına bıraktığın duygu izleri.",
                     color = Pale, fontSize = 13.sp, lineHeight = 20.sp)
             }
         }

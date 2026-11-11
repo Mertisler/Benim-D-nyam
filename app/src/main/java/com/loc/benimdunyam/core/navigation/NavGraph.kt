@@ -84,9 +84,6 @@ fun BenimDunyamNavGraph(
                     onNavigateToEpisodes = { seasonId ->
                         navController.navigate(Screen.LifeEpisodes.createRoute(seasonId))
                     },
-                    onNavigateToYearReview = {
-                        navController.navigate("year_review")
-                    }
                 )
             }
 
@@ -155,6 +152,9 @@ fun BenimDunyamNavGraph(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToEdit = { journalId ->
                         navController.navigate(Screen.JournalCreateEdit.createRoute(journalId))
+                    },
+                    onNavigateToPersonDetail = { personId ->
+                        navController.navigate(Screen.PersonDetail.createRoute(personId))
                     }
                 )
             }
@@ -221,10 +221,11 @@ fun BenimDunyamNavGraph(
                 )
             }
 
-            // 11. Yaşam Dönemleri Ekranı (Sezonlar)
-            composable(route = Screen.LifeSeasons.route) {
+            // 11. Dönemler sekmesi: mevcut LifeSeasons ekranı aynı route ile kullanılır.
+            composable(route = BottomNavScreen.Seasons.route) {
                 LifeSeasonsScreen(
                     onNavigateBack = { navController.popBackStack() },
+                    showBackButton = false,
                     onNavigateToEpisodes = { seasonId ->
                         navController.navigate(Screen.LifeEpisodes.createRoute(seasonId))
                     }
@@ -254,6 +255,9 @@ fun BenimDunyamNavGraph(
                     },
                     onNavigateToJournalDetail = { journalId ->
                         navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                    },
+                    onNavigateToSeasonFilm = { selectedSeasonId ->
+                        navController.navigate("season_film/$selectedSeasonId")
                     }
                 )
             }
@@ -261,6 +265,19 @@ fun BenimDunyamNavGraph(
             // 13. Zaman Çizgisi Ekranı (Faz 3)
             composable(route = Screen.Timeline.route) {
                 TimelineScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToJournalDetail = { journalId ->
+                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                    }
+                )
+            }
+
+            // Seçilen sezonun filmi; yıl bazlı eski ekranın hesapları sezon id ile sınırlandırılır.
+            composable(
+                route = "season_film/{seasonId}",
+                arguments = listOf(navArgument("seasonId") { type = NavType.StringType })
+            ) {
+                YearReviewScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToJournalDetail = { journalId ->
                         navController.navigate(Screen.JournalDetail.createRoute(journalId))

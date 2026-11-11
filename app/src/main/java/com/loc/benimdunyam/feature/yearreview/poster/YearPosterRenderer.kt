@@ -75,12 +75,20 @@ object YearPosterRenderer {
         }
         p.style = Paint.Style.FILL
 
-        text(c, "BENİM DÜNYAM  /  YILLIK HİKÂYE", 82f, 126f,
+        text(c, if (content.seasonTitle == null) "BENİM DÜNYAM  /  YILLIK HİKÂYE" else "BENİM DÜNYAM  /  SEZON HİKÂYESİ", 82f, 126f,
             25f, accent, bold = true, spacing = 2f)
         line(c, 82f, 161f, 998f, 161f, accent, 2f)
-        text(c, content.year.toString(), 80f, 340f, 177f, accent, serif = true)
+        if (content.seasonTitle == null) {
+            text(c, content.year.toString(), 80f, 340f, 177f, accent, serif = true)
+        } else {
+            // Uzun dönem adları tek satıra sığsın, görseli taşırmasın.
+            val title = content.seasonTitle.take(34)
+            text(c, title, 80f, 340f,
+                if (title.length > 20) 51f else 69f, accent, serif = true)
+        }
         text(c, "BENİM HİKÂYEM", 85f, 415f, 52f, foreground, serif = true, bold = true)
-        text(c, "Bir yıl. Birbirinden değerli küçük anlar.", 86f, 474f, 29f, muted)
+        text(c, if (content.seasonTitle == null) "Bir yıl. Birbirinden değerli küçük anlar."
+        else "Bir dönem. Birbirinden değerli küçük anlar.", 86f, 474f, 29f, muted)
 
         val imageArea = RectF(82f, 535f, 998f, 1130f)
         roundRect(c, imageArea, 32f, surface)
@@ -104,7 +112,7 @@ object YearPosterRenderer {
                 }
                 c.drawRect(imageArea, gradient)
                 c.restore()
-                text(c, "BU YILIN KARELERİNDEN", 120f, 1076f, 29f, Color.WHITE, bold = true)
+                text(c, if (content.seasonTitle == null) "BU YILIN KARELERİNDEN" else "BU DÖNEMİN KARELERİNDEN", 120f, 1076f, 29f, Color.WHITE, bold = true)
             } finally {
                 image.recycle()
             }
@@ -125,7 +133,8 @@ object YearPosterRenderer {
             val values = listOf(
                 content.journalCount.toString() to "ANI",
                 content.uniquePeopleCount.toString() to "İNSAN",
-                content.seasonCount.toString() to "SEZON"
+                (if (content.seasonTitle == null) content.seasonCount else content.activeMonthCount).toString() to
+                        (if (content.seasonTitle == null) "SEZON" else "AY")
             )
             values.forEachIndexed { index, (value, label) ->
                 val left = 82f + index * 314f
@@ -140,13 +149,13 @@ object YearPosterRenderer {
         val earliest = if (options.includeStats) 1442f else 1330f
         var cursor = earliest
         if (content.personNames.isNotEmpty()) {
-            text(c, "BU YILIN İNSANLARI", 85f, cursor, 25f, accent, bold = true)
+            text(c, if (content.seasonTitle == null) "BU YILIN İNSANLARI" else "BU DÖNEMİN İNSANLARI", 85f, cursor, 25f, accent, bold = true)
             cursor += 47f
             cursor = wrappedText(c, content.personNames.joinToString("  ·  "), 86f,
                 cursor, 910f, 33f, foreground, maxLines = 2, lineHeight = 45f) + 38f
         }
         if (content.memoryTitle != null || content.memoryExcerpt != null) {
-            text(c, "YILIN SAYFALARINDAN", 85f, cursor, 25f, accent, bold = true)
+            text(c, if (content.seasonTitle == null) "YILIN SAYFALARINDAN" else "SEZONUN SAYFALARINDAN", 85f, cursor, 25f, accent, bold = true)
             cursor += 52f
             if (content.memoryTitle != null) {
                 cursor = wrappedText(c, content.memoryTitle, 86f, cursor,
@@ -159,7 +168,8 @@ object YearPosterRenderer {
         }
         if (content.personNames.isEmpty() && content.memoryTitle == null && content.memoryExcerpt == null) {
             text(c, "${content.activeMonthCount} AYDAN KALAN ANILAR", 86f, 1500f, 31f, accent, bold = true)
-            text(c, "Bazı yıllar geçer. Bazıları bizimle kalır.", 86f, 1556f, 30f, foreground, serif = true)
+            text(c, if (content.seasonTitle == null) "Bazı yıllar geçer. Bazıları bizimle kalır."
+            else "Bazı dönemler geçer. Hatıraları bizimle kalır.", 86f, 1556f, 30f, foreground, serif = true)
         }
         line(c, 82f, 1773f, 998f, 1773f, accent, 2f)
         text(c, "BU HİKÂYE DEVAM EDİYOR.", 83f, 1831f, 29f, foreground, bold = true)

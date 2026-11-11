@@ -95,7 +95,8 @@ class HomeViewModel @Inject constructor(
                     title = randomJournal.title.ifBlank { "Zaman Tünelinden" },
                     snippet = randomJournal.content,
                     dateText = dateFormat.format(Date(randomJournal.entryDate)),
-                    yearsAgo = 1
+                    // Aynı tarihe denk gelmeyen arşiv anılarını "1 yıl önce bugün" diye tanıtma.
+                    yearsAgo = 0
                 )
             )
         }

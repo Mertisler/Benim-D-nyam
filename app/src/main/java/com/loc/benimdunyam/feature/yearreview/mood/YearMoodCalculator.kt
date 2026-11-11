@@ -32,7 +32,16 @@ object YearMoodCalculator {
             .distinctBy { it.id }
             .filter { localYear(it.entryDate) == year }
             .toList()
+        return calculateForEntries(year, yearEntries, moodNamesByJournalId)
+    }
 
+    /** Yıl yerine döneme göre önceden seçilmiş anıların duygularını sayar. */
+    fun calculateForEntries(
+        year: Int,
+        entries: List<JournalEntry>,
+        moodNamesByJournalId: Map<String, String>
+    ): YearMoodReport {
+        val yearEntries = entries.distinctBy { it.id }
         val monthlyAll = MutableList(12) { 0 }
         val monthlyTagged = MutableList(12) { 0 }
         val moodMonths = linkedMapOf<String, MutableList<Int>>()

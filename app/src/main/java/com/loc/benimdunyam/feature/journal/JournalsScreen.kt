@@ -40,6 +40,7 @@ import com.loc.benimdunyam.feature.journal.cover.JournalArchiveCoverViewModel
 import java.io.File
 import com.loc.benimdunyam.feature.journal.components.SwipeToDeleteJournalItem
 import com.loc.benimdunyam.feature.journal.components.JournalArchiveFiltersSheet
+import com.loc.benimdunyam.feature.journal.components.JournalDogActionFab
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -73,6 +74,9 @@ fun JournalsScreen(
 ) {
 
     val uiState by viewModel.uiState.collectAsState()
+    val seasonTitles = remember(uiState.seasons) {
+        uiState.seasons.associate { it.id to it.title }
+    }
 
     // Kapaklar ayrı bir ViewModel'de; mevcut JournalsViewModel ve arşiv filtresi değişmez.
     val coverViewModel: JournalArchiveCoverViewModel = hiltViewModel()
@@ -395,43 +399,8 @@ fun JournalsScreen(
         // -------------------------------------------------
 
         floatingActionButton = {
-
-            ExtendedFloatingActionButton(
-
-                onClick = onNavigateToCreateJournal,
-
-                containerColor = JournalGreen,
-
-                contentColor = Color.White,
-
-                shape = RoundedCornerShape(
-                    topStart = 18.dp,
-                    topEnd = 18.dp,
-                    bottomStart = 6.dp,
-                    bottomEnd = 18.dp
-                ),
-
-                elevation = FloatingActionButtonDefaults.elevation(
-                    defaultElevation = 6.dp,
-                    pressedElevation = 2.dp
-                ),
-
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null
-                    )
-                },
-
-                text = {
-                    Text(
-                        text = "Yeni anı",
-
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    )
-                }
+            JournalDogActionFab(
+                onClick = onNavigateToCreateJournal
             )
         }
 
@@ -582,6 +551,10 @@ fun JournalsScreen(
 
                                     content = journal.content,
 
+                                    seasonTitle = journal.seasonId?.let(seasonTitles::get),
+
+                                    episodeTitle = journal.episodeId?.let(uiState.episodeTitles::get),
+
                                     coverPath = coverPaths[journal.id],
 
                                     onClick = {
@@ -629,6 +602,8 @@ private fun JournalArchiveCard(
     date: String,
     title: String,
     content: String,
+    seasonTitle: String?,
+    episodeTitle: String?,
     coverPath: String?,
     onClick: () -> Unit
 ) {
@@ -818,9 +793,49 @@ private fun JournalArchiveCard(
                 }
 
 
-                Spacer(
-                    modifier = Modifier.height(13.dp)
-                )
+                // Bilgi varsa tek satırlık, sade sezon/bölüm etiketleri göster.
+                // İki etiket ayrı ayrı daralabildiği için uzun sezon adı bölüm bilgisini gizlemez.
+                val seasonLabel = seasonTitle?.trim()?.takeIf { it.isNotEmpty() }
+                val episodeLabel = episodeTitle?.trim()?.takeIf { it.isNotEmpty() }
+                if (seasonLabel != null || episodeLabel != null) {
+                    Spacer(modifier = Modifier.height(9.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val labelStyle = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 10.5.sp,
+                            letterSpacing = 0.sp
+                        )
+                        if (seasonLabel != null) {
+                            Text(
+                                text = "Sezon: $seasonLabel",
+                                modifier = Modifier.weight(1f, fill = false),
+                                style = labelStyle,
+                                color = JournalGreen.copy(alpha = 0.85f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (seasonLabel != null && episodeLabel != null) {
+                            Text(text = "·", style = labelStyle, color = JournalMuted)
+                        }
+                        if (episodeLabel != null) {
+                            Text(
+                                text = "Bölüm: $episodeLabel",
+                                modifier = Modifier.weight(1f, fill = false),
+                                style = labelStyle,
+                                color = JournalMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(11.dp))
 
 
                 // ALT ETİKET

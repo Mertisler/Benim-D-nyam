@@ -1,4 +1,3 @@
-
 package com.loc.benimdunyam.feature.seasons.episodes
 
 import androidx.compose.foundation.BorderStroke
@@ -16,6 +15,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,7 +41,8 @@ fun LifeEpisodesScreen(
     onBackClick: () -> Unit,
     onNavigateToCreateJournal: (String, String) -> Unit,
     onNavigateToEpisodeMemories: (String, String) -> Unit,
-    onNavigateToJournalDetail: (String) -> Unit
+    onNavigateToJournalDetail: (String) -> Unit,
+    onNavigateToSeasonFilm: (String) -> Unit
 ) {
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -187,6 +188,35 @@ fun LifeEpisodesScreen(
                             )
                         }
 
+                        item(key = "season-film") {
+                            val seasonJournalCount = remember(seasonId, uiState.allJournals) {
+                                uiState.allJournals.count { it.seasonId == seasonId }
+                            }
+                            Surface(
+                                onClick = { onNavigateToSeasonFilm(seasonId) },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                color = Color(0xFF252324),
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.dp, Color(0xFF655039))
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFFE2BA83))
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("SEZONUN FİLMİ", color = Color(0xFFE2BA83),
+                                            style = MaterialTheme.typography.labelMedium)
+                                        Text("$seasonJournalCount anıdan oluşan sinematik hikâyen",
+                                            color = Color(0xFFD4C8B7), style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    Icon(Icons.Default.ChevronRight, contentDescription = "Filmi aç",
+                                        tint = Color(0xFFE2BA83))
+                                }
+                            }
+                        }
+
                         // YENİ: SİNEMATİK SEZON HİKÂYESİ
                         item(key = "cinematic-season-summary") {
 
@@ -213,19 +243,7 @@ fun LifeEpisodesScreen(
                                     .padding(horizontal = 16.dp)
                             )
                         }
-                    } // BÖLÜMLER BAŞLIĞI
-                    item {
-                        Text(
-                            text = "Bölümler",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
-                            modifier = Modifier.padding(
-                                horizontal = 16.dp,
-                                vertical = 4.dp
-                            )
-                        )
                     }
-
 
                     // BÖLÜMLER BAŞLIĞI
                     item {

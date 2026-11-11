@@ -45,7 +45,9 @@ object YearMovieVideoPlanner {
                 YearMovieChapter.OPENING -> 3_200
                 YearMovieChapter.MONTHS -> 2_800
                 YearMovieChapter.MONTH_STORY -> {
-                    val count = report.monthlyStories.firstOrNull { it.monthIndex == frame.monthIndex }?.journalCount ?: 0
+                    val count = report.monthlyStories.firstOrNull {
+                        it.monthIndex == frame.monthIndex && it.storyYear == frame.monthYear
+                    }?.journalCount ?: 0
                     if (count == 0) 1_200 else 2_600
                 }
                 YearMovieChapter.MOOD -> 0 // Bilerek MP4 planına alınmıyor.

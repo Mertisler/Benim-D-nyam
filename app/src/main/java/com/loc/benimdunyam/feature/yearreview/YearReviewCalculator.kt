@@ -26,7 +26,8 @@ data class YearReviewMonthStory(
     val topPeople: List<YearReviewPerson>,
     val firstJournal: JournalEntry?,
     val lastJournal: JournalEntry?,
-    val coverCandidates: List<JournalEntry>
+    val coverCandidates: List<JournalEntry>,
+    val storyYear: Int? = null
 )
 
 data class YearReviewReport(
@@ -43,7 +44,10 @@ data class YearReviewReport(
     val lastJournal: JournalEntry?,
     val selectedMemories: List<JournalEntry>,
     val coverCandidates: List<JournalEntry>,
-    val monthlyStories: List<YearReviewMonthStory> = emptyList()
+    val monthlyStories: List<YearReviewMonthStory> = emptyList(),
+    /** null = yıl özeti; dolu = seçilen yaşam döneminin filmi. */
+    val seasonId: String? = null,
+    val seasonTitle: String? = null
 )
 
 /** Android framework'ünden bağımsız hesaplayıcı; kullanıcı cihazının yerel takvimi kullanılır. */
@@ -65,7 +69,29 @@ object YearReviewCalculator {
             .distinctBy { it.id }
             .sortedWith(compareBy<JournalEntry> { it.entryDate }.thenBy { it.id })
             .toList()
+        return calculateEntries(year, selected, seasons)
+    }
 
+    /** Dönem kimliğine göre filtreler; tarih başka takvim yılına taşsa da anıyı kaybetmez. */
+    fun calculateForSeason(season: LifeSeason, journals: List<JournalEntry>): YearReviewReport {
+        val selected = journals.asSequence()
+            .filter { it.seasonId == season.id }
+            .distinctBy { it.id }
+            .sortedWith(compareBy<JournalEntry> { it.entryDate }.thenBy { it.id })
+            .toList()
+        val startYear = localYear(season.startDate)
+        return calculateEntries(startYear, selected, listOf(season), seasonSpecific = true).copy(
+            seasonId = season.id,
+            seasonTitle = season.title
+        )
+    }
+
+    private fun calculateEntries(
+        year: Int,
+        selected: List<JournalEntry>,
+        seasons: List<LifeSeason>,
+        seasonSpecific: Boolean = false
+    ): YearReviewReport {
         val months = MutableList(12) { 0 }
         selected.forEach { months[localMonth(it.entryDate)]++ }
         val busiestIndex = months.withIndex()
@@ -103,9 +129,14 @@ object YearReviewCalculator {
 
         // Tam olarak 12 ay: anı olmayan ayların sayısı sıfırdır; sahte anı üretilmez.
         // Bir kişiyi aynı günlükte tekrar etiketlemek yalnızca bir kez sayılır.
-        val byMonth = selected.groupBy { localMonth(it.entryDate) }
-        val monthlyStories = (0..11).map { monthIndex ->
-            val entries = byMonth[monthIndex].orEmpty()
+        val byPeriod = selected.groupBy { localYear(it.entryDate) to localMonth(it.entryDate) }
+        val monthKeys: List<Pair<Int, Int>> = if (seasonSpecific) {
+            byPeriod.keys.sortedWith(compareBy({ it.first }, { it.second }))
+        } else {
+            (0..11).map { year to it }
+        }
+        val monthlyStories = monthKeys.map { (storyYear, monthIndex) ->
+            val entries = byPeriod[storyYear to monthIndex].orEmpty()
             val monthlyPeople = linkedMapOf<String, YearReviewPerson>()
             entries.forEach { journal ->
                 journal.mentionedPeople.distinctBy { it.id }.forEach { person ->
@@ -129,7 +160,8 @@ object YearReviewCalculator {
                 topPeople = leadingPeople.take(3),
                 firstJournal = entries.firstOrNull(),
                 lastJournal = entries.lastOrNull(),
-                coverCandidates = entries.asReversed().take(3)
+                coverCandidates = entries.asReversed().take(3),
+                storyYear = storyYear
             )
         }
 

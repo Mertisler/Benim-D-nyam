@@ -64,7 +64,8 @@ private fun moodLabel(key: String): String = when (key.uppercase(Locale.ROOT)) {
 @Composable
 fun YearMoodMapSection(
     report: YearMoodReport,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    seasonTitle: String? = null
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -77,13 +78,14 @@ fun YearMoodMapSection(
         ) {
             Text("SAHNE 06 • DUYGULARIM", color = Green, fontSize = 10.sp,
                 letterSpacing = 1.7.sp, fontWeight = FontWeight.Bold)
-            Text("Yılın Duygu Haritası", fontFamily = FontFamily.Serif,
+            Text(if (seasonTitle == null) "Yılın Duygu Haritası" else "Dönemin Duygu Haritası", fontFamily = FontFamily.Serif,
                 fontSize = 25.sp, color = Ink, fontWeight = FontWeight.SemiBold)
             Text("Her renk, bir anı yazarken seçtiğin duyguyu temsil ediyor.",
                 color = Faint, fontSize = 12.sp)
 
             if (report.journalCount == 0) {
-                Text("Bu yıl için henüz bir anı bulunmuyor.", color = Faint)
+                Text(if (seasonTitle == null) "Bu yıl için henüz bir anı bulunmuyor."
+                else "Bu dönemde henüz bir anı bulunmuyor.", color = Faint)
                 return@Column
             }
 
@@ -106,7 +108,9 @@ fun YearMoodMapSection(
 
             if (report.taggedJournalCount == 0) {
                 HorizontalDivider(color = Soft)
-                Text("Bu yıla ait anılarda henüz ruh hali seçilmemiş. Anı düzenleme ekranından bir duygu seçtiğinde harita oluşacak.",
+                Text(if (seasonTitle == null)
+                    "Bu yıla ait anılarda henüz ruh hali seçilmemiş. Anı düzenleme ekranından bir duygu seçtiğinde harita oluşacak."
+                else "Bu dönemin anılarında henüz ruh hali seçilmemiş.",
                     color = Ink, fontSize = 13.sp)
                 return@Column
             }

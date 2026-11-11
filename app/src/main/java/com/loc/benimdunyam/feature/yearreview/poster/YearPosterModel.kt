@@ -26,7 +26,8 @@ data class YearPosterContent(
     val photoPath: String?,
     val personNames: List<String>,
     val memoryTitle: String?,
-    val memoryExcerpt: String?
+    val memoryExcerpt: String?,
+    val seasonTitle: String? = null
 )
 
 object YearPosterModel {
@@ -56,6 +57,10 @@ object YearPosterModel {
         } else null
         return YearPosterContent(
             year = report.year,
+            // Özel sezon adı yalnızca kullanıcı metin paylaşımını açarsa dışa çıkar.
+            seasonTitle = report.seasonTitle?.let { title ->
+                if (options.includeMemoryText) title else "Bir Dönem"
+            },
             journalCount = report.journalCount,
             uniquePeopleCount = report.uniquePeopleCount,
             seasonCount = report.seasonCount,

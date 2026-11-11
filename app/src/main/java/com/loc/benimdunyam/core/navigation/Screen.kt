@@ -71,5 +71,7 @@ sealed class BottomNavScreen(
 ) {
     object Home : BottomNavScreen("home", "Ana Sayfa", "home")
     object Journals : BottomNavScreen("journals", "Günlükler", "book")
+    // Aynı ekranı iki farklı route ile tanımlamamak için mevcut dönem rotasını kullan.
+    object Seasons : BottomNavScreen(Screen.LifeSeasons.route, "Dönemler", "date_range")
     object People : BottomNavScreen("people", "İnsanlarım", "people")
 }

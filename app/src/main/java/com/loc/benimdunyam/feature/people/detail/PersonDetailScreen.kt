@@ -70,6 +70,10 @@ import com.loc.benimdunyam.feature.people.detail.presentation.JournalMentionSnap
 import com.loc.benimdunyam.feature.people.detail.presentation.PersonCoMentionCalculator
 import com.loc.benimdunyam.feature.people.detail.presentation.PersonCoMentionSummary
 import com.loc.benimdunyam.feature.people.detail.presentation.PersonMentionSnapshot
+import com.loc.benimdunyam.feature.people.detail.mood.PersonMoodViewModel
+import com.loc.benimdunyam.feature.people.detail.mood.PersonMoodInsightsCalculator
+import com.loc.benimdunyam.feature.people.detail.mood.PersonMoodInsightsSummary
+import com.loc.benimdunyam.feature.people.detail.mood.PersonMoodTimelineBadge
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlinx.coroutines.launch
@@ -93,9 +97,11 @@ fun PersonDetailScreen(
     onNavigateToJournalDetail: (String) -> Unit,
     viewModel: PersonDetailViewModel = hiltViewModel(),
     onNavigateToPersonDetail: ((String) -> Unit)? = null,
-    onNavigateToAnalytics: ((String) -> Unit)? = null
+    onNavigateToAnalytics: ((String) -> Unit)? = null,
+    moodViewModel: PersonMoodViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val moodState by moodViewModel.uiState.collectAsStateWithLifecycle()
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var moreMenuExpanded by remember { mutableStateOf(false) }
@@ -151,6 +157,15 @@ fun PersonDetailScreen(
                     }
                 )
             }
+        )
+    }
+
+    // Duygular yalnızca BU kişiye bağlı anılardan hesaplanır.
+    // Bir günlükteki aynı kişi/aynı anı tekrarlarını tek sayar.
+    val personMoodSummary = remember(uiState.associatedJournals, moodState.moodsByJournalId) {
+        PersonMoodInsightsCalculator.calculate(
+            journalIds = uiState.associatedJournals.map { it.id },
+            moodByJournalId = moodState.moodsByJournalId
         )
     }
 
@@ -217,7 +232,8 @@ fun PersonDetailScreen(
                 val lastJournalId = stats.lastAppearance?.journal?.id
                 val hasInsights = stats.seasonBreakdown.isNotEmpty() ||
                         stats.badges.isNotEmpty() || uiState.connections.isNotEmpty() ||
-                        sharedPeopleFromJournals.isNotEmpty()
+                        sharedPeopleFromJournals.isNotEmpty() ||
+                        personMoodSummary.taggedMemories > 0
 
                 LazyColumn(
                     state = listState,
@@ -365,13 +381,23 @@ fun PersonDetailScreen(
                                 items = visibleAppearances,
                                 key = { "timeline-journal-${it.journal.id}" }
                             ) { appearance ->
-                                PersonTimelineItem(
-                                    appearance = appearance,
-                                    dateFormat = dateFormat,
-                                    isFirstAppearance = appearance.journal.id == firstJournalId,
-                                    isLastAppearance = appearance.journal.id == lastJournalId,
-                                    onClick = { onNavigateToJournalDetail(appearance.journal.id) }
-                                )
+                                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    PersonTimelineItem(
+                                        appearance = appearance,
+                                        dateFormat = dateFormat,
+                                        isFirstAppearance = appearance.journal.id == firstJournalId,
+                                        isLastAppearance = appearance.journal.id == lastJournalId,
+                                        onClick = { onNavigateToJournalDetail(appearance.journal.id) }
+                                    )
+                                    moodState.moodsByJournalId[appearance.journal.id]
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?.let { savedMood ->
+                                            PersonMoodTimelineBadge(
+                                                moodName = savedMood,
+                                                modifier = Modifier.padding(start = 42.dp)
+                                            )
+                                        }
+                                }
                             }
                         }
                     } else {
@@ -387,6 +413,14 @@ fun PersonDetailScreen(
                                 EmptyProfileMessage(
                                     "Birlikte yeni anılar biriktirdikçe burada keşfedeceğin detaylar oluşacak."
                                 )
+                            }
+                        }
+
+                        // Kişinin hisleri değil, kullanıcı tarafından anılara seçilen ruh halleri.
+                        // Hiç kayıt yoksa boş bir grafik veya tekrar eden kart göstermeyiz.
+                        if (personMoodSummary.taggedMemories > 0) {
+                            item(key = "insights-person-moods") {
+                                PersonMoodInsightsSummary(summary = personMoodSummary)
                             }
                         }
 

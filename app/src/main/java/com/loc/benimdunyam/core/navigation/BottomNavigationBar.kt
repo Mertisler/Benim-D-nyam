@@ -3,9 +3,11 @@ package com.loc.benimdunyam.core.navigation
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.outlined.Book
+import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material3.*
@@ -35,6 +37,12 @@ sealed class NavigationItem(
         selectedIcon = Icons.Filled.Book,
         unselectedIcon = Icons.Outlined.Book
     )
+    object Seasons : NavigationItem(
+        route = BottomNavScreen.Seasons.route,
+        title = "Dönemler",
+        selectedIcon = Icons.Filled.DateRange,
+        unselectedIcon = Icons.Outlined.DateRange
+    )
     object People : NavigationItem(
         route = BottomNavScreen.People.route,
         title = "İnsanlarım",
@@ -48,6 +56,7 @@ fun BottomNavigationBar(navController: NavController) {
     val items = listOf(
         NavigationItem.Home,
         NavigationItem.Journals,
+        NavigationItem.Seasons,
         NavigationItem.People
     )
 
@@ -86,7 +95,9 @@ fun BottomNavigationBar(navController: NavController) {
                         onClick = {
                             if (currentRoute != item.route) {
                                 navController.navigate(item.route) {
-                                    popUpTo(Screen.Main.route) { saveState = true }
+                                    // Screen.Main grafikte kayıtlı değildi. Sekmeler arası geçişin
+                                    // Home üzerinden tek kökte kalmasını sağla.
+                                    popUpTo(BottomNavScreen.Home.route) { saveState = true }
                                     launchSingleTop = true
                                     restoreState = true
                                 }

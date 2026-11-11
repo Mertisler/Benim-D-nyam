@@ -88,10 +88,11 @@ fun YearReviewScreen(
     // Mevcut film seansı boyunca fotoğraf kapakları snapshot olarak sabitlenir:
     // arka planda kapaklar geldikçe sahnelerin sırası değişmez.
     if (showMovie && state.report != null && state.report!!.journalCount > 0) {
-        val movieReport = remember(state.report!!.year) { state.report!! }
-        val movieCovers = remember(state.report!!.year) { state.coverPaths.toMap() }
-        val movieFeatured = remember(state.report!!.year) { state.featuredMemories.toList() }
-        val movieMoods = remember(state.report!!.year) {
+        val movieKey = state.report!!.seasonId ?: state.report!!.year.toString()
+        val movieReport = remember(movieKey) { state.report!! }
+        val movieCovers = remember(movieKey) { state.coverPaths.toMap() }
+        val movieFeatured = remember(movieKey) { state.featuredMemories.toList() }
+        val movieMoods = remember(movieKey) {
             state.moodReport?.takeIf { it.year == state.report!!.year }
         }
         YearMovieScreen(
@@ -137,8 +138,10 @@ fun YearReviewScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Yıl Sonu Hikâyem", color = Ink, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
-                        Text("HAYATININ BİR YILI • BİR HİKÂYE", fontSize = 9.sp, letterSpacing = 1.6.sp, color = Muted)
+                        Text(if (state.seasonId == null) "Yıl Sonu Hikâyem" else "Sezonun Filmi",
+                            color = Ink, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                        Text(state.seasonTitle ?: "HAYATININ BİR YILI • BİR HİKÂYE",
+                            fontSize = 11.sp, color = Muted, maxLines = 1)
                     }
                 },
                 navigationIcon = {
@@ -164,22 +167,24 @@ fun YearReviewScreen(
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                     contentPadding = PaddingValues(bottom = 48.dp)
                 ) {
-                    item(key = "year-picker") {
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(state.years, key = { it }) { year ->
-                                FilterChip(
-                                    selected = state.selectedYear == year,
-                                    onClick = { viewModel.selectYear(year) },
-                                    label = { Text(year.toString(), fontWeight = FontWeight.SemiBold) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Pine,
-                                        selectedLabelColor = Color.White
+                    if (state.seasonId == null) {
+                        item(key = "year-picker") {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(state.years, key = { it }) { year ->
+                                    FilterChip(
+                                        selected = state.selectedYear == year,
+                                        onClick = { viewModel.selectYear(year) },
+                                        label = { Text(year.toString(), fontWeight = FontWeight.SemiBold) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = Pine,
+                                            selectedLabelColor = Color.White
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
                     }
@@ -217,7 +222,8 @@ fun YearReviewScreen(
                                 ) {
                                     Icon(Icons.Default.Star, contentDescription = null)
                                     Spacer(Modifier.width(10.dp))
-                                    Text("Yılımın Posterini Oluştur", fontWeight = FontWeight.Bold)
+                                    Text(if (state.seasonId == null) "Yılımın Posterini Oluştur"
+                                    else "Sezonumun Posterini Oluştur", fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -233,7 +239,8 @@ fun YearReviewScreen(
                                 ) {
                                     Icon(Icons.Default.PlayArrow, contentDescription = null)
                                     Spacer(Modifier.width(10.dp))
-                                    Text("Yılımın Filmini MP4 Olarak Kaydet", fontWeight = FontWeight.Bold)
+                                    Text(if (state.seasonId == null) "Yılımın Filmini MP4 Olarak Kaydet"
+                                    else "Sezonumun Filmini MP4 Olarak Kaydet", fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -256,8 +263,11 @@ fun YearReviewScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Text("Henüz bu yıla ait bir anın yok", color = Ink, fontFamily = FontFamily.Serif, fontSize = 23.sp)
-                                    Text("Bir anı yazdığında bu yılın hikâyesi burada şekillenecek.", color = Muted)
+                                    Text(if (state.seasonId == null) "Henüz bu yıla ait bir anın yok"
+                                    else "Bu döneme henüz bir anı eklenmemiş", color = Ink, fontFamily = FontFamily.Serif, fontSize = 23.sp)
+                                    Text(if (state.seasonId == null)
+                                        "Bir anı yazdığında bu yılın hikâyesi burada şekillenecek."
+                                    else "Bu dönemde bir anı yazdığında film burada şekillenecek.", color = Muted)
                                 }
                             }
                         } else {
@@ -268,7 +278,8 @@ fun YearReviewScreen(
                                 item(key = "mood-map-${report.year}") {
                                     YearMoodMapSection(
                                         report = moodReport,
-                                        modifier = Modifier.padding(horizontal = 18.dp)
+                                        modifier = Modifier.padding(horizontal = 18.dp),
+                                        seasonTitle = report.seasonTitle
                                     )
                                 }
                             }
@@ -277,7 +288,7 @@ fun YearReviewScreen(
                                     YearPeopleScene(report, Modifier.padding(horizontal = 18.dp))
                                 }
                             }
-                            if (report.topSeasons.isNotEmpty()) {
+                            if (state.seasonId == null && report.topSeasons.isNotEmpty()) {
                                 item(key = "seasons") {
                                     YearSeasonScene(report, Modifier.padding(horizontal = 18.dp))
                                 }
@@ -299,7 +310,7 @@ fun YearReviewScreen(
                                 }
                             }
                             item(key = "end-card") {
-                                YearEndingCard(report.year, Modifier.padding(horizontal = 18.dp))
+                                YearEndingCard(report.year, Modifier.padding(horizontal = 18.dp), report.seasonTitle)
                             }
                         }
                     }
@@ -322,13 +333,16 @@ private fun YearReviewPoster(report: YearReviewReport, modifier: Modifier = Modi
         ) {
             Text("BENİM DÜNYAM ORIGINAL STORY", color = Color(0xFFDED2B7), fontSize = 10.sp, letterSpacing = 2.1.sp)
             Spacer(Modifier.height(5.dp))
-            Text(report.year.toString(), color = Gold, fontSize = 84.sp, lineHeight = 88.sp,
+            Text(report.seasonTitle ?: report.year.toString(), color = Gold,
+                fontSize = if (report.seasonId == null) 84.sp else 32.sp,
+                lineHeight = if (report.seasonId == null) 88.sp else 39.sp,
                 fontWeight = FontWeight.Light, fontFamily = FontFamily.Serif)
             Text("Benim Hikâyem", color = Color.White, fontSize = 30.sp,
                 fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Serif)
             Text(
                 if (report.journalCount == 0) "Henüz yazılmayı bekleyen bir hikâye..."
-                else "Bir yıl. Sayısız küçük an. Hepsi sana ait.",
+                else if (report.seasonId == null) "Bir yıl. Sayısız küçük an. Hepsi sana ait."
+                else "Bir dönem. Biriktirdiğin bütün anılar, sana ait.",
                 color = Color(0xFFE3E8E0), fontSize = 14.sp
             )
             Spacer(Modifier.height(18.dp))
@@ -336,7 +350,9 @@ private fun YearReviewPoster(report: YearReviewReport, modifier: Modifier = Modi
             Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
                 PosterMetric(report.journalCount.toString(), "ANI")
                 PosterMetric(report.uniquePeopleCount.toString(), "İNSAN")
-                PosterMetric(report.seasonCount.toString(), "SEZON")
+                PosterMetric(if (report.seasonId == null) report.seasonCount.toString()
+                else report.activeMonthCount.toString(),
+                    if (report.seasonId == null) "SEZON" else "AY")
             }
         }
     }
@@ -378,7 +394,9 @@ private fun YearCard(modifier: Modifier = Modifier, content: @Composable ColumnS
 @Composable
 private fun YearMonthlyScene(report: YearReviewReport, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SceneTitle("SAHNE 01  /  ZAMAN", "On iki ayın izi", "Hikâyenin hangi aylarda daha yoğun yazıldığını keşfet.")
+        SceneTitle("SAHNE 01  /  ZAMAN",
+            if (report.seasonId == null) "On iki ayın izi" else "Bu dönemin ayları",
+            "Hikâyenin hangi aylarda daha yoğun yazıldığını keşfet.")
         YearCard {
             val max = (report.monthlyCounts.maxOrNull() ?: 0).coerceAtLeast(1)
             Row(
@@ -415,7 +433,9 @@ private fun YearMonthlyScene(report: YearReviewReport, modifier: Modifier = Modi
 @Composable
 private fun YearPeopleScene(report: YearReviewReport, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SceneTitle("SAHNE 02  /  KARAKTERLER", "Bu yılın insanları", "Günlüklerinde en çok yer verdiğin kişiler.")
+        SceneTitle("SAHNE 02  /  KARAKTERLER",
+            if (report.seasonId == null) "Bu yılın insanları" else "Bu dönemin insanları",
+            "Günlüklerinde en çok yer verdiğin kişiler.")
         YearCard {
             report.topPeople.forEachIndexed { index, person ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
@@ -463,7 +483,9 @@ private fun YearMemoryScene(
     modifier: Modifier = Modifier
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SceneTitle("SAHNE 04  /  ANI DEFTERİ", "Dönüm sayfaları", "Yılın başından ortasına, oradan son sayfaya...")
+        SceneTitle("SAHNE 04  /  ANI DEFTERİ", "Dönüm sayfaları",
+            if (report.seasonId == null) "Yılın başından ortasına, oradan son sayfaya..."
+            else "Dönemin ilk anısından son sayfasına...")
         YearCard {
             report.selectedMemories.forEachIndexed { index, journal ->
                 Row(
@@ -498,7 +520,9 @@ private fun YearPhotoScene(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.padding(horizontal = 18.dp)) {
-            SceneTitle("SAHNE 05  /  KARELER", "Yıldan kalan görüntüler", "Fotoğraflı anılarından küçük bir film şeridi.")
+            SceneTitle("SAHNE 05  /  KARELER",
+                if (report.seasonId == null) "Yıldan kalan görüntüler" else "Dönemden kalan kareler",
+                "Fotoğraflı anılarından küçük bir film şeridi.")
         }
         val photoJournals = report.coverCandidates.filter { it.id in paths }
         LazyRow(contentPadding = PaddingValues(horizontal = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -530,7 +554,7 @@ private fun YearPhotoScene(
 }
 
 @Composable
-private fun YearEndingCard(year: Int, modifier: Modifier = Modifier) {
+private fun YearEndingCard(year: Int, modifier: Modifier = Modifier, seasonTitle: String? = null) {
     Box(modifier.fillMaxWidth().clip(RoundedCornerShape(25.dp))
         .background(Brush.verticalGradient(listOf(Color(0xFFEEE1CC), Color(0xFFF7F0E4))))) {
         Column(Modifier.fillMaxWidth().padding(26.dp),
@@ -539,7 +563,9 @@ private fun YearEndingCard(year: Int, modifier: Modifier = Modifier) {
             Text("✦", fontSize = 30.sp, color = Gold)
             Text("Ve hikâye devam ediyor...", fontSize = 25.sp, color = Ink,
                 fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
-            Text("$year yılından geriye kalan bu satırlar, yaşadığın günlerin sessiz tanıkları.",
+            Text(if (seasonTitle == null)
+                "$year yılından geriye kalan bu satırlar, yaşadığın günlerin sessiz tanıkları."
+            else "$seasonTitle döneminden geriye kalan bu anılar, yaşadığın günlerin sessiz tanıkları.",
                 color = Muted, fontSize = 13.sp, lineHeight = 20.sp)
             Text("BENİM DÜNYAM • SON SAHNE", color = Pine, fontSize = 10.sp, letterSpacing = 1.7.sp)
         }
@@ -568,7 +594,7 @@ private fun YearFeaturedMemoriesSection(
                 style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Serif)
         }
         Text(
-            "${year} filmine seçtiğin ${memories.size}/5 anı. " +
+            "Filme seçtiğin ${memories.size}/5 anı. " +
                     "Anı detayına giderek yıldızla işaretleyebilirsin.",
             color = Muted, style = MaterialTheme.typography.bodySmall
         )

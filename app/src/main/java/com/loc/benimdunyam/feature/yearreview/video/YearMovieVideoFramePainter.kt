@@ -44,6 +44,12 @@ internal class YearMovieVideoFramePainter(
     private var currentImage: Bitmap? = null
     private val months = listOf("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
     private val dateFormat = SimpleDateFormat("d MMMM yyyy", Locale.forLanguageTag("tr-TR"))
+    // İçe/dışa aktarılan filmde kişisel sezon adı varsayılan olarak paylaşılmaz.
+    private val visiblePeriodTitle = when {
+        report.seasonId == null -> report.year.toString()
+        options.includeMemoryText -> report.seasonTitle ?: "Bir Dönem"
+        else -> "Bir Dönem"
+    }
 
     fun render(clip: YearMovieVideoClip, clipIndex: Int, progress: Float, totalClips: Int): Bitmap {
         if (currentClipIndex != clipIndex) {
@@ -60,7 +66,7 @@ internal class YearMovieVideoFramePainter(
         when (clip.frame.chapter) {
             YearMovieChapter.OPENING -> opening(t)
             YearMovieChapter.MONTHS -> allMonths(t)
-            YearMovieChapter.MONTH_STORY -> monthStory(t, clip.frame.monthIndex)
+            YearMovieChapter.MONTH_STORY -> monthStory(t, clip.frame.monthIndex, clip.frame.monthYear)
             YearMovieChapter.MOOD -> Unit // Ruh hali verisi video için varsayılan olarak dışarı aktarılmaz.
             YearMovieChapter.CAST -> people(t)
             YearMovieChapter.SEASONS -> seasons(t)
@@ -106,7 +112,7 @@ internal class YearMovieVideoFramePainter(
     }
 
     private fun header(index: Int, count: Int) {
-        text("BENİM DÜNYAM  /  ${report.year}", 58f, 100f, 19f, gold, true, spacing = 1.3f)
+        text("BENİM DÜNYAM  /  ${visiblePeriodTitle.take(24)}", 58f, 100f, 19f, gold, true, spacing = 1.3f)
         paint.color = gold
         canvas.drawRect(58f, 124f, 662f, 126f, paint)
         val left = 58f
@@ -122,13 +128,17 @@ internal class YearMovieVideoFramePainter(
     }
 
     private fun opening(t: Float) {
-        smallTag("BİR YILIN FİLMİ", 254f)
-        text(report.year.toString(), 56f, 475f+(1f-t)*24f, 165f, gold, serif = true, alpha = appear(t))
+        smallTag(if (report.seasonId == null) "BİR YILIN FİLMİ" else "BİR DÖNEMİN FİLMİ", 254f)
+        text(visiblePeriodTitle.take(30),
+            56f, 475f+(1f-t)*24f, if (report.seasonId == null) 165f else 59f,
+            gold, serif = true, alpha = appear(t))
         text("Benim Hikâyem", 60f, 556f, 57f, cream, serif = true, alpha = appear(t))
-        wrapped("Her yıl bir hikâye bırakır. İşte seninki.", 60f, 625f, 35f, 580f, 2, muted)
+        wrapped(if (report.seasonId == null) "Her yıl bir hikâye bırakır. İşte seninki."
+        else "Her dönem bir hikâye bırakır. İşte seninki.", 60f, 625f, 35f, 580f, 2, muted)
         statCard(60f, 800f, "${report.journalCount}", "ANI")
         statCard(265f, 800f, "${report.uniquePeopleCount}", "İNSAN")
-        statCard(470f, 800f, "${report.seasonCount}", "SEZON")
+        statCard(470f, 800f, "${if (report.seasonId == null) report.seasonCount else report.activeMonthCount}",
+            if (report.seasonId == null) "SEZON" else "AY")
     }
 
     private fun allMonths(t: Float) {
@@ -153,10 +163,12 @@ internal class YearMovieVideoFramePainter(
         wrapped("${report.activeMonthCount} ayda anı biriktirdin.", 60f, 1102f, 31f, 575f, 2, cream)
     }
 
-    private fun monthStory(t: Float, monthIndex: Int?) {
-        val story = report.monthlyStories.firstOrNull { it.monthIndex == monthIndex }
+    private fun monthStory(t: Float, monthIndex: Int?, monthYear: Int?) {
+        val story = report.monthlyStories.firstOrNull {
+            it.monthIndex == monthIndex && it.storyYear == monthYear
+        }
         val name = months.getOrNull(monthIndex ?: -1) ?: "Bir Ay"
-        smallTag("${(monthIndex ?: 0)+1}. BÖLÜM  /  ${report.year}", 246f)
+        smallTag("${(monthIndex ?: 0)+1}. BÖLÜM  /  $visiblePeriodTitle", 246f)
         text(name, 58f, 377f+(1f-t)*16f, 98f, gold, serif = true, alpha = appear(t))
         if (story == null || story.journalCount == 0) {
             wrapped("Bu ay kaydedilmiş bir anı yok.", 60f, 530f, 35f, 590f, 3, cream)
@@ -182,7 +194,7 @@ internal class YearMovieVideoFramePainter(
 
     private fun people(t: Float) {
         smallTag("OYUNCU KADROSU", 250f)
-        text("Yılın İnsanları", 58f, 340f, 54f, cream, serif = true, alpha = appear(t))
+        text(if (report.seasonId == null) "Yılın İnsanları" else "Dönemin İnsanları", 58f, 340f, 54f, cream, serif = true, alpha = appear(t))
         report.topPeople.take(5).forEachIndexed { i, person ->
             val y = 450f+i*118f
             paint.color = 0x99304E3D.toInt()
@@ -195,7 +207,7 @@ internal class YearMovieVideoFramePainter(
     }
 
     private fun seasons(t: Float) {
-        smallTag("YILIN PERDELERİ", 255f)
+        smallTag(if (report.seasonId == null) "YILIN PERDELERİ" else "DÖNEMİN PERDELERİ", 255f)
         text("Hayatının Sezonları", 58f, 360f, 52f, cream, serif = true, alpha = appear(t))
         val max = report.topSeasons.maxOfOrNull { it.journalCount }?.coerceAtLeast(1) ?: 1
         report.topSeasons.take(4).forEachIndexed { i, season ->
@@ -234,7 +246,7 @@ internal class YearMovieVideoFramePainter(
     }
 
     private fun photos(t: Float) {
-        smallTag("YILINDAN KARELER", 270f)
+        smallTag(if (report.seasonId == null) "YILINDAN KARELER" else "DÖNEMDEN KARELER", 270f)
         text("Hatıra Kareleri", 58f, 396f, 60f, cream, serif = true, alpha = appear(t))
         wrapped("Fotoğraflar bazen kelimelerden daha fazlasını anlatır.", 60f, 510f, 32f, 570f, 4, cream)
     }
@@ -243,7 +255,9 @@ internal class YearMovieVideoFramePainter(
         smallTag("SON SAHNE", 280f)
         text("Hikâyen", 58f, 448f+(1f-t)*22f, 77f, cream, serif = true, alpha = appear(t))
         text("Devam Ediyor.", 58f, 545f, 75f, gold, serif = true, alpha = appear(t))
-        wrapped("${report.year} yılında ${report.journalCount} anı biriktirdin. Her biri sana ait.",
+        wrapped(if (report.seasonId == null)
+            "${report.year} yılında ${report.journalCount} anı biriktirdin. Her biri sana ait."
+        else "$visiblePeriodTitle döneminde ${report.journalCount} anı biriktirdin. Her biri sana ait.",
             60f, 657f, 32f, 565f, 4, cream)
         text("BENİM DÜNYAM", 60f, 1027f, 38f, gold, true, spacing = 3f)
         text("SON  /  YENİ BİR BAŞLANGIÇ", 60f, 1072f, 20f, muted, true)
@@ -322,7 +336,8 @@ internal class YearMovieVideoFramePainter(
         val ids = when (clip.frame.chapter) {
             YearMovieChapter.FEATURED -> listOfNotNull(clip.frame.journalId)
             YearMovieChapter.MONTH_STORY -> report.monthlyStories.firstOrNull {
-                it.monthIndex == clip.frame.monthIndex
+                it.monthIndex == clip.frame.monthIndex &&
+                        it.storyYear == clip.frame.monthYear
             }?.coverCandidates.orEmpty().map { it.id }
             YearMovieChapter.PHOTOS, YearMovieChapter.OPENING ->
                 (featured + report.coverCandidates).distinctBy { it.id }.map { it.id }

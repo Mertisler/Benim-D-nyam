@@ -89,9 +89,9 @@ fun YearPosterScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
-    var options by remember(report.year) { mutableStateOf(YearPosterOptions()) }
-    var preview by remember(report.year) { mutableStateOf<Bitmap?>(null) }
-    var preparingPreview by remember(report.year) { mutableStateOf(true) }
+    var options by remember(report.seasonId ?: report.year.toString()) { mutableStateOf(YearPosterOptions()) }
+    var preview by remember(report.seasonId ?: report.year.toString()) { mutableStateOf<Bitmap?>(null) }
+    var preparingPreview by remember(report.seasonId ?: report.year.toString()) { mutableStateOf(true) }
     var exporting by remember { mutableStateOf(false) }
     var pendingDocument by remember { mutableStateOf<Pair<YearPosterContent, YearPosterOptions>?>(null) }
 
@@ -164,7 +164,7 @@ fun YearPosterScreen(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             // Android 9 ve öncesinde depolama izni istemek yerine sistem dosya seçicisi.
             pendingDocument = content to options
-            documentLauncher.launch("BenimDunyam_${report.year}_Poster.png")
+            documentLauncher.launch("BenimDunyam_${report.seasonId?.take(8) ?: report.year}_Poster.png")
             return
         }
         val snapshot = content to options
@@ -204,7 +204,7 @@ fun YearPosterScreen(
                 } finally {
                     bitmap.recycle()
                 }
-                context.startActivity(Intent.createChooser(shareIntent, "Yılın posterini paylaş"))
+                context.startActivity(Intent.createChooser(shareIntent, if (report.seasonId != null) "Sezonun posterini paylaş" else "Yılın posterini paylaş"))
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Exception) {

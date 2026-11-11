@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -90,7 +92,10 @@ fun SeasonStorySummaryFeature(
     }
     val coverPaths by coverViewModel.covers.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
-    var showEpisodeStories by rememberSaveable(season.id) { mutableStateOf(false) }
+    var showStory by rememberSaveable(season.id, "story") { mutableStateOf(false) }
+    var showTimeline by rememberSaveable(season.id, "timeline") { mutableStateOf(false) }
+    var showPhotos by rememberSaveable(season.id, "photos") { mutableStateOf(false) }
+    var showEpisodeStories by rememberSaveable(season.id, "episodes") { mutableStateOf(false) }
 
     LaunchedEffect(candidateIds) { coverViewModel.load(candidateIds) }
     // Covers are files rather than Room Flow; reload when coming back from an editor.
@@ -108,52 +113,46 @@ fun SeasonStorySummaryFeature(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.MenuBook, contentDescription = null, tint = StoryGold)
-            Spacer(Modifier.width(9.dp))
-            Column {
-                Text("SEZONUN HİKÂYESİ", color = StoryGold,
-                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.8.sp))
-                Text("Bir dönemin izleri", color = StoryPaper,
-                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif))
-            }
+        StoryExpandableHeading("Sezonun Hikâyesi", "Bir dönemin izleri", showStory) {
+            showStory = !showStory
         }
+        AnimatedVisibility(visible = showStory) {
+            Card(
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = StoryCard),
+                border = BorderStroke(1.dp, StoryBorder)
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StoryMetric("ANI", report.memoryCount.toString(), Modifier.weight(1f))
+                        StoryMetric("İNSAN", report.uniquePeopleCount.toString(), Modifier.weight(1f))
+                        StoryMetric("DOLU BÖLÜM", report.filledEpisodeCount.toString(), Modifier.weight(1f))
+                    }
 
-        Card(
-            shape = RoundedCornerShape(22.dp),
-            colors = CardDefaults.cardColors(containerColor = StoryCard),
-            border = BorderStroke(1.dp, StoryBorder)
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StoryMetric("ANI", report.memoryCount.toString(), Modifier.weight(1f))
-                    StoryMetric("İNSAN", report.uniquePeopleCount.toString(), Modifier.weight(1f))
-                    StoryMetric("DOLU BÖLÜM", report.filledEpisodeCount.toString(), Modifier.weight(1f))
-                }
+                    HorizontalDivider(color = StoryBorder)
 
-                HorizontalDivider(color = StoryBorder)
-
-                if (report.memoryCount == 0) {
-                    Text("Bu sezonun hikâyesi henüz yazılmadı. İlk anını eklediğinde burada günlerin izleri görünecek.",
-                        color = StoryMuted, style = MaterialTheme.typography.bodyMedium)
-                } else {
-                    Text("Bu sezonda öne çıkan insanlar", color = StoryPaper,
-                        style = MaterialTheme.typography.titleMedium)
-                    if (report.topPeople.isEmpty()) {
-                        Text("Henüz bu sezonda etiketlenmiş bir kişi bulunmuyor.",
-                            color = StoryMuted, style = MaterialTheme.typography.bodySmall)
+                    if (report.memoryCount == 0) {
+                        Text("Bu sezonun hikâyesi henüz yazılmadı. İlk anını eklediğinde burada günlerin izleri görünecek.",
+                            color = StoryMuted, style = MaterialTheme.typography.bodyMedium)
                     } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                            report.topPeople.forEachIndexed { index, person ->
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("${index + 1}.", color = StoryGold,
-                                        style = MaterialTheme.typography.labelLarge)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(person.name, modifier = Modifier.weight(1f), color = StoryPaper,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text("${person.journalCount} anıda", color = StoryMuted,
-                                        style = MaterialTheme.typography.labelSmall)
+                        Text("Bu sezonda öne çıkan insanlar", color = StoryPaper,
+                            style = MaterialTheme.typography.titleMedium)
+                        if (report.topPeople.isEmpty()) {
+                            Text("Henüz bu sezonda etiketlenmiş bir kişi bulunmuyor.",
+                                color = StoryMuted, style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                report.topPeople.forEachIndexed { index, person ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("${index + 1}.", color = StoryGold,
+                                            style = MaterialTheme.typography.labelLarge)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(person.name, modifier = Modifier.weight(1f), color = StoryPaper,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("${person.journalCount} anıda", color = StoryMuted,
+                                            style = MaterialTheme.typography.labelSmall)
+                                    }
                                 }
                             }
                         }
@@ -163,19 +162,20 @@ fun SeasonStorySummaryFeature(
         }
 
         if (report.timeline.isNotEmpty()) {
-            Text("Hikâyenin dönüm sayfaları", color = StoryPaper,
-                style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Serif))
-            Text("İlk, orta ve son kayıtlardan kronolojik bir seçki.", color = StoryMuted,
-                style = MaterialTheme.typography.bodySmall)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                report.timeline.forEachIndexed { index, journal ->
-                    val label = when {
-                        report.timeline.size == 1 -> "BU SEZONUN ANI SAYFASI"
-                        index == 0 -> "İLK SAYFA"
-                        index == report.timeline.lastIndex -> "SON SAYFA"
-                        else -> "HİKÂYENİN ORTASI"
+            StoryExpandableHeading("Hikâyenin Dönüm Sayfaları", "İlk, orta ve son anılar", showTimeline) {
+                showTimeline = !showTimeline
+            }
+            AnimatedVisibility(visible = showTimeline) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    report.timeline.forEachIndexed { index, journal ->
+                        val label = when {
+                            report.timeline.size == 1 -> "BU SEZONUN ANI SAYFASI"
+                            index == 0 -> "İLK SAYFA"
+                            index == report.timeline.lastIndex -> "SON SAYFA"
+                            else -> "HİKÂYENİN ORTASI"
+                        }
+                        StoryTimelineRow(label, journal, onJournalClick)
                     }
-                    StoryTimelineRow(label, journal, onJournalClick)
                 }
             }
         }
@@ -184,52 +184,76 @@ fun SeasonStorySummaryFeature(
             report.recentMemories.filter { coverPaths.containsKey(it.id) }.take(5)
         }
         if (photoJournals.isNotEmpty()) {
-            Text("Sezondan kareler", color = StoryPaper,
-                style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Serif))
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                photoJournals.forEach { journal ->
-                    val path = coverPaths[journal.id]
-                    if (path != null) {
-                        StoryPhotoTile(journal, path, onJournalClick)
+            StoryExpandableHeading("Sezondan Kareler", "Fotoğraflı anıların", showPhotos) { showPhotos = !showPhotos }
+            AnimatedVisibility(visible = showPhotos) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    photoJournals.forEach { journal ->
+                        val path = coverPaths[journal.id]
+                        if (path != null) {
+                            StoryPhotoTile(journal, path, onJournalClick)
+                        }
                     }
                 }
             }
         }
 
-        Card(
-            colors = CardDefaults.cardColors(containerColor = StoryCard),
-            border = BorderStroke(1.dp, StoryBorder),
-            shape = RoundedCornerShape(18.dp)
-        ) {
-            Column(Modifier.fillMaxWidth().padding(14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = StoryGold)
-                    Spacer(Modifier.width(6.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Bölümlerin kısa hikâyesi", color = StoryPaper,
-                            style = MaterialTheme.typography.titleMedium)
-                        Text("${report.episodeReports.size} bölümün anı dökümü", color = StoryMuted,
-                            style = MaterialTheme.typography.bodySmall)
-                    }
-                    TextButton(onClick = { showEpisodeStories = !showEpisodeStories }) {
-                        Text(if (showEpisodeStories) "Gizle" else "Göster", color = StoryGold)
-                    }
-                }
-                AnimatedVisibility(visible = showEpisodeStories) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        if (report.episodeReports.isEmpty()) {
-                            Text("Bu sezona henüz bölüm eklenmemiş.", color = StoryMuted)
-                        } else {
-                            report.episodeReports.forEach { summary ->
-                                StoryEpisodeRow(summary, onEpisodeClick, onJournalClick)
-                            }
+
+        StoryExpandableHeading(
+            "Bölümlerin Kısa Hikâyesi",
+            "${report.episodeReports.size} bölümün anı dökümü",
+            showEpisodeStories
+        ) { showEpisodeStories = !showEpisodeStories }
+        AnimatedVisibility(visible = showEpisodeStories) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = StoryCard),
+                border = BorderStroke(1.dp, StoryBorder),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (report.episodeReports.isEmpty()) {
+                        Text("Bu sezona henüz bölüm eklenmemiş.", color = StoryMuted)
+                    } else {
+                        report.episodeReports.forEach { summary ->
+                            StoryEpisodeRow(summary, onEpisodeClick, onJournalClick)
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StoryExpandableHeading(
+    title: String,
+    subtitle: String,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle),
+        shape = RoundedCornerShape(15.dp),
+        color = StoryCard,
+        border = BorderStroke(1.dp, StoryBorder)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.MenuBook, contentDescription = null, tint = StoryGold)
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = StoryPaper, style = MaterialTheme.typography.titleSmall)
+                Text(subtitle, color = StoryMuted, style = MaterialTheme.typography.bodySmall)
+            }
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                contentDescription = if (expanded) "Daralt" else "Genişlet",
+                tint = StoryGold
+            )
         }
     }
 }

@@ -35,6 +35,8 @@ data class JournalsUiState(
     val totalJournals: Int = 0,
     val seasons: List<LifeSeason> = emptyList(),
     val episodes: List<LifeEpisode> = emptyList(),
+    // Every journal can belong to a different season: these titles are not tied to the filter.
+    val episodeTitles: Map<String, String> = emptyMap(),
     val people: List<Person> = emptyList(),
     val startDate: Long? = null,
     val endDate: Long? = null,
@@ -87,11 +89,30 @@ class JournalsViewModel @Inject constructor(
         JournalArchiveData(journals, seasons, people, episodes)
     }
 
+    // The filter sheet observes episodes only for the selected season. Journal cards,
+    // however, must display episode names from *all* seasons represented in the archive.
+    // Observe just those seasons reactively; renaming an episode updates the card too.
+    private val archiveEpisodeTitles = archiveData
+        .map { data ->
+            data.journals.mapNotNull { it.seasonId }.distinct().sorted()
+        }
+        .distinctUntilChanged()
+        .flatMapLatest { seasonIds ->
+            if (seasonIds.isEmpty()) {
+                flowOf(emptyMap<String, String>())
+            } else {
+                combine(seasonIds.map { seasonId -> observeEpisodesBySeasonUseCase(seasonId) }) { groups ->
+                    groups.flatMap { it }.associate { it.id to it.title }
+                }
+            }
+        }
+
     val uiState: StateFlow<JournalsUiState> = combine(
         archiveData,
+        archiveEpisodeTitles,
         filters,
         deleteError
-    ) { data, active, warning ->
+    ) { data, episodeTitles, active, warning ->
         // Filter menu only lists people actually mentioned in at least one entry.
         // This avoids creating thousands of menu items after contact import.
         val mentionedIds = data.journals.flatMap { journal ->
@@ -108,6 +129,7 @@ class JournalsViewModel @Inject constructor(
             seasons = data.seasons,
             episodes = data.episodes.filter { it.seasonId == active.selectedSeasonId }
                 .sortedBy { it.orderIndex },
+            episodeTitles = episodeTitles,
             people = choices,
             startDate = active.startDate,
             endDate = active.endDate,

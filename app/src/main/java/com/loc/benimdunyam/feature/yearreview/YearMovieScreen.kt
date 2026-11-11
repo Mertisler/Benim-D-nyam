@@ -94,20 +94,20 @@ fun YearMovieScreen(
         return
     }
 
-    var frameIndex by remember(report.year) { mutableIntStateOf(0) }
-    var replayVersion by remember(report.year) { mutableIntStateOf(0) }
+    var frameIndex by remember(report.seasonId ?: report.year.toString()) { mutableIntStateOf(0) }
+    var replayVersion by remember(report.seasonId ?: report.year.toString()) { mutableIntStateOf(0) }
     val context = LocalContext.current
     val accessibilityManager = remember(context) {
         context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
     }
-    var paused by remember(report.year) {
+    var paused by remember(report.seasonId ?: report.year.toString()) {
         mutableStateOf(accessibilityManager?.isTouchExplorationEnabled == true)
     }
     // Film içi tercihtir; kalıcı ayar veya yeni DataStore bağımlılığı istemez.
-    var reducedMotion by remember(report.year) {
+    var reducedMotion by remember(report.seasonId ?: report.year.toString()) {
         mutableStateOf(accessibilityManager?.isTouchExplorationEnabled == true)
     }
-    val progress = remember(report.year) { Animatable(0f) }
+    val progress = remember(report.seasonId ?: report.year.toString()) { Animatable(0f) }
     val lifecycleOwner = LocalLifecycleOwner.current
     var foreground by remember(lifecycleOwner) {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
@@ -148,7 +148,7 @@ fun YearMovieScreen(
 
     // Tek coroutine: sahne sıfırlama ve sayaç asla birbirleriyle yarışmaz.
     // Duraklat / arka plana geç / devam et: aynı sahnede kalan süre korunur.
-    var lastPlaybackKey by remember(report.year) { mutableStateOf<Pair<Int, Int>?>(null) }
+    var lastPlaybackKey by remember(report.seasonId ?: report.year.toString()) { mutableStateOf<Pair<Int, Int>?>(null) }
     val playbackKey = safeIndex to replayVersion
     LaunchedEffect(playbackKey, paused, foreground) {
         if (lastPlaybackKey != playbackKey) {
@@ -285,7 +285,8 @@ fun YearMovieScreen(
                             featuredMemory = featuredMemories.firstOrNull { it.id == visibleFrame.journalId },
                             moodReport = moodReport,
                             monthStory = report.monthlyStories.firstOrNull {
-                                it.monthIndex == visibleFrame.monthIndex
+                                it.monthIndex == visibleFrame.monthIndex &&
+                                        it.storyYear == visibleFrame.monthYear
                             },
                             sceneProgress = if (visibleIndex == safeIndex) visibleProgress else 0f,
                             report = report,
