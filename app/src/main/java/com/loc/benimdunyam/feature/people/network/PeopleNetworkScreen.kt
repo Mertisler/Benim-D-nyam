@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.people.network
 
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -100,8 +102,10 @@ fun PeopleNetworkScreen(
     val hasActiveFilter = state.selectedSeasonId != null || !state.onlyWithMemories
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 title = {
                     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                         Text("İnsan Haritası", style = MaterialTheme.typography.titleMedium)

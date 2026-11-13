@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.yearreview
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -34,14 +36,14 @@ import com.loc.benimdunyam.feature.yearreview.mood.YearMoodReport
 import java.util.Locale
 import kotlin.math.max
 
-private val Gold = Color(0xFFE7C68A)
-private val White = Color(0xFFFAF5E9)
-private val Pale = Color(0xFFBDD3C6)
-private val Muted = Color(0xFF7E998D)
+private val Gold get() = themedColor(Color(0xFFE7C68A))
+private val White get() = themedColor(Color(0xFFFAF5E9))
+private val Pale get() = themedColor(Color(0xFFBDD3C6))
+private val Muted get() = themedColor(Color(0xFF7E998D))
 private val GraphColors = listOf(
-    Color(0xFF547C67), Color(0xFFCE9B58), Color(0xFF7E91B4),
-    Color(0xFFB77E83), Color(0xFF8A7DB1), Color(0xFFCB8A5D),
-    Color(0xFF71A6A0), Color(0xFFA1A168)
+    themedColor(Color(0xFF547C67)), themedColor(Color(0xFFCE9B58)), themedColor(Color(0xFF7E91B4)),
+    themedColor(Color(0xFFB77E83)), themedColor(Color(0xFF8A7DB1)), themedColor(Color(0xFFCB8A5D)),
+    themedColor(Color(0xFF71A6A0)), themedColor(Color(0xFFA1A168))
 )
 private val Months = listOf("Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara")
 
@@ -87,7 +89,7 @@ internal fun YearMoodMovieScene(report: YearMoodReport, sceneProgress: Float, se
                 Column(
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFF2B5044))
+                        .background(themedColor(Color(0xFF2B5044)))
                         .padding(17.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
@@ -179,7 +181,7 @@ internal fun YearMoodMovieScene(report: YearMoodReport, sceneProgress: Float, se
 private fun MoodFilmMetric(value: String, label: String, modifier: Modifier) {
     Column(
         modifier = modifier.clip(RoundedCornerShape(13.dp))
-            .background(Color(0xFF254539)).padding(horizontal = 10.dp, vertical = 12.dp),
+            .background(themedColor(Color(0xFF254539))).padding(horizontal = 10.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         Text(value, color = Gold, fontSize = 22.sp, fontWeight = FontWeight.Bold)

@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.home.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -46,15 +48,15 @@ fun RecentJournalsSection(
         Text(
             text = "Son Anılar",
             style = MaterialTheme.typography.titleLarge,
-            color = Color(0xFF332D27)
+            color = themedColor(Color(0xFF332D27))
         )
 
         if (recentJournals.isEmpty()) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                color = Color(0xFFF0EAE1),
-                border = BorderStroke(1.dp, Color(0xFFE5DDD1))
+                color = themedColor(Color(0xFFF0EAE1)),
+                border = BorderStroke(1.dp, themedColor(Color(0xFFE5DDD1)))
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
@@ -63,18 +65,18 @@ fun RecentJournalsSection(
                     Text(
                         text = "Henüz bir anı yazmadın.",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color(0xFF514A41)
+                        color = themedColor(Color(0xFF514A41))
                     )
                     Spacer(modifier = Modifier.height(5.dp))
                     Text(
                         text = "Günün içinden küçük bir anı bile burada güzel bir hatıraya dönüşebilir.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF81796F)
+                        color = themedColor(Color(0xFF81796F))
                     )
                     TextButton(onClick = onCreateJournalClick) {
                         Text(
                             text = "İlk anını yaz",
-                            color = Color(0xFF52745B)
+                            color = themedColor(Color(0xFF52745B))
                         )
                     }
                 }
@@ -110,9 +112,9 @@ fun HorizontalJournalCard(
             .height(139.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFF0EAE1)
+            containerColor = themedColor(Color(0xFFF0EAE1))
         ),
-        border = BorderStroke(1.dp, Color(0xFFE5DDD1)),
+        border = BorderStroke(1.dp, themedColor(Color(0xFFE5DDD1))),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -127,12 +129,12 @@ fun HorizontalJournalCard(
                     style = MaterialTheme.typography.labelLarge.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
-                    color = Color(0xFF62816C)
+                    color = themedColor(Color(0xFF62816C))
                 )
                 Text(
                     text = journal.content.ifBlank { journal.title },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF514A41),
+                    color = themedColor(Color(0xFF514A41)),
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -146,7 +148,7 @@ fun HorizontalJournalCard(
                 ) {
                     Surface(
                         shape = CircleShape,
-                        color = Color(0xFF6E947B),
+                        color = themedColor(Color(0xFF6E947B)),
                         modifier = Modifier.size(21.dp)
                     ) {
                         androidx.compose.foundation.layout.Box(
@@ -162,7 +164,7 @@ fun HorizontalJournalCard(
                     Text(
                         text = firstPerson.name,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF716A60),
+                        color = themedColor(Color(0xFF716A60)),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

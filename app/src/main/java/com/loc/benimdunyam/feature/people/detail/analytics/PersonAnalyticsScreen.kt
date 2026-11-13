@@ -1,5 +1,6 @@
 package com.loc.benimdunyam.feature.people.detail.analytics
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,8 +35,10 @@ fun PersonAnalyticsScreen(
     val trMonths = remember { listOf("Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara") }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 title = { Text("Hikâye Analizi") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {

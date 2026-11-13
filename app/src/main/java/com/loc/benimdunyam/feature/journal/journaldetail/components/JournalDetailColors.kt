@@ -1,19 +1,22 @@
 package com.loc.benimdunyam.feature.journal.journaldetail.components
 
+import com.loc.benimdunyam.core.designsystem.AppThemeController
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.ui.graphics.Color
 
 internal object JournalDetailColors {
-    val PaperLight = Color(0xFFFAF6EE)
-    val Paper = Color(0xFFF7F1E5)
-    val Ink = Color(0xFF33271F)
-    val MutedInk = Color(0xFF756755)
-    val Tape = Color(0xFFE8DDC9)
-    val Green = Color(0xFF365A43)
-    val Delete = Color(0xFF9B453B)
-    val Polaroid = Color(0xFFFFFEFA)
-    val PolaroidImageTop = Color(0xFFE9E0D2)
-    val PolaroidImageBottom = Color(0xFFDCD0BD)
-    val Accent = Color(0xFF9A7952)
-    val Divider = Color(0xFFAA987D)
-    val PersonTag = Color(0xFFE7E0D1)
+    val PaperLight get() = AppThemeController.palette.background
+    val Paper get() = AppThemeController.palette.paper
+    val Ink get() = AppThemeController.palette.ink
+    val MutedInk get() = AppThemeController.palette.muted
+    val Tape get() = AppThemeController.palette.tape
+    val Green get() = AppThemeController.palette.primary
+    val Delete get() = themedColor(Color(0xFF9B453B))
+    val Polaroid get() = AppThemeController.palette.paper
+    val PolaroidImageTop get() = AppThemeController.palette.tape
+    val PolaroidImageBottom get() = AppThemeController.palette.border
+    val Accent get() = AppThemeController.palette.secondary
+    val Divider get() = AppThemeController.palette.border
+    val PersonTag get() = AppThemeController.palette.softPrimary
 }

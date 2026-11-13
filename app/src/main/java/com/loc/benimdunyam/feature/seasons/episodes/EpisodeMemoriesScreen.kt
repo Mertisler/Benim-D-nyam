@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.seasons.episodes
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,24 +31,25 @@ fun EpisodeMemoriesScreen(
     val episode = uiState.episode
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         text = episode?.let { "${it.orderIndex}. Bölüm Anıları" } ?: "Bölüm Anıları",
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri", tint = Color.White)
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri", tint = MaterialTheme.colorScheme.onBackground)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         },
-        containerColor = Color(0xFF121212)
-    ) { paddingValues ->
+
+        ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -91,7 +94,7 @@ fun EpisodeMemoriesScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onJournalClick(journal.id) },
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+                            colors = CardDefaults.cardColors(containerColor = themedColor(Color(0xFF1E1E1E))),
                             shape = RoundedCornerShape(12.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                         ) {

@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.home
 
+import com.loc.benimdunyam.core.designsystem.AppThemeController
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,10 +62,6 @@ fun HomeScreen(
                 )
     }
 
-    val background = Brush.verticalGradient(
-        listOf(Color(0xFFFAF7F2), Color(0xFFF3ECE1))
-    )
-
     val onCreateJournal = {
         onNavigateToCreateJournal(
             uiState.activeSeasonId,
@@ -80,11 +78,7 @@ fun HomeScreen(
             )
         }
     ) { scaffoldPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(background)
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),

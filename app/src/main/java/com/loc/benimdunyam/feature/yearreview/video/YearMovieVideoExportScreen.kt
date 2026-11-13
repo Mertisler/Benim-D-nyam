@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.yearreview.video
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import android.content.Intent
 import android.os.Build
 import androidx.activity.compose.BackHandler
@@ -66,10 +68,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private val Bg = Color(0xFFFAF7F2)
-private val Pine = Color(0xFF284B39)
-private val Gold = Color(0xFFE7C68A)
-private val Ink = Color(0xFF322A24)
+private val Bg get() = themedColor(Color(0xFFFAF7F2))
+private val Pine get() = themedColor(Color(0xFF284B39))
+private val Gold get() = themedColor(Color(0xFFE7C68A))
+private val Ink get() = themedColor(Color(0xFF322A24))
 
 private sealed class VideoDestination {
     data object Gallery : VideoDestination()
@@ -242,12 +244,12 @@ fun YearMovieVideoExportScreen(
                     Text("${report.journalCount} anı · ${report.activeMonthCount} aktif ay · ${featuredMemories.size} özel sahne",
                         color = Color.White, fontSize = 13.sp)
                     Text("720 × 1280  •  24 FPS  •  yaklaşık ${videoPlan.durationSeconds} saniye",
-                        color = Color(0xFFD5E0D8), fontSize = 12.sp)
+                        color = themedColor(Color(0xFFD5E0D8)), fontSize = 12.sp)
                 }
             }
             Text("Paylaşımda neler görünsün?", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold)
             Text("Günlüğün özel. Bu seçenekler her açılışta kapalı gelir. Açmadığın içerik videoda görünmez.",
-                color = Color(0xFF766D64), fontSize = 13.sp)
+                color = themedColor(Color(0xFF766D64)), fontSize = 13.sp)
             PrivacySwitch("Anı fotoğrafları", "Seçilmiş kapak fotoğrafları videoya dahil edilir.",
                 includePhotos, busy) { includePhotos = it }
             HorizontalDivider()
@@ -259,9 +261,9 @@ fun YearMovieVideoExportScreen(
                 includeMemoryText, busy) { includeMemoryText = it }
             HorizontalDivider()
             Text("Video sessiz oluşturulur. İnternet, kayıt izni veya üçüncü taraf video servisi gerekmez.",
-                fontSize = 12.sp, color = Color(0xFF766D64))
+                fontSize = 12.sp, color = themedColor(Color(0xFF766D64)))
             Text("Film dosyasını paylaşırsan veya galeriye kaydedersen, seçtiğin özel bilgiler cihaz dışına çıkabilir ya da fotoğraf yedekleme uygulamalarınca senkronize edilebilir.",
-                fontSize = 12.sp, color = Color(0xFF766D64))
+                fontSize = 12.sp, color = themedColor(Color(0xFF766D64)))
             if (busy) Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(modifier = Modifier.height(20.dp).width(20.dp), color = Pine, strokeWidth = 2.dp)
                 Spacer(Modifier.width(10.dp))
@@ -280,7 +282,7 @@ private fun PrivacySwitch(
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(title, fontWeight = FontWeight.SemiBold, color = Ink)
-            Text(description, fontSize = 12.sp, color = Color(0xFF766D64))
+            Text(description, fontSize = 12.sp, color = themedColor(Color(0xFF766D64)))
         }
         Switch(checked = checked, onCheckedChange = onChange, enabled = !disabled)
     }

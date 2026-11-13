@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.journal.journaldetail.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -21,7 +23,7 @@ internal fun JournalDetailBackground(modifier: Modifier = Modifier) {
                 colors = listOf(
                     JournalDetailColors.PaperLight,
                     JournalDetailColors.Paper,
-                    Color(0xFFF0E6D8)
+                    themedColor(Color(0xFFF0E6D8))
                 )
             )
         )
@@ -29,10 +31,10 @@ internal fun JournalDetailBackground(modifier: Modifier = Modifier) {
         drawRect(
             brush = Brush.horizontalGradient(
                 colors = listOf(
-                    Color(0xFF9C8868).copy(alpha = 0.12f),
+                    themedColor(Color(0xFF9C8868)).copy(alpha = 0.12f),
                     Color.Transparent,
                     Color.Transparent,
-                    Color(0xFF9C8868).copy(alpha = 0.10f)
+                    themedColor(Color(0xFF9C8868)).copy(alpha = 0.10f)
                 )
             )
         )
@@ -44,14 +46,14 @@ internal fun JournalDetailBackground(modifier: Modifier = Modifier) {
             val radius = random.nextFloat() * 1.3f + 0.2f
             val alpha = random.nextFloat() * 0.045f + 0.01f
             drawCircle(
-                color = Color(0xFF806F55).copy(alpha = alpha),
+                color = themedColor(Color(0xFF806F55)).copy(alpha = alpha),
                 radius = radius,
                 center = Offset(x, y)
             )
         }
 
         drawLine(
-            color = Color(0xFF9C8C73).copy(alpha = 0.09f),
+            color = themedColor(Color(0xFF9C8C73)).copy(alpha = 0.09f),
             start = Offset(0f, size.height * 0.54f),
             end = Offset(size.width, size.height * 0.54f),
             strokeWidth = 1.dp.toPx()
@@ -75,7 +77,7 @@ private fun DrawScope.drawBotanicalStem(
     height: Float,
     direction: Float
 ) {
-    val ink = Color(0xFF81745F).copy(alpha = 0.34f)
+    val ink = themedColor(Color(0xFF81745F)).copy(alpha = 0.34f)
     val stem = Path().apply {
         moveTo(start.x, start.y)
         cubicTo(

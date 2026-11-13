@@ -1,6 +1,8 @@
 
 package com.loc.benimdunyam.feature.journal.journaldetail.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,11 +25,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val NavigationInk = Color(0xFF33271F)
-private val NavigationMutedInk = Color(0xFF756755)
-private val NavigationGreen = Color(0xFF365A43)
-private val NavigationBackground = Color(0xFFE8DDC9)
-private val NavigationDisabled = Color(0xFFECE6DC)
+private val NavigationInk get() = themedColor(Color(0xFF33271F))
+private val NavigationMutedInk get() = themedColor(Color(0xFF756755))
+private val NavigationGreen get() = themedColor(Color(0xFF365A43))
+private val NavigationBackground get() = themedColor(Color(0xFFE8DDC9))
+private val NavigationDisabled get() = themedColor(Color(0xFFECE6DC))
 
 @Composable
 fun JournalDetailNavigationBar(

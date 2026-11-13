@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.journal.journalphotos
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -73,17 +75,17 @@ fun JournalPhotoManageStrip(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             if (photo.isCover) {
-                                Surface(color = Color(0xEAF8EBD3), shape = RoundedCornerShape(6.dp)) {
+                                Surface(color = themedColor(Color(0xEAF8EBD3)), shape = RoundedCornerShape(6.dp)) {
                                     Text(
                                         "★ Kapak",
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFF54412C)
+                                        color = themedColor(Color(0xFF54412C))
                                     )
                                 }
                             }
                             if (photo.isDraft) {
-                                Surface(color = Color(0xEAF8F8F8), shape = RoundedCornerShape(6.dp)) {
+                                Surface(color = themedColor(Color(0xEAF8F8F8)), shape = RoundedCornerShape(6.dp)) {
                                     Text("Taslak", Modifier.padding(horizontal = 5.dp, vertical = 3.dp),
                                         style = MaterialTheme.typography.labelSmall)
                                 }
@@ -118,7 +120,7 @@ fun JournalPhotoManageStrip(
                         Icon(
                             Icons.Default.Star,
                             contentDescription = if (photo.isCover) "Kapak fotoğrafı" else "Kapak yap",
-                            tint = if (photo.isCover) Color(0xFFC39A47) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = if (photo.isCover) themedColor(Color(0xFFC39A47)) else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(19.dp)
                         )
                     }

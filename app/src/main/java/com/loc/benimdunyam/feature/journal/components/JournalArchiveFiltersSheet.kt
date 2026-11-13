@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.journal.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,6 +32,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -182,7 +185,7 @@ fun JournalArchiveFiltersSheet(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = androidx.compose.ui.graphics.Color(0xFF496B5B)
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Text("${state.journals.size} anıyı göster", maxLines = 1)

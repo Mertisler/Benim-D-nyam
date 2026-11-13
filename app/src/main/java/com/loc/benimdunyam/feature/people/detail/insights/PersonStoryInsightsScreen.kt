@@ -1,5 +1,6 @@
 package com.loc.benimdunyam.feature.people.detail.insights
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +53,7 @@ fun PersonStoryInsightsScreen(
     val monthFormat = remember { SimpleDateFormat("MMMM yyyy", Locale.forLanguageTag("tr-TR")) }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),

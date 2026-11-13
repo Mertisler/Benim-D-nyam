@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.journal.journaleditor
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -145,11 +147,11 @@ fun FlyingMoodBubble(
 
             shape = CircleShape,
 
-            color = Color(0xFFFFFCF7),
+            color = themedColor(Color(0xFFFFFCF7)),
 
             border = BorderStroke(
                 width = 1.dp,
-                color = Color(0xFFDCE6D7)
+                color = themedColor(Color(0xFFDCE6D7))
             ),
 
             shadowElevation = 3.dp

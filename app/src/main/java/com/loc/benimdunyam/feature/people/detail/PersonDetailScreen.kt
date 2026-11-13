@@ -1,5 +1,8 @@
 package com.loc.benimdunyam.feature.people.detail
 
+import androidx.compose.material3.TopAppBarDefaults
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -78,8 +81,8 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlinx.coroutines.launch
 
-private val ProfileGreen = Color(0xFF496C5D)
-private val ProfileGold = Color(0xFFB58A3A)
+private val ProfileGreen get() = themedColor(Color(0xFF496C5D))
+private val ProfileGold get() = themedColor(Color(0xFFB58A3A))
 
 /**
  * Tek kişi profili, iki sekme:
@@ -170,8 +173,10 @@ fun PersonDetailScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 title = { Text("Kişi Profili") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {

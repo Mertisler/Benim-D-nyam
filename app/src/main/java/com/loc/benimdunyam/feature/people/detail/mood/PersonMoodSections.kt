@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.people.detail.mood
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,8 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.loc.benimdunyam.feature.journal.journaldetail.components.journalMoodDisplay
 
-private val MoodPine = Color(0xFF416956)
-private val MoodGold = Color(0xFFD1AD73)
+private val MoodPine get() = themedColor(Color(0xFF416956))
+private val MoodGold get() = themedColor(Color(0xFFD1AD73))
 
 /** Tek anının altında kısa, tıklama gerektirmeyen ruh hali etiketi. */
 @Composable
@@ -44,7 +46,7 @@ fun PersonMoodTimelineBadge(moodName: String, modifier: Modifier = Modifier) {
             contentDescription = "Bu anıyı yazarken seçilen ruh hali: ${display.label}"
         },
         shape = RoundedCornerShape(50),
-        color = Color(0xFFE8EFE6)
+        color = themedColor(Color(0xFFE8EFE6))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -107,7 +109,7 @@ fun PersonMoodInsightsSummary(summary: PersonMoodInsights, modifier: Modifier = 
                         }
                         Box(
                             modifier = Modifier.fillMaxWidth().height(5.dp)
-                                .background(Color(0xFFDCDAD3), RoundedCornerShape(50))
+                                .background(themedColor(Color(0xFFDCDAD3)), RoundedCornerShape(50))
                         ) {
                             Box(
                                 modifier = Modifier.fillMaxWidth(mood.count.toFloat() / maxCount)

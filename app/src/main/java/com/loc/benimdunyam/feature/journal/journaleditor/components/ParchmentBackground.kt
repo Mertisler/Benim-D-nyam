@@ -1,5 +1,9 @@
 package com.loc.benimdunyam.feature.journal.journaleditor.components
 
+import com.loc.benimdunyam.core.designsystem.scenicDrawable
+import com.loc.benimdunyam.core.designsystem.AppThemeController
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 
@@ -23,6 +27,15 @@ fun ParchmentBackground(
     modifier: Modifier = Modifier
 ) {
 
+    val themePreset = AppThemeController.selected
+    // Özel illüstrasyonlar defter editöründe tam ekran görünür.
+    // Diğer temalar için mevcut parşömen dokusu korunur.
+    if (scenicDrawable(themePreset) != null) {
+        // Ortak sahne zaten NavGraph altında çiziliyor; burada tekrar çizilmez.
+        return
+    }
+    val palette = AppThemeController.palette
+    val textureInk = themedColor(Color(0xFF806F55))
     Canvas(
         modifier = modifier
     ) {
@@ -31,11 +44,7 @@ fun ParchmentBackground(
 
         drawRect(
             brush = Brush.verticalGradient(
-                colors = listOf(
-                    Color(0xFFF4EBDD),
-                    Color(0xFFF7F0E5),
-                    Color(0xFFF0E6D8)
-                )
+                colors = listOf(palette.background, palette.paper, palette.backgroundEnd)
             )
         )
 
@@ -44,10 +53,10 @@ fun ParchmentBackground(
         drawRect(
             brush = Brush.horizontalGradient(
                 colors = listOf(
-                    Color(0xFF9C8868).copy(alpha = 0.13f),
+                    themedColor(Color(0xFF9C8868)).copy(alpha = 0.13f),
                     Color.Transparent,
                     Color.Transparent,
-                    Color(0xFF9C8868).copy(alpha = 0.10f)
+                    themedColor(Color(0xFF9C8868)).copy(alpha = 0.10f)
                 )
             )
         )
@@ -65,7 +74,7 @@ fun ParchmentBackground(
             val alpha = random.nextFloat() * 0.055f + 0.012f
 
             drawCircle(
-                color = Color(0xFF806F55).copy(alpha = alpha),
+                color = textureInk.copy(alpha = alpha),
                 radius = radius,
                 center = Offset(x, y)
             )
@@ -74,7 +83,7 @@ fun ParchmentBackground(
         // YATAY KAT İZİ
 
         drawLine(
-            color = Color(0xFF9C8C73).copy(alpha = 0.10f),
+            color = themedColor(Color(0xFF9C8C73)).copy(alpha = 0.10f),
 
             start = Offset(
                 0f,
@@ -142,7 +151,7 @@ private fun DrawScope.drawSprig(
     direction: Float
 ) {
 
-    val botanicalInk = Color(0xFF81745F).copy(alpha = 0.42f)
+    val botanicalInk = themedColor(Color(0xFF81745F)).copy(alpha = 0.42f)
 
     val stem = Path().apply {
 

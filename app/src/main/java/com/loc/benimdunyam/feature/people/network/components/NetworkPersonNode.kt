@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.people.network.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -90,14 +92,14 @@ fun NetworkPersonNode(
             modifier = Modifier.border(
                 border = BorderStroke(
                     width = if (selected) 3.dp else if (highlighted) 2.dp else 1.dp,
-                    color = if (selected) Color(0xFFEAC48D) else if (highlighted) Color.White else Color(0xFF75849D)
+                    color = if (selected) themedColor(Color(0xFFEAC48D)) else if (highlighted) Color.White else themedColor(Color(0xFF75849D))
                 ),
                 shape = CircleShape
             )
         )
         Text(
             text = node.name,
-            color = if (selected) Color(0xFFF6D9AD) else Color.White,
+            color = if (selected) themedColor(Color(0xFFF6D9AD)) else Color.White,
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -112,15 +114,15 @@ fun NetworkCenterNode() {
         Box(
             modifier = Modifier.size(58.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFE8B87A))
-                .border(3.dp, Color(0xFFFFF1D3), CircleShape),
+                .background(themedColor(Color(0xFFE8B87A)))
+                .border(3.dp, themedColor(Color(0xFFFFF1D3)), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text("✦", color = Color(0xFF253045), style = MaterialTheme.typography.headlineMedium)
+            Text("✦", color = themedColor(Color(0xFF253045)), style = MaterialTheme.typography.headlineMedium)
         }
         Text(
             "Benim Dünyam",
-            color = Color(0xFFFFE1B0),
+            color = themedColor(Color(0xFFFFE1B0)),
             style = MaterialTheme.typography.labelSmall,
             maxLines = 1
         )

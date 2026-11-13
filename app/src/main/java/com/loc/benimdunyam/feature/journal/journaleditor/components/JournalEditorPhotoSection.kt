@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.journal.journaleditor.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,7 +61,7 @@ fun JournalEditorPhotoSection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Anı Fotoğrafları", style = MaterialTheme.typography.titleSmall, color = Color(0xFF496B5B))
+                Text("Anı Fotoğrafları", style = MaterialTheme.typography.titleSmall, color = themedColor(Color(0xFF496B5B)))
                 Text("${photos.size}/${JournalPhotoStore.MAX_PHOTOS_PER_JOURNAL} fotoğraf",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)

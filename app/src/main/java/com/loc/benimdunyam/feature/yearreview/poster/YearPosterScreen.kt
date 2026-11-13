@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.yearreview.poster
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
@@ -74,9 +76,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Pine = Color(0xFF2C503B)
-private val Paper = Color(0xFFFAF7F2)
-private val Ink = Color(0xFF292D29)
+private val Pine get() = themedColor(Color(0xFF2C503B))
+private val Paper get() = themedColor(Color(0xFFFAF7F2))
+private val Ink get() = themedColor(Color(0xFF292D29))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -253,7 +255,7 @@ fun YearPosterScreen(
                     Button(
                         onClick = ::sharePoster, enabled = !exporting,
                         modifier = Modifier.weight(1f).height(52.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB18A53)),
+                        colors = ButtonDefaults.buttonColors(containerColor = themedColor(Color(0xFFB18A53))),
                         shape = RoundedCornerShape(15.dp)
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null)
@@ -432,7 +434,7 @@ private fun PosterOptionRow(
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(title, fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
-            Text(description, color = Color(0xFF7A766C), fontSize = 12.sp)
+            Text(description, color = themedColor(Color(0xFF7A766C)), fontSize = 12.sp)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }

@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.yearreview
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -58,10 +60,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Ivory = Color(0xFFFDF6E9)
-private val Champagne = Color(0xFFE7C68A)
-private val LightGreen = Color(0xFFA9C2AF)
-private val Forest = Color(0xFF173629)
+private val Ivory get() = themedColor(Color(0xFFFDF6E9))
+private val Champagne get() = themedColor(Color(0xFFE7C68A))
+private val LightGreen get() = themedColor(Color(0xFFA9C2AF))
+private val Forest get() = themedColor(Color(0xFF173629))
 private val SoftWhite = Ivory.copy(alpha = 0.80f)
 private val MonthShort = listOf("O", "Ş", "M", "N", "M", "H", "T", "A", "E", "E", "K", "A")
 private val MonthFull = listOf("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
@@ -131,7 +133,7 @@ private fun MovieGlassCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Color(0xFF284738).copy(alpha = 0.94f),
+        color = themedColor(Color(0xFF284738)).copy(alpha = 0.94f),
         border = BorderStroke(1.dp, Ivory.copy(alpha = 0.17f)),
         shape = RoundedCornerShape(20.dp)
     ) {
@@ -156,7 +158,7 @@ private fun OpeningScene(report: YearReviewReport, paths: Map<String, String>, s
                         .movieKenBurns(sceneProgress, reducedMotion, direction = 1)
                 )
                 Box(Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(Color.Transparent, Color(0xFF0F2119).copy(alpha = 0.7f)))
+                    Brush.verticalGradient(listOf(Color.Transparent, themedColor(Color(0xFF0F2119)).copy(alpha = 0.7f)))
                 ))
                 Text("HAYATININ BAŞROLÜNDE SEN VARSIN",
                     modifier = Modifier.align(Alignment.BottomStart).padding(16.dp),

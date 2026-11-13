@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.journal.journaleditor.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -70,14 +72,14 @@ fun JournalSaveButton(
 
             drawPath(
                 path = roughBorder,
-                color = Color(0xFFE7E0CB),
+                color = themedColor(Color(0xFFE7E0CB)),
                 style = Stroke(
                     width = 2.dp.toPx()
                 )
             )
 
             drawLine(
-                color = Color(0xFFE7E0CB).copy(alpha = 0.55f),
+                color = themedColor(Color(0xFFE7E0CB)).copy(alpha = 0.55f),
 
                 start = Offset(
                     size.width * 0.18f,
@@ -95,7 +97,7 @@ fun JournalSaveButton(
 
         Text(
             text = "Kaydet",
-            color = Color(0xFFF9F5E9),
+            color = themedColor(Color(0xFFF9F5E9)),
             fontSize = 17.sp,
             fontFamily = FontFamily.Cursive,
             fontWeight = FontWeight.Bold

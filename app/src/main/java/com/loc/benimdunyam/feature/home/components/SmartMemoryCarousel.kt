@@ -1,5 +1,8 @@
 package com.loc.benimdunyam.feature.home.components
 
+import com.loc.benimdunyam.core.designsystem.AppThemeController
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -52,11 +55,11 @@ import coil.compose.AsyncImage
 import com.loc.benimdunyam.feature.home.SmartMemoryItem
 import com.loc.benimdunyam.feature.home.insights.LifeStoryInsight
 
-private val TunnelInk = Color(0xFF332D27)
-private val TunnelPine = Color(0xFF436A55)
-private val TunnelMuted = Color(0xFF777067)
-private val TunnelBorder = Color(0xFFE5DDD1)
-private val TunnelPaper = Color(0xFFFFFCF7)
+private val TunnelInk get() = AppThemeController.palette.ink
+private val TunnelPine get() = AppThemeController.palette.primary
+private val TunnelMuted get() = AppThemeController.palette.muted
+private val TunnelBorder get() = AppThemeController.palette.border
+private val TunnelPaper get() = AppThemeController.palette.paper
 
 private sealed interface TunnelCard {
     data class Memory(val value: SmartMemoryItem) : TunnelCard
@@ -123,7 +126,7 @@ fun SmartMemoryCarousel(
                     Text(
                         text = "Tümü",
                         style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF63816C)
+                        color = themedColor(Color(0xFF63816C))
                     )
                 }
             }
@@ -133,7 +136,7 @@ fun SmartMemoryCarousel(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(23.dp),
-                color = Color(0xFFF0EAE1),
+                color = themedColor(Color(0xFFF0EAE1)),
                 border = BorderStroke(1.dp, TunnelBorder)
             ) {
                 Column(
@@ -178,7 +181,7 @@ fun SmartMemoryCarousel(
                                     .width(if (selected) 15.dp else 5.dp)
                                     .height(5.dp)
                                     .background(
-                                        color = if (selected) Color(0xFF6F927B) else Color(0xFFCFC6B9),
+                                        color = if (selected) themedColor(Color(0xFF6F927B)) else themedColor(Color(0xFFCFC6B9)),
                                         shape = CircleShape
                                     )
                             )
@@ -199,7 +202,7 @@ fun SmartMemoryCarousel(
     if (showAll && cards.isNotEmpty()) {
         ModalBottomSheet(
             onDismissRequest = { showAll = false },
-            containerColor = Color(0xFFFFFBF5)
+            containerColor = themedColor(Color(0xFFFFFBF5))
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
@@ -303,7 +306,7 @@ private fun OnThisDayCard(
         onClick = { onJournalClick(memory.journalId) },
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(23.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0EAE1)),
+        colors = CardDefaults.cardColors(containerColor = themedColor(Color(0xFFF0EAE1))),
         border = BorderStroke(1.dp, TunnelBorder),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -316,23 +319,23 @@ private fun OnThisDayCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(shape = RoundedCornerShape(50), color = Color(0xFFD8EDE1)) {
+                Surface(shape = RoundedCornerShape(50), color = themedColor(Color(0xFFD8EDE1))) {
                     Text(
                         text = if (memory.yearsAgo > 0)
                             "📅  ${memory.yearsAgo} yıl önce bugün" else "📖 Arşivden bir anı",
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color(0xFF365C49)
+                        color = themedColor(Color(0xFF365C49))
                     )
                 }
                 Text(memory.dateText,
                     style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFF888176))
+                    color = themedColor(Color(0xFF888176)))
             }
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(memory.title,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color(0xFF4B443B), maxLines = 1,
+                    color = themedColor(Color(0xFF4B443B)), maxLines = 1,
                     overflow = TextOverflow.Ellipsis)
                 Text(memory.snippet,
                     style = MaterialTheme.typography.bodyMedium,
@@ -356,8 +359,8 @@ private fun StoryInsightCard(
             } ?: Modifier
         ),
         shape = RoundedCornerShape(23.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFE9F0E9)),
-        border = BorderStroke(1.dp, Color(0xFFD8E4D9)),
+        colors = CardDefaults.cardColors(containerColor = themedColor(Color(0xFFE9F0E9))),
+        border = BorderStroke(1.dp, themedColor(Color(0xFFD8E4D9))),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -369,7 +372,7 @@ private fun StoryInsightCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(shape = RoundedCornerShape(50), color = Color(0xFFD8E8DA)) {
+                Surface(shape = RoundedCornerShape(50), color = themedColor(Color(0xFFD8E8DA))) {
                     Text(
                         "✦  HİKÂYENDEN",
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -405,8 +408,8 @@ private fun SeasonMemoryCard(
         onClick = onSeasonClick,
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(23.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFE8E0D4)),
-        border = BorderStroke(1.dp, Color(0xFFE1D7C9)),
+        colors = CardDefaults.cardColors(containerColor = themedColor(Color(0xFFE8E0D4))),
+        border = BorderStroke(1.dp, themedColor(Color(0xFFE1D7C9))),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -420,7 +423,7 @@ private fun SeasonMemoryCard(
             } else {
                 Box(
                     modifier = Modifier.fillMaxSize().background(
-                        Brush.linearGradient(listOf(Color(0xFFE8E1D8), Color(0xFFB9B1A7)))
+                        Brush.linearGradient(listOf(themedColor(Color(0xFFE8E1D8)), themedColor(Color(0xFFB9B1A7))))
                     )
                 )
             }

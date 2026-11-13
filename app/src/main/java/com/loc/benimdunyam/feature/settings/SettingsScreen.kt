@@ -1,5 +1,6 @@
 package com.loc.benimdunyam.feature.settings
 
+import androidx.compose.ui.graphics.Color
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -21,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import com.loc.benimdunyam.feature.settings.components.AppearanceThemePicker
 
 private enum class BackupPasswordAction {
     EXPORT,
@@ -130,8 +132,10 @@ fun SettingsScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 title = {
                     Text("Ayarlar ve Gizlilik")
                 },
@@ -158,6 +162,9 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+
+            // Üç temanın minyatür önizlemeleri. Buradaki seçim tüm ekranlarda geçerli.
+            AppearanceThemePicker(enabled = !isBusy)
 
             // GİZLİLİK
             Card(

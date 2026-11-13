@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.journal.journaleditor.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,7 +60,7 @@ fun JournalBottomToolbar(
                 lineTo(0f, size.height)
                 close()
             }
-            drawPath(path, Color(0xFFF5EEE3))
+            drawPath(path, themedColor(Color(0xFFF5EEE3)))
         }
 
         Row(
@@ -69,19 +71,19 @@ fun JournalBottomToolbar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             ToolbarAction("Metin biçimi", onTextFormatClick) {
-                Icon(Icons.Outlined.TextFields, contentDescription = "Metin biçimi", tint = Color(0xFF496B5B))
+                Icon(Icons.Outlined.TextFields, contentDescription = "Metin biçimi", tint = themedColor(Color(0xFF496B5B)))
             }
             ToolbarAction("Görsel ekle", onImageClick, imageEnabled) {
-                Icon(Icons.Outlined.Image, contentDescription = "Görsel ekle", tint = Color(0xFF496B5B))
+                Icon(Icons.Outlined.Image, contentDescription = "Görsel ekle", tint = themedColor(Color(0xFF496B5B)))
             }
             ToolbarAction("Yıldız ekle", onStarClick) {
-                Icon(Icons.Outlined.Star, contentDescription = "Yıldız ekle", tint = Color(0xFF496B5B))
+                Icon(Icons.Outlined.Star, contentDescription = "Yıldız ekle", tint = themedColor(Color(0xFF496B5B)))
             }
             ToolbarAction("Emoji ekle", onEmojiClick) {
-                Icon(Icons.Outlined.EmojiEmotions, contentDescription = "Emoji ekle", tint = Color(0xFF496B5B))
+                Icon(Icons.Outlined.EmojiEmotions, contentDescription = "Emoji ekle", tint = themedColor(Color(0xFF496B5B)))
             }
             ToolbarAction("Metin ekle", onInsertTextClick) {
-                Icon(Icons.Outlined.TextFields, contentDescription = "Metin ekle", tint = Color(0xFF496B5B))
+                Icon(Icons.Outlined.TextFields, contentDescription = "Metin ekle", tint = themedColor(Color(0xFF496B5B)))
             }
         }
     }

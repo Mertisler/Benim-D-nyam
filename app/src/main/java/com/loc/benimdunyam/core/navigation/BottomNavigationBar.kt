@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.core.navigation
 
+import com.loc.benimdunyam.core.designsystem.scenicDrawable
+import com.loc.benimdunyam.core.designsystem.AppThemeController
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Book
@@ -14,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -65,13 +68,15 @@ fun BottomNavigationBar(navController: NavController) {
 
     // Sadece ana sekme rotalarındayken alt menüyü göster
     if (currentRoute in items.map { it.route }) {
+        val hasScene = scenicDrawable(AppThemeController.selected) != null
+        val barColor = MaterialTheme.colorScheme.surface.copy(alpha = if (hasScene) 0.86f else 1f)
         Surface(
             tonalElevation = 3.dp,
             shadowElevation = 8.dp,
-            color = MaterialTheme.colorScheme.surface
+            color = Color.Transparent
         ) {
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = barColor,
                 tonalElevation = 0.dp
             ) {
                 items.forEach { item ->

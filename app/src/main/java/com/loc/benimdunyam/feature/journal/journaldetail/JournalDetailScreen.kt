@@ -1,5 +1,9 @@
 package com.loc.benimdunyam.feature.journal.journaldetail
 
+import com.loc.benimdunyam.core.designsystem.scenicDrawable
+import com.loc.benimdunyam.core.designsystem.AppThemeController
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -86,7 +90,11 @@ fun JournalDetailScreen(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(Color(0xFFFCF9F2), Color(0xFFF3EADC))
+                    if (scenicDrawable(AppThemeController.selected) != null) {
+                        listOf(Color.Transparent, Color.Transparent)
+                    } else {
+                        listOf(AppThemeController.palette.background, AppThemeController.palette.backgroundEnd)
+                    }
                 )
             )
     ) {

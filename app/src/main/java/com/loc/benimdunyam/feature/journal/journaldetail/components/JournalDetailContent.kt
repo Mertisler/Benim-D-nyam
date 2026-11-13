@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.journal.journaldetail.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -98,7 +100,7 @@ internal fun JournalDetailContent(
                     .height(110.dp)
             ) {
                 drawLine(
-                    color = Color(0xFFB99D78).copy(alpha = 0.55f),
+                    color = themedColor(Color(0xFFB99D78)).copy(alpha = 0.55f),
                     start = Offset(size.width / 2f, 0f),
                     end = Offset(size.width / 2f, size.height),
                     strokeWidth = 1.dp.toPx()

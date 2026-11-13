@@ -1,6 +1,8 @@
 
 package com.loc.benimdunyam.feature.journal
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 
@@ -47,11 +49,11 @@ import androidx.compose.ui.unit.sp
 import com.loc.benimdunyam.domain.model.JournalMood
 
 
-private val MoodPaper = Color(0xFFEFE6D8)
-private val MoodInk = Color(0xFF33271F)
-private val MoodMuted = Color(0xFF756755)
-private val MoodGreen = Color(0xFF365A43)
-private val MoodSelected = Color(0xFFDCE6D7)
+private val MoodPaper get() = themedColor(Color(0xFFEFE6D8))
+private val MoodInk get() = themedColor(Color(0xFF33271F))
+private val MoodMuted get() = themedColor(Color(0xFF756755))
+private val MoodGreen get() = themedColor(Color(0xFF365A43))
+private val MoodSelected get() = themedColor(Color(0xFFDCE6D7))
 
 
 @Composable
@@ -218,13 +220,13 @@ private fun MoodItem(
         color = if (selected) {
             MoodSelected
         } else {
-            Color(0xFFFFFCF7)
+            themedColor(Color(0xFFFFFCF7))
         },
 
         border = if (selected) {
             BorderStroke(1.5.dp, MoodGreen)
         } else {
-            BorderStroke(1.dp, Color(0xFFDED2C0))
+            BorderStroke(1.dp, themedColor(Color(0xFFDED2C0)))
         }
     ) {
 

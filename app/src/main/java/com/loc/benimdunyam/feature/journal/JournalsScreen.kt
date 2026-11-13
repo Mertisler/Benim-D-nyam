@@ -1,5 +1,8 @@
 package com.loc.benimdunyam.feature.journal
 
+import com.loc.benimdunyam.core.designsystem.AppThemeController
+import com.loc.benimdunyam.core.designsystem.scenicDrawable
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -51,14 +54,14 @@ import java.util.Locale
 // TASARIM RENKLERİ
 // ---------------------------------------------------------
 
-private val JournalCanvas = Color(0xFFF6F2EA)
-private val JournalPaper = Color(0xFFFFFCF6)
-private val JournalInk = Color(0xFF352B24)
-private val JournalMuted = Color(0xFF82766A)
-private val JournalGreen = Color(0xFF496B5B)
-private val JournalSoftGreen = Color(0xFFE5EEE8)
-private val JournalTape = Color(0xFFECE2D1)
-private val JournalBorder = Color(0xFFE6DCCF)
+private val JournalCanvas get() = AppThemeController.palette.background
+private val JournalPaper get() = AppThemeController.palette.paper
+private val JournalInk get() = AppThemeController.palette.ink
+private val JournalMuted get() = AppThemeController.palette.muted
+private val JournalGreen get() = AppThemeController.palette.primary
+private val JournalSoftGreen get() = AppThemeController.palette.softPrimary
+private val JournalTape get() = AppThemeController.palette.tape
+private val JournalBorder get() = AppThemeController.palette.border
 
 
 // ---------------------------------------------------------
@@ -126,455 +129,461 @@ fun JournalsScreen(
         uiState.startDate != null || uiState.endDate != null
 
 
-    Scaffold(
-        containerColor = JournalCanvas,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+    val hasScenicArtwork = scenicDrawable(AppThemeController.selected) != null
 
-        // -------------------------------------------------
-        // ÜST BAR
-        // -------------------------------------------------
+    Box(modifier = Modifier.fillMaxSize()) {
 
-        topBar = {
+        Scaffold(
+            containerColor = Color.Transparent,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(JournalCanvas)
-            ) {
+            // -------------------------------------------------
+            // ÜST BAR
+            // -------------------------------------------------
 
-                TopAppBar(
+            topBar = {
 
-                    title = {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-
-                            Text(
-                                text = "Anı Defterim",
-
-                                style = MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFamily = FontFamily.Serif,
-                                    letterSpacing = (-0.5).sp
-                                ),
-
-                                color = JournalInk
-                            )
-
-                            Text(
-                                text = "HAYATINDAN KÜÇÜK KESİTLER",
-
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    letterSpacing = 1.5.sp
-                                ),
-
-                                color = JournalMuted
-                            )
-                        }
-                    },
-
-                    actions = {
-
-                        // Filtrelerin tamamını ayrı bir panelde göster; liste yüksekliği korunur.
-                        IconButton(onClick = { showFiltersSheet = true }) {
-                            Icon(
-                                imageVector = Icons.Default.FilterList,
-                                contentDescription = "Gelişmiş filtreler",
-                                tint = if (uiState.hasActiveFilters) JournalGreen else JournalMuted
-                            )
-                        }
-
-                        // ARAMA BUTONU
-                        Surface(
-                            modifier = Modifier
-                                .padding(end = 16.dp)
-                                .size(44.dp)
-                                .clickable {
-
-                                    if (showSearchField) {
-
-                                        showSearchField = false
-                                        viewModel.clearSearch()
-
-                                    } else {
-
-                                        showSearchField = true
-                                    }
-                                },
-
-                            shape = CircleShape,
-
-                            color = if (showSearchField) {
-                                JournalSoftGreen
-                            } else {
-                                JournalTape
-                            }
-                        ) {
-
-                            Box(
-                                contentAlignment = Alignment.Center
-                            ) {
-
-                                Icon(
-                                    imageVector = if (showSearchField) {
-                                        Icons.Default.Close
-                                    } else {
-                                        Icons.Default.Search
-                                    },
-
-                                    contentDescription = if (showSearchField) {
-                                        "Aramayı kapat"
-                                    } else {
-                                        "Günlüklerde ara"
-                                    },
-
-                                    tint = JournalGreen
-                                )
-                            }
-                        }
-                    },
-
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = JournalCanvas
-                    )
-                )
-
-
-                // -------------------------------------------------
-                // ARAMA ALANI
-                // -------------------------------------------------
-
-                AnimatedVisibility(
-                    visible = showSearchField,
-
-                    enter = fadeIn() + expandVertically(),
-
-                    exit = fadeOut() + shrinkVertically()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (hasScenicArtwork) Color.Transparent else JournalCanvas)
                 ) {
 
-                    OutlinedTextField(
+                    TopAppBar(
 
-                        value = uiState.searchQuery,
+                        title = {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
 
-                        onValueChange = { query ->
-                            viewModel.updateSearchQuery(query)
+                                Text(
+                                    text = "Anı Defterim",
+
+                                    style = MaterialTheme.typography.headlineSmall.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontFamily = FontFamily.Serif,
+                                        letterSpacing = (-0.5).sp
+                                    ),
+
+                                    color = JournalInk
+                                )
+
+                                Text(
+                                    text = "HAYATINDAN KÜÇÜK KESİTLER",
+
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        letterSpacing = 1.5.sp
+                                    ),
+
+                                    color = JournalMuted
+                                )
+                            }
                         },
 
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                horizontal = 20.dp,
-                                vertical = 8.dp
-                            ),
+                        actions = {
 
-                        placeholder = {
-                            Text(
-                                text = "Kelime, anı veya kişi ara...",
-                                color = JournalMuted
-                            )
-                        },
+                            // Filtrelerin tamamını ayrı bir panelde göster; liste yüksekliği korunur.
+                            IconButton(onClick = { showFiltersSheet = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.FilterList,
+                                    contentDescription = "Gelişmiş filtreler",
+                                    tint = if (uiState.hasActiveFilters) JournalGreen else JournalMuted
+                                )
+                            }
 
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = null,
-                                tint = JournalGreen
-                            )
-                        },
+                            // ARAMA BUTONU
+                            Surface(
+                                modifier = Modifier
+                                    .padding(end = 16.dp)
+                                    .size(44.dp)
+                                    .clickable {
 
-                        trailingIcon = {
+                                        if (showSearchField) {
 
-                            if (uiState.searchQuery.isNotEmpty()) {
+                                            showSearchField = false
+                                            viewModel.clearSearch()
 
-                                IconButton(
-                                    onClick = {
-                                        viewModel.clearSearch()
-                                    }
+                                        } else {
+
+                                            showSearchField = true
+                                        }
+                                    },
+
+                                shape = CircleShape,
+
+                                color = if (showSearchField) {
+                                    JournalSoftGreen
+                                } else {
+                                    JournalTape
+                                }
+                            ) {
+
+                                Box(
+                                    contentAlignment = Alignment.Center
                                 ) {
 
                                     Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Aramayı temizle",
-                                        tint = JournalMuted
+                                        imageVector = if (showSearchField) {
+                                            Icons.Default.Close
+                                        } else {
+                                            Icons.Default.Search
+                                        },
+
+                                        contentDescription = if (showSearchField) {
+                                            "Aramayı kapat"
+                                        } else {
+                                            "Günlüklerde ara"
+                                        },
+
+                                        tint = JournalGreen
                                     )
                                 }
                             }
                         },
 
-                        singleLine = true,
-
-                        shape = RoundedCornerShape(18.dp),
-
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = JournalGreen,
-                            unfocusedBorderColor = JournalBorder,
-                            cursorColor = JournalGreen,
-                            focusedContainerColor = JournalPaper,
-                            unfocusedContainerColor = JournalPaper
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent
                         )
                     )
-                }
 
 
-                // -------------------------------------------------
-                // ÜST AÇIKLAMA VE ANI SAYISI
-                // -------------------------------------------------
+                    // -------------------------------------------------
+                    // ARAMA ALANI
+                    // -------------------------------------------------
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            start = 24.dp,
-                            end = 24.dp,
-                            top = 2.dp,
-                            bottom = 18.dp
-                        ),
+                    AnimatedVisibility(
+                        visible = showSearchField,
 
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                        enter = fadeIn() + expandVertically(),
 
-                    Column(
-                        modifier = Modifier.weight(1f)
+                        exit = fadeOut() + shrinkVertically()
                     ) {
 
-                        Text(
-                            text = "Geçmişinden sayfalar",
+                        OutlinedTextField(
 
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Medium
-                            ),
+                            value = uiState.searchQuery,
 
-                            color = JournalMuted
-                        )
-
-                        Spacer(
-                            modifier = Modifier.height(3.dp)
-                        )
-
-                        Text(
-                            text = "Her anı, sana ait bir hikâye.",
-
-                            style = MaterialTheme.typography.bodySmall,
-
-                            color = JournalMuted.copy(alpha = 0.85f)
-                        )
-                    }
-
-
-                    // GÜNLÜK / ARAMA SONUCU SAYISI
-                    Surface(
-                        shape = RoundedCornerShape(50.dp),
-
-                        color = JournalSoftGreen
-                    ) {
-
-                        Text(
-                            text = if (uiState.hasActiveFilters) {
-                                "${uiState.journals.size} SONUÇ"
-                            } else {
-                                "${uiState.journals.size} ANI"
+                            onValueChange = { query ->
+                                viewModel.updateSearchQuery(query)
                             },
 
-                            modifier = Modifier.padding(
-                                horizontal = 14.dp,
-                                vertical = 9.dp
-                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = 20.dp,
+                                    vertical = 8.dp
+                                ),
 
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.8.sp
-                            ),
+                            placeholder = {
+                                Text(
+                                    text = "Kelime, anı veya kişi ara...",
+                                    color = JournalMuted
+                                )
+                            },
 
-                            color = JournalGreen
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = JournalGreen
+                                )
+                            },
+
+                            trailingIcon = {
+
+                                if (uiState.searchQuery.isNotEmpty()) {
+
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.clearSearch()
+                                        }
+                                    ) {
+
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Aramayı temizle",
+                                            tint = JournalMuted
+                                        )
+                                    }
+                                }
+                            },
+
+                            singleLine = true,
+
+                            shape = RoundedCornerShape(18.dp),
+
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = JournalGreen,
+                                unfocusedBorderColor = JournalBorder,
+                                cursorColor = JournalGreen,
+                                focusedContainerColor = JournalPaper,
+                                unfocusedContainerColor = JournalPaper
+                            )
                         )
                     }
-                }
-            }
-        },
 
 
-        // -------------------------------------------------
-        // YENİ ANI BUTONU
-        // -------------------------------------------------
+                    // -------------------------------------------------
+                    // ÜST AÇIKLAMA VE ANI SAYISI
+                    // -------------------------------------------------
 
-        floatingActionButton = {
-            JournalDogActionFab(
-                onClick = onNavigateToCreateJournal
-            )
-        }
-
-    ) { paddingValues ->
-
-
-        // -------------------------------------------------
-        // ANA İÇERİK
-        // -------------------------------------------------
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(JournalCanvas)
-                .padding(horizontal = 20.dp)
-        ) {
-
-
-            // Aktif filtreleri kullanıcının kolayca temizleyebilmesi için.
-            if (uiState.hasActiveFilters) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        "${uiState.journals.size} / ${uiState.totalJournals} anı",
-                        color = JournalMuted,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    TextButton(onClick = viewModel::clearFilters) {
-                        Text("Filtreleri sıfırla", color = JournalGreen)
-                    }
-                }
-            }
-
-            // -------------------------------------------------
-            // YÜKLENİYOR / BOŞ / GÜNLÜK LİSTESİ
-            // -------------------------------------------------
-
-            when {
-
-                // YÜKLENİYOR
-                uiState.isLoading -> {
-
-                    Box(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
+                            .padding(
+                                start = 24.dp,
+                                end = 24.dp,
+                                top = 2.dp,
+                                bottom = 18.dp
+                            ),
 
-                        contentAlignment = Alignment.Center
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
 
-                        CircularProgressIndicator(
-                            color = JournalGreen,
-                            strokeWidth = 3.dp
-                        )
-                    }
-                }
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
 
+                            Text(
+                                text = "Geçmişinden sayfalar",
 
-                // GÜNLÜK BULUNAMADI
-                uiState.journals.isEmpty() -> {
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Medium
+                                ),
 
-                    JournalEmptyState(
-
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-
-                        hasActiveSearch = hasActiveSearch,
-
-                        hasActiveDateFilter = hasActiveDateFilter,
-
-                        hasOtherFilters = hasFacetFilter,
-
-                        onCreateJournal = onNavigateToCreateJournal,
-
-                        onClearSearch = {
-                            viewModel.clearFilters()
-                        },
-
-                        onClearFilters = {
-                            viewModel.clearFilters()
-                        }
-                    )
-                }
-
-
-
-                // GÜNLÜKLER
-                else -> {
-
-                    LazyColumn(
-
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-
-                        contentPadding = PaddingValues(
-                            top = 4.dp,
-                            bottom = 110.dp
-                        ),
-
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-
-                    ) {
-
-                        itemsIndexed(
-
-                            items = uiState.journals,
-
-                            key = { _, journal ->
-                                journal.id
-                            }
-
-                        ) { index, journal ->
-
-                            // LazyColumn sadece görünen satırlarda dosya okuması başlatır.
-                            LaunchedEffect(journal.id, coverVersion) {
-                                coverViewModel.ensureCoverLoaded(journal.id, coverVersion)
-                            }
-
-                            val formattedDate = dateFormat.format(
-                                Date(journal.entryDate)
+                                color = JournalMuted
                             )
 
-                            // Kaydırılabilir silme bileşeni
-                            SwipeToDeleteJournalItem(
+                            Spacer(
+                                modifier = Modifier.height(3.dp)
+                            )
 
-                                modifier = Modifier.fillMaxWidth(),
+                            Text(
+                                text = "Her anı, sana ait bir hikâye.",
 
-                                onDelete = {
-                                    viewModel.deleteJournal(journal.id)
+                                style = MaterialTheme.typography.bodySmall,
+
+                                color = JournalMuted.copy(alpha = 0.85f)
+                            )
+                        }
+
+
+                        // GÜNLÜK / ARAMA SONUCU SAYISI
+                        Surface(
+                            shape = RoundedCornerShape(50.dp),
+
+                            color = JournalSoftGreen
+                        ) {
+
+                            Text(
+                                text = if (uiState.hasActiveFilters) {
+                                    "${uiState.journals.size} SONUÇ"
+                                } else {
+                                    "${uiState.journals.size} ANI"
+                                },
+
+                                modifier = Modifier.padding(
+                                    horizontal = 14.dp,
+                                    vertical = 9.dp
+                                ),
+
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 0.8.sp
+                                ),
+
+                                color = JournalGreen
+                            )
+                        }
+                    }
+                }
+            },
+
+
+            // -------------------------------------------------
+            // YENİ ANI BUTONU
+            // -------------------------------------------------
+
+            floatingActionButton = {
+                JournalDogActionFab(
+                    onClick = onNavigateToCreateJournal
+                )
+            }
+
+        ) { paddingValues ->
+
+
+            // -------------------------------------------------
+            // ANA İÇERİK
+            // -------------------------------------------------
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .background(if (hasScenicArtwork) Color.Transparent else JournalCanvas)
+                    .padding(horizontal = 20.dp)
+            ) {
+
+
+                // Aktif filtreleri kullanıcının kolayca temizleyebilmesi için.
+                if (uiState.hasActiveFilters) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "${uiState.journals.size} / ${uiState.totalJournals} anı",
+                            color = JournalMuted,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        TextButton(onClick = viewModel::clearFilters) {
+                            Text("Filtreleri sıfırla", color = JournalGreen)
+                        }
+                    }
+                }
+
+                // -------------------------------------------------
+                // YÜKLENİYOR / BOŞ / GÜNLÜK LİSTESİ
+                // -------------------------------------------------
+
+                when {
+
+                    // YÜKLENİYOR
+                    uiState.isLoading -> {
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+
+                            contentAlignment = Alignment.Center
+                        ) {
+
+                            CircularProgressIndicator(
+                                color = JournalGreen,
+                                strokeWidth = 3.dp
+                            )
+                        }
+                    }
+
+
+                    // GÜNLÜK BULUNAMADI
+                    uiState.journals.isEmpty() -> {
+
+                        JournalEmptyState(
+
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+
+                            hasActiveSearch = hasActiveSearch,
+
+                            hasActiveDateFilter = hasActiveDateFilter,
+
+                            hasOtherFilters = hasFacetFilter,
+
+                            onCreateJournal = onNavigateToCreateJournal,
+
+                            onClearSearch = {
+                                viewModel.clearFilters()
+                            },
+
+                            onClearFilters = {
+                                viewModel.clearFilters()
+                            }
+                        )
+                    }
+
+
+
+                    // GÜNLÜKLER
+                    else -> {
+
+                        LazyColumn(
+
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+
+                            contentPadding = PaddingValues(
+                                top = 4.dp,
+                                bottom = 110.dp
+                            ),
+
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+
+                        ) {
+
+                            itemsIndexed(
+
+                                items = uiState.journals,
+
+                                key = { _, journal ->
+                                    journal.id
                                 }
 
-                            ) {
+                            ) { index, journal ->
 
-                                // Mevcut günlük kartımız
-                                JournalArchiveCard(
+                                // LazyColumn sadece görünen satırlarda dosya okuması başlatır.
+                                LaunchedEffect(journal.id, coverVersion) {
+                                    coverViewModel.ensureCoverLoaded(journal.id, coverVersion)
+                                }
 
-                                    index = index,
+                                val formattedDate = dateFormat.format(
+                                    Date(journal.entryDate)
+                                )
 
-                                    date = formattedDate,
+                                // Kaydırılabilir silme bileşeni
+                                SwipeToDeleteJournalItem(
 
-                                    title = journal.title,
+                                    modifier = Modifier.fillMaxWidth(),
 
-                                    content = journal.content,
-
-                                    seasonTitle = journal.seasonId?.let(seasonTitles::get),
-
-                                    episodeTitle = journal.episodeId?.let(uiState.episodeTitles::get),
-
-                                    coverPath = coverPaths[journal.id],
-
-                                    onClick = {
-                                        onNavigateToJournalDetail(journal.id)
+                                    onDelete = {
+                                        viewModel.deleteJournal(journal.id)
                                     }
+
+                                ) {
+
+                                    // Mevcut günlük kartımız
+                                    JournalArchiveCard(
+
+                                        index = index,
+
+                                        date = formattedDate,
+
+                                        title = journal.title,
+
+                                        content = journal.content,
+
+                                        seasonTitle = journal.seasonId?.let(seasonTitles::get),
+
+                                        episodeTitle = journal.episodeId?.let(uiState.episodeTitles::get),
+
+                                        coverPath = coverPaths[journal.id],
+
+                                        onClick = {
+                                            onNavigateToJournalDetail(journal.id)
+                                        }
+                                    )
+                                }
+                            }
+
+                            item {
+                                Spacer(
+                                    modifier = Modifier.height(16.dp)
                                 )
                             }
                         }
-
-                        item {
-                            Spacer(
-                                modifier = Modifier.height(16.dp)
-                            )
-                        }
                     }
-                }
 
+                }
             }
         }
-    }
+
+    } // scenic backdrop Box
 
     if (showFiltersSheet) {
         JournalArchiveFiltersSheet(

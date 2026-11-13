@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.yearreview
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import android.content.Context
 import com.loc.benimdunyam.domain.model.JournalEntry
 import com.loc.benimdunyam.feature.yearreview.mood.YearMoodReport
@@ -67,9 +69,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
-private val MovieGreen = Color(0xFF11291F)
-private val MovieGold = Color(0xFFE7C68A)
-private val MovieCream = Color(0xFFFAF5E9)
+private val MovieGreen get() = themedColor(Color(0xFF11291F))
+private val MovieGold get() = themedColor(Color(0xFFE7C68A))
+private val MovieCream get() = themedColor(Color(0xFFFAF5E9))
 
 /**
  * Bilerek yeni bir NavHost route'u veya ViewModel açmaz: YearReviewScreen'in
@@ -170,14 +172,14 @@ fun YearMovieScreen(
             Brush.verticalGradient(
                 when (frame.chapter) {
                     YearMovieChapter.OPENING, YearMovieChapter.FINALE ->
-                        listOf(Color(0xFF10261F), Color(0xFF244A36), Color(0xFF0E221B))
+                        listOf(themedColor(Color(0xFF10261F)), themedColor(Color(0xFF244A36)), themedColor(Color(0xFF0E221B)))
                     YearMovieChapter.MOOD ->
-                        listOf(Color(0xFF152C29), Color(0xFF35524D), Color(0xFF162C29))
+                        listOf(themedColor(Color(0xFF152C29)), themedColor(Color(0xFF35524D)), themedColor(Color(0xFF162C29)))
                     YearMovieChapter.MONTH_STORY ->
-                        listOf(Color(0xFF142D24), Color(0xFF36513C), Color(0xFF12251C))
+                        listOf(themedColor(Color(0xFF142D24)), themedColor(Color(0xFF36513C)), themedColor(Color(0xFF12251C)))
                     YearMovieChapter.PHOTOS ->
-                        listOf(Color(0xFF16251F), Color(0xFF384534), Color(0xFF15221C))
-                    else -> listOf(MovieGreen, Color(0xFF253E31), MovieGreen)
+                        listOf(themedColor(Color(0xFF16251F)), themedColor(Color(0xFF384534)), themedColor(Color(0xFF15221C)))
+                    else -> listOf(MovieGreen, themedColor(Color(0xFF253E31)), MovieGreen)
                 }
             )
         )

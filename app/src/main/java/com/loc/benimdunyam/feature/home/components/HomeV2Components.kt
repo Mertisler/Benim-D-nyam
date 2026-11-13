@@ -1,5 +1,8 @@
 package com.loc.benimdunyam.feature.home.components
 
+import com.loc.benimdunyam.core.designsystem.AppThemeController
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,11 +53,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Ink = Color(0xFF302F29)
-private val SoftInk = Color(0xFF726E65)
-private val Pine = Color(0xFF436A55)
-private val CardPaper = Color(0xFFFFFCF7)
-private val Line = Color(0xFFE8E0D5)
+private val Ink get() = AppThemeController.palette.ink
+private val SoftInk get() = AppThemeController.palette.muted
+private val Pine get() = AppThemeController.palette.primary
+private val CardPaper get() = AppThemeController.palette.paper
+private val Line get() = AppThemeController.palette.border
 
 /** Sade karşılama. Anı Yaz yalnızca ekranda kayan FriendlyActionFab üzerinden açılır. */
 @Composable
@@ -200,7 +203,7 @@ private fun HomeRecentJournalRow(journal: JournalEntry, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFE6EEE7)) {
+            Surface(shape = RoundedCornerShape(12.dp), color = themedColor(Color(0xFFE6EEE7))) {
                 Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                     Icon(Icons.Default.MenuBook, contentDescription = null, tint = Pine)
                 }
@@ -242,7 +245,7 @@ fun HomeDiscoveryDialog(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            color = Color(0xFFFFFBF5)
+            color = themedColor(Color(0xFFFFFBF5))
         ) {
             Column(modifier = Modifier.padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {

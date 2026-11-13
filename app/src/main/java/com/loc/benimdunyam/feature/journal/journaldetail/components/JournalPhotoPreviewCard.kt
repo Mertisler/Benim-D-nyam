@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.journal.journaldetail.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -64,8 +66,8 @@ fun JournalPhotoPreviewCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        color = Color(0xFFF7F0E5),
-        border = BorderStroke(1.dp, Color(0xFFE5D7C5))
+        color = themedColor(Color(0xFFF7F0E5)),
+        border = BorderStroke(1.dp, themedColor(Color(0xFFE5D7C5)))
     ) {
         Row(
             modifier = Modifier.padding(start = 8.dp, end = 6.dp, top = 7.dp, bottom = 7.dp),
@@ -81,7 +83,7 @@ fun JournalPhotoPreviewCard(
                         modifier = Modifier
                             .size(72.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFFE4D9C7))
+                            .background(themedColor(Color(0xFFE4D9C7)))
                             .clickable { onPhotoClick(photo) }
                             .semantics {
                                 contentDescription = "Anı fotoğrafını tam ekranda aç"

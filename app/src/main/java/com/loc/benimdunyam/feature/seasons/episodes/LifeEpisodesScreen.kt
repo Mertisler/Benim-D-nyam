@@ -1,4 +1,8 @@
+
 package com.loc.benimdunyam.feature.seasons.episodes
+
+import com.loc.benimdunyam.core.designsystem.themedColor
+import com.loc.benimdunyam.core.designsystem.AppThemeController
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -83,13 +87,14 @@ fun LifeEpisodesScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
 
                 title = {
                     Text(
                         text = season?.title ?: "Sezon Bölümleri",
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 },
 
@@ -100,7 +105,7 @@ fun LifeEpisodesScreen(
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Geri",
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
@@ -117,14 +122,14 @@ fun LifeEpisodesScreen(
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = "Yaşam dönemini sil",
-                                tint = Color(0xFFFF6B6B)
+                                tint = themedColor(Color(0xFFFF6B6B))
                             )
                         }
                     }
                 },
 
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Black
+                    containerColor = Color.Transparent
                 )
             )
         },
@@ -150,9 +155,9 @@ fun LifeEpisodesScreen(
             }
         },
 
-        containerColor = Color(0xFF121212)
 
-    ) { paddingValues ->
+
+        ) { paddingValues ->
 
         Box(
             modifier = Modifier
@@ -195,24 +200,24 @@ fun LifeEpisodesScreen(
                             Surface(
                                 onClick = { onNavigateToSeasonFilm(seasonId) },
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                                color = Color(0xFF252324),
+                                color = AppThemeController.palette.paper.copy(alpha = 0.95f),
                                 shape = RoundedCornerShape(16.dp),
-                                border = BorderStroke(1.dp, Color(0xFF655039))
+                                border = BorderStroke(1.dp, AppThemeController.palette.border)
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFFE2BA83))
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = AppThemeController.palette.secondary)
                                     Spacer(Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text("SEZONUN FİLMİ", color = Color(0xFFE2BA83),
+                                        Text("SEZONUN FİLMİ", color = AppThemeController.palette.secondary,
                                             style = MaterialTheme.typography.labelMedium)
                                         Text("$seasonJournalCount anıdan oluşan sinematik hikâyen",
-                                            color = Color(0xFFD4C8B7), style = MaterialTheme.typography.bodySmall)
+                                            color = AppThemeController.palette.muted, style = MaterialTheme.typography.bodySmall)
                                     }
                                     Icon(Icons.Default.ChevronRight, contentDescription = "Filmi aç",
-                                        tint = Color(0xFFE2BA83))
+                                        tint = AppThemeController.palette.secondary)
                                 }
                             }
                         }
@@ -250,7 +255,7 @@ fun LifeEpisodesScreen(
                         Text(
                             text = "Bölümler",
                             style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.padding(
                                 horizontal = 16.dp,
                                 vertical = 4.dp
@@ -506,9 +511,9 @@ fun SeasonHeroHeader(
                     Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            Color(0xFF121212)
-                        ),
-                        startY = 100f
+                            Color(0x44020A14),
+                            Color(0xE8020914)
+                        )
                     )
                 )
         )
@@ -537,7 +542,7 @@ fun SeasonHeroHeader(
                 Text(
                     text = season.description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.LightGray,
+                    color = Color.White.copy(alpha = 0.90f),
                     maxLines = 3
                 )
             }
@@ -559,7 +564,7 @@ fun NetflixStyleEpisodeItem(
     onWriteJournalClick: () -> Unit
 ) {
 
-    val activeRed = Color(0xFFE50914)
+    val activeRed = themedColor(Color(0xFFE50914))
 
     Card(
         modifier = Modifier
@@ -571,7 +576,7 @@ fun NetflixStyleEpisodeItem(
                 shape = RoundedCornerShape(12.dp)
             ),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF1E1E1E)
+            containerColor = AppThemeController.palette.paper.copy(alpha = 0.94f)
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 4.dp
@@ -598,7 +603,7 @@ fun NetflixStyleEpisodeItem(
                         .clip(RoundedCornerShape(8.dp))
                         .background(
                             if (isActive) activeRed
-                            else Color(0xFF2C2C2C)
+                            else AppThemeController.palette.softPrimary
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -606,7 +611,7 @@ fun NetflixStyleEpisodeItem(
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
-                        tint = Color.White
+                        tint = if (isActive) Color.White else MaterialTheme.colorScheme.primary
                     )
                 }
 
@@ -624,7 +629,7 @@ fun NetflixStyleEpisodeItem(
                         Text(
                             text = "${episode.orderIndex}. Bölüm: ${episode.title}",
                             style = MaterialTheme.typography.titleMedium,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
 
                         if (isActive) {
@@ -652,7 +657,7 @@ fun NetflixStyleEpisodeItem(
                         Text(
                             text = episode.description,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.LightGray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2
                         )
                     }
@@ -670,9 +675,9 @@ fun NetflixStyleEpisodeItem(
                             containerColor = if (isActive) {
                                 activeRed
                             } else {
-                                Color(0xFF2C2C2C)
+                                AppThemeController.palette.primary
                             },
-                            contentColor = Color.White
+                            contentColor = if (isActive) Color.White else AppThemeController.palette.onPrimary
                         ),
                         contentPadding = PaddingValues(
                             horizontal = 8.dp,
@@ -707,7 +712,7 @@ fun NetflixStyleEpisodeItem(
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Bölümü Sil",
-                            tint = Color(0xFFCF6679)
+                            tint = themedColor(Color(0xFFCF6679))
                         )
                     }
                 }
@@ -721,11 +726,11 @@ fun NetflixStyleEpisodeItem(
                     .height(36.dp),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = Color.White
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 ),
                 border = BorderStroke(
                     1.dp,
-                    Color(0xFF333333)
+                    MaterialTheme.colorScheme.outline
                 )
             ) {
 

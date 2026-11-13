@@ -1,5 +1,6 @@
 package com.loc.benimdunyam.feature.search
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,8 +31,10 @@ fun SearchScreen(
     val dateFormat = SimpleDateFormat("dd MMMM yyyy", Locale("tr", "TR"))
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 title = {
                     OutlinedTextField(
                         value = uiState.query,

@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.seasons.summary
 
+import com.loc.benimdunyam.core.designsystem.AppThemeController
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -64,11 +66,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val StoryGold = Color(0xFFE2BA83)
-private val StoryPaper = Color(0xFFF7EDDB)
-private val StoryMuted = Color(0xFFB9ADA0)
-private val StoryCard = Color(0xFF252324)
-private val StoryBorder = Color(0xFF4E433B)
+private val StoryGold get() = AppThemeController.palette.secondary
+private val StoryPaper get() = AppThemeController.palette.ink
+private val StoryMuted get() = AppThemeController.palette.muted
+private val StoryCard get() = AppThemeController.palette.paper.copy(alpha = 0.94f)
+private val StoryBorder get() = AppThemeController.palette.border
 
 /**
  * Put this inside the existing LifeEpisodesScreen LazyColumn, under SeasonHeroHeader.
@@ -282,7 +284,7 @@ private fun StoryTimelineRow(
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier.size(38.dp).background(Color(0xFF403427), RoundedCornerShape(10.dp)),
+                modifier = Modifier.size(38.dp).background(AppThemeController.palette.softPrimary, RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.Star, contentDescription = null, tint = StoryGold)
@@ -323,7 +325,7 @@ private fun StoryPhotoTile(
         )
         Box(
             modifier = Modifier.matchParentSize().background(
-                Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC151212)))
+                Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f)))
             )
         )
         Text(
@@ -345,7 +347,7 @@ private fun StoryEpisodeRow(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth()
-            .background(Color(0xFF302D2B), RoundedCornerShape(12.dp))
+            .background(AppThemeController.palette.softPrimary, RoundedCornerShape(12.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {

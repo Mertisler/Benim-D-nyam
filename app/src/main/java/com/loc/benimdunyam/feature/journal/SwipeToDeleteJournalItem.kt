@@ -1,6 +1,8 @@
 
 package com.loc.benimdunyam.feature.journal.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -23,11 +25,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
-private val DeleteRed = Color(0xFFB84C43)
-private val PaperColor = Color(0xFFFAF6EE)
-private val InkColor = Color(0xFF33271F)
-private val MutedColor = Color(0xFF756755)
-private val GreenColor = Color(0xFF365A43)
+private val DeleteRed get() = themedColor(Color(0xFFB84C43))
+private val PaperColor get() = themedColor(Color(0xFFFAF6EE))
+private val InkColor get() = themedColor(Color(0xFF33271F))
+private val MutedColor get() = themedColor(Color(0xFF756755))
+private val GreenColor get() = themedColor(Color(0xFF365A43))
 
 @Composable
 fun SwipeToDeleteJournalItem(

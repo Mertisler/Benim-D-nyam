@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.people.network.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -66,7 +68,7 @@ fun PeopleNetworkCanvas(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF142033))
+            .background(themedColor(Color(0xFF142033)))
             .onSizeChanged { viewportSize = it }
             .pointerInput(Unit) {
                 detectTransformGestures { centroid, panChange, zoomChange, _ ->
@@ -95,8 +97,8 @@ fun PeopleNetworkCanvas(
                     (draggedNodes[node.id] ?: Offset.Zero))
         }
         val nodeRadius = with(density) { 26.dp.toPx() }
-        val edgeColor = Color(0xFF9FB2C8)
-        val strongEdge = Color(0xFFE8B87A)
+        val edgeColor = themedColor(Color(0xFF9FB2C8))
+        val strongEdge = themedColor(Color(0xFFE8B87A))
 
         Canvas(modifier = Modifier.fillMaxSize()) {
             // Yalnızca gerçek ortak-anı bağlantıları çizilir.

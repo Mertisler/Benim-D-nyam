@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.people.detail.components.connections
 
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -73,8 +75,10 @@ fun SharedMemoriesScreen(
             }
 
             Scaffold(
+                containerColor = Color.Transparent,
                 topBar = {
                     TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                         title = { Text("Ortak Anılar") },
                         navigationIcon = {
                             IconButton(onClick = onClose) {

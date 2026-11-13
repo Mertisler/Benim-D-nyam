@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.people
 
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.Color
 import android.Manifest
 import android.content.pm.PackageManager
 import android.widget.Toast
@@ -136,8 +138,10 @@ fun PeopleScreen(
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 title = { Text("İnsanlarım") },
                 actions = {
                     IconButton(

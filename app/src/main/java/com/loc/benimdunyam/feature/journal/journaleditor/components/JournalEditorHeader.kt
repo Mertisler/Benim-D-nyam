@@ -1,6 +1,8 @@
 
 package com.loc.benimdunyam.feature.journal.journaleditor.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -467,7 +469,7 @@ private fun PolaroidDateCard(
                     .fillMaxWidth()
                     .weight(1f)
                     .clip(RoundedCornerShape(1.dp))
-                    .background(Color(0xFFE9E1D5))
+                    .background(themedColor(Color(0xFFE9E1D5)))
             ) {
 
                 if (!imagePath.isNullOrBlank()) {
@@ -567,7 +569,7 @@ private fun TapeLabel(
             )
 
             drawLine(
-                color = Color(0xFFB6A78E).copy(alpha = 0.24f),
+                color = themedColor(Color(0xFFB6A78E)).copy(alpha = 0.24f),
 
                 start = Offset(
                     size.width * 0.08f,

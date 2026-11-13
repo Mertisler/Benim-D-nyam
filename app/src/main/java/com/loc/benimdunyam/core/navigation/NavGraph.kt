@@ -1,5 +1,9 @@
 package com.loc.benimdunyam.core.navigation
 
+import com.loc.benimdunyam.core.designsystem.ThemeScenicBackground
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -34,286 +38,289 @@ fun BenimDunyamNavGraph(
 ) {
     val navController = rememberNavController()
 
-    Scaffold(
-        bottomBar = {
-            BottomNavigationBar(navController = navController)
-        }
-    ) { paddingValues ->
-        NavHost(
-            navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier.padding(paddingValues)
-        ) {
-            // 1. Onboarding
-            composable(route = Screen.Onboarding.route) {
-                OnboardingScreen(
-                    onNavigateToHome = {
-                        navController.navigate(BottomNavScreen.Home.route) {
-                            popUpTo(Screen.Onboarding.route) { inclusive = true }
-                        }
-                    }
-                )
+    Box(modifier = Modifier.fillMaxSize()) {
+        ThemeScenicBackground(modifier = Modifier.matchParentSize())
+        Scaffold(
+            containerColor = Color.Transparent,
+            bottomBar = {
+                BottomNavigationBar(navController = navController)
             }
+        ) { paddingValues ->
+            NavHost(
+                navController = navController,
+                startDestination = startDestination,
+                modifier = Modifier.padding(paddingValues)
+            ) {
+                // 1. Onboarding
+                composable(route = Screen.Onboarding.route) {
+                    OnboardingScreen(
+                        onNavigateToHome = {
+                            navController.navigate(BottomNavScreen.Home.route) {
+                                popUpTo(Screen.Onboarding.route) { inclusive = true }
+                            }
+                        }
+                    )
+                }
 
-            // 2. Ana Sayfa (Tab 1)
-            composable(route = BottomNavScreen.Home.route) {
-                HomeScreen(
-                    onNavigateToCreateJournal = { seasonId, episodeId ->
-                        navController.navigate(
-                            Screen.JournalCreateEdit.createRoute(
-                                seasonId = seasonId,
-                                episodeId = episodeId
+                // 2. Ana Sayfa (Tab 1)
+                composable(route = BottomNavScreen.Home.route) {
+                    HomeScreen(
+                        onNavigateToCreateJournal = { seasonId, episodeId ->
+                            navController.navigate(
+                                Screen.JournalCreateEdit.createRoute(
+                                    seasonId = seasonId,
+                                    episodeId = episodeId
+                                )
                             )
-                        )
-                    },
-                    onNavigateToJournalDetail = { journalId ->
-                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
-                    },
-                    onNavigateToSearch = {
-                        navController.navigate(Screen.Search.route)
-                    },
-                    onNavigateToSettings = {
-                        navController.navigate(Screen.Settings.route)
-                    },
-                    onNavigateToSeasons = {
-                        navController.navigate(Screen.LifeSeasons.route)
-                    },
-                    onNavigateToTimeline = {
-                        navController.navigate(Screen.Timeline.route)
-                    },
-                    onNavigateToEpisodes = { seasonId ->
-                        navController.navigate(Screen.LifeEpisodes.createRoute(seasonId))
-                    },
-                )
-            }
+                        },
+                        onNavigateToJournalDetail = { journalId ->
+                            navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                        },
+                        onNavigateToSearch = {
+                            navController.navigate(Screen.Search.route)
+                        },
+                        onNavigateToSettings = {
+                            navController.navigate(Screen.Settings.route)
+                        },
+                        onNavigateToSeasons = {
+                            navController.navigate(Screen.LifeSeasons.route)
+                        },
+                        onNavigateToTimeline = {
+                            navController.navigate(Screen.Timeline.route)
+                        },
+                        onNavigateToEpisodes = { seasonId ->
+                            navController.navigate(Screen.LifeEpisodes.createRoute(seasonId))
+                        },
+                    )
+                }
 
-            // 3. Tüm Günlükler / Arşiv (Tab 2)
-            composable(route = BottomNavScreen.Journals.route) {
-                JournalsScreen(
-                    onNavigateToCreateJournal = {
-                        navController.navigate(Screen.JournalCreateEdit.createRoute())
-                    },
-                    onNavigateToJournalDetail = { journalId ->
-                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
-                    }
-                )
-            }
-
-            // 4. İnsanlarım Rehberi (Tab 3)
-            composable(route = BottomNavScreen.People.route) {
-                PeopleScreen(
-                    onNavigateToCreatePerson = {
-                        navController.navigate(Screen.PersonCreateEdit.createRoute())
-                    },
-                    onNavigateToPersonDetail = { personId ->
-                        navController.navigate(Screen.PersonDetail.createRoute(personId))
-                    },
-                    onNavigateToPeopleNetwork = {
-                        navController.navigate(Screen.PeopleNetwork.route)
-                    }
-                )
-            }
-
-            // Hayatımın İnsan Haritası
-            composable(route = Screen.PeopleNetwork.route) {
-                PeopleNetworkScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToPersonDetail = { personId ->
-                        navController.navigate(Screen.PersonDetail.createRoute(personId))
-                    },
-                    onNavigateToJournalDetail = { journalId ->
-                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
-                    }
-                )
-            }
-
-            // 5. Günlük Ekleme / Düzenleme
-            composable(
-                route = "journal_create_edit?journalId={journalId}&seasonId={seasonId}&episodeId={episodeId}",
-                arguments = listOf(
-                    navArgument("journalId") { type = NavType.StringType; nullable = true; defaultValue = null },
-                    navArgument("seasonId") { type = NavType.StringType; nullable = true; defaultValue = null },
-                    navArgument("episodeId") { type = NavType.StringType; nullable = true; defaultValue = null }
-                )
-            ) {
-                JournalEditorScreen(
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-
-            // 6. Günlük Detayı
-            composable(
-                route = Screen.JournalDetail.route,
-                arguments = listOf(
-                    navArgument("journalId") { type = NavType.StringType }
-                )
-            ) {
-                JournalDetailScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToEdit = { journalId ->
-                        navController.navigate(Screen.JournalCreateEdit.createRoute(journalId))
-                    },
-                    onNavigateToPersonDetail = { personId ->
-                        navController.navigate(Screen.PersonDetail.createRoute(personId))
-                    }
-                )
-            }
-
-            // 7. Kişi Detayı
-            composable(
-                route = Screen.PersonDetail.route,
-                arguments = listOf(
-                    navArgument("personId") { type = NavType.StringType }
-                )
-            ) {
-                PersonDetailScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToEdit = { personId ->
-                        navController.navigate(Screen.PersonCreateEdit.createRoute(personId))
-                    },
-                    onNavigateToJournalDetail = { journalId ->
-                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
-                    },
-                    onNavigateToPersonDetail = { otherPersonId ->
-                        navController.navigate(Screen.PersonDetail.createRoute(otherPersonId))
-                    }
-                )
-            }
-
-            // 8. Kişi Ekleme / Düzenleme
-            composable(
-                route = Screen.PersonCreateEdit.route,
-                arguments = listOf(
-                    navArgument("personId") {
-                        type = NavType.StringType
-                        nullable = true
-                        defaultValue = null
-                    }
-                )
-            ) {
-                PersonEditorScreen(
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-
-            // 9. Arama Ekranı
-            composable(route = Screen.Search.route) {
-                SearchScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToJournalDetail = { journalId ->
-                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
-                    },
-                    onNavigateToPersonDetail = { personId ->
-                        navController.navigate(Screen.PersonDetail.createRoute(personId))
-                    }
-                )
-            }
-
-            // 10. Ayarlar ve Gizlilik
-            composable(route = Screen.Settings.route) {
-                SettingsScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onDataCleared = {
-                        navController.navigate(Screen.Onboarding.route) {
-                            popUpTo(BottomNavScreen.Home.route) { inclusive = true }
+                // 3. Tüm Günlükler / Arşiv (Tab 2)
+                composable(route = BottomNavScreen.Journals.route) {
+                    JournalsScreen(
+                        onNavigateToCreateJournal = {
+                            navController.navigate(Screen.JournalCreateEdit.createRoute())
+                        },
+                        onNavigateToJournalDetail = { journalId ->
+                            navController.navigate(Screen.JournalDetail.createRoute(journalId))
                         }
-                    }
-                )
-            }
+                    )
+                }
 
-            // 11. Dönemler sekmesi: mevcut LifeSeasons ekranı aynı route ile kullanılır.
-            composable(route = BottomNavScreen.Seasons.route) {
-                LifeSeasonsScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    showBackButton = false,
-                    onNavigateToEpisodes = { seasonId ->
-                        navController.navigate(Screen.LifeEpisodes.createRoute(seasonId))
-                    }
-                )
-            }
+                // 4. İnsanlarım Rehberi (Tab 3)
+                composable(route = BottomNavScreen.People.route) {
+                    PeopleScreen(
+                        onNavigateToCreatePerson = {
+                            navController.navigate(Screen.PersonCreateEdit.createRoute())
+                        },
+                        onNavigateToPersonDetail = { personId ->
+                            navController.navigate(Screen.PersonDetail.createRoute(personId))
+                        },
+                        onNavigateToPeopleNetwork = {
+                            navController.navigate(Screen.PeopleNetwork.route)
+                        }
+                    )
+                }
 
-            // 12. Sezon Bölümleri Ekranı
-            composable(
-                route = Screen.LifeEpisodes.route,
-                arguments = listOf(
-                    navArgument("seasonId") { type = NavType.StringType }
-                )
-            ) { backStackEntry ->
-                val seasonId = backStackEntry.arguments?.getString("seasonId") ?: ""
-                val viewModel: LifeEpisodesViewModel = hiltViewModel()
+                // Hayatımın İnsan Haritası
+                composable(route = Screen.PeopleNetwork.route) {
+                    PeopleNetworkScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToPersonDetail = { personId ->
+                            navController.navigate(Screen.PersonDetail.createRoute(personId))
+                        },
+                        onNavigateToJournalDetail = { journalId ->
+                            navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                        }
+                    )
+                }
 
-                LifeEpisodesScreen(
-                    viewModel = viewModel,
-                    seasonId = seasonId,
-                    onBackClick = { navController.popBackStack() },
-                    onNavigateToCreateJournal = { sId, eId ->
-                        viewModel.setSelectedSeasonAndEpisode(eId)
-                        navController.navigate(Screen.JournalCreateEdit.createRoute(seasonId = sId, episodeId = eId))
-                    },
-                    onNavigateToEpisodeMemories = { sId, eId ->
-                        navController.navigate(Screen.EpisodeMemories.createRoute(sId, eId))
-                    },
-                    onNavigateToJournalDetail = { journalId ->
-                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
-                    },
-                    onNavigateToSeasonFilm = { selectedSeasonId ->
-                        navController.navigate("season_film/$selectedSeasonId")
-                    }
-                )
-            }
+                // 5. Günlük Ekleme / Düzenleme
+                composable(
+                    route = "journal_create_edit?journalId={journalId}&seasonId={seasonId}&episodeId={episodeId}",
+                    arguments = listOf(
+                        navArgument("journalId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("seasonId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("episodeId") { type = NavType.StringType; nullable = true; defaultValue = null }
+                    )
+                ) {
+                    JournalEditorScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
 
-            // 13. Zaman Çizgisi Ekranı (Faz 3)
-            composable(route = Screen.Timeline.route) {
-                TimelineScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToJournalDetail = { journalId ->
-                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
-                    }
-                )
-            }
+                // 6. Günlük Detayı
+                composable(
+                    route = Screen.JournalDetail.route,
+                    arguments = listOf(
+                        navArgument("journalId") { type = NavType.StringType }
+                    )
+                ) {
+                    JournalDetailScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToEdit = { journalId ->
+                            navController.navigate(Screen.JournalCreateEdit.createRoute(journalId))
+                        },
+                        onNavigateToPersonDetail = { personId ->
+                            navController.navigate(Screen.PersonDetail.createRoute(personId))
+                        }
+                    )
+                }
 
-            // Seçilen sezonun filmi; yıl bazlı eski ekranın hesapları sezon id ile sınırlandırılır.
-            composable(
-                route = "season_film/{seasonId}",
-                arguments = listOf(navArgument("seasonId") { type = NavType.StringType })
-            ) {
-                YearReviewScreen(
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToJournalDetail = { journalId ->
-                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
-                    }
-                )
-            }
+                // 7. Kişi Detayı
+                composable(
+                    route = Screen.PersonDetail.route,
+                    arguments = listOf(
+                        navArgument("personId") { type = NavType.StringType }
+                    )
+                ) {
+                    PersonDetailScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToEdit = { personId ->
+                            navController.navigate(Screen.PersonCreateEdit.createRoute(personId))
+                        },
+                        onNavigateToJournalDetail = { journalId ->
+                            navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                        },
+                        onNavigateToPersonDetail = { otherPersonId ->
+                            navController.navigate(Screen.PersonDetail.createRoute(otherPersonId))
+                        }
+                    )
+                }
 
-            composable(route = "year_review") {
-                YearReviewScreen(
-                    onNavigateBack = {
-                        navController.popBackStack()
-                    },
-                    onNavigateToJournalDetail = { journalId ->
-                        navController.navigate(
-                            Screen.JournalDetail.createRoute(journalId)
-                        )
-                    }
-                )
-            }
+                // 8. Kişi Ekleme / Düzenleme
+                composable(
+                    route = Screen.PersonCreateEdit.route,
+                    arguments = listOf(
+                        navArgument("personId") {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        }
+                    )
+                ) {
+                    PersonEditorScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
 
-            // Bölüm Anıları Sayfası
-            composable(
-                route = "episode_memories/{seasonId}/{episodeId}",
-                arguments = listOf(
-                    navArgument("seasonId") { type = NavType.StringType },
-                    navArgument("episodeId") { type = NavType.StringType }
-                )
-            ) {
-                EpisodeMemoriesScreen(
-                    onBackClick = { navController.popBackStack() },
-                    onJournalClick = { journalId ->
-                        navController.navigate(Screen.JournalDetail.createRoute(journalId))
-                    }
-                )
+                // 9. Arama Ekranı
+                composable(route = Screen.Search.route) {
+                    SearchScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToJournalDetail = { journalId ->
+                            navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                        },
+                        onNavigateToPersonDetail = { personId ->
+                            navController.navigate(Screen.PersonDetail.createRoute(personId))
+                        }
+                    )
+                }
+
+                // 10. Ayarlar ve Gizlilik
+                composable(route = Screen.Settings.route) {
+                    SettingsScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onDataCleared = {
+                            navController.navigate(Screen.Onboarding.route) {
+                                popUpTo(BottomNavScreen.Home.route) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
+                // 11. Dönemler sekmesi: mevcut LifeSeasons ekranı aynı route ile kullanılır.
+                composable(route = BottomNavScreen.Seasons.route) {
+                    LifeSeasonsScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        showBackButton = false,
+                        onNavigateToEpisodes = { seasonId ->
+                            navController.navigate(Screen.LifeEpisodes.createRoute(seasonId))
+                        }
+                    )
+                }
+
+                // 12. Sezon Bölümleri Ekranı
+                composable(
+                    route = Screen.LifeEpisodes.route,
+                    arguments = listOf(
+                        navArgument("seasonId") { type = NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val seasonId = backStackEntry.arguments?.getString("seasonId") ?: ""
+                    val viewModel: LifeEpisodesViewModel = hiltViewModel()
+
+                    LifeEpisodesScreen(
+                        viewModel = viewModel,
+                        seasonId = seasonId,
+                        onBackClick = { navController.popBackStack() },
+                        onNavigateToCreateJournal = { sId, eId ->
+                            viewModel.setSelectedSeasonAndEpisode(eId)
+                            navController.navigate(Screen.JournalCreateEdit.createRoute(seasonId = sId, episodeId = eId))
+                        },
+                        onNavigateToEpisodeMemories = { sId, eId ->
+                            navController.navigate(Screen.EpisodeMemories.createRoute(sId, eId))
+                        },
+                        onNavigateToJournalDetail = { journalId ->
+                            navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                        },
+                        onNavigateToSeasonFilm = { selectedSeasonId ->
+                            navController.navigate("season_film/$selectedSeasonId")
+                        }
+                    )
+                }
+
+                // 13. Zaman Çizgisi Ekranı (Faz 3)
+                composable(route = Screen.Timeline.route) {
+                    TimelineScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToJournalDetail = { journalId ->
+                            navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                        }
+                    )
+                }
+
+                // Seçilen sezonun filmi; yıl bazlı eski ekranın hesapları sezon id ile sınırlandırılır.
+                composable(
+                    route = "season_film/{seasonId}",
+                    arguments = listOf(navArgument("seasonId") { type = NavType.StringType })
+                ) {
+                    YearReviewScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToJournalDetail = { journalId ->
+                            navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                        }
+                    )
+                }
+
+                composable(route = "year_review") {
+                    YearReviewScreen(
+                        onNavigateBack = {
+                            navController.popBackStack()
+                        },
+                        onNavigateToJournalDetail = { journalId ->
+                            navController.navigate(
+                                Screen.JournalDetail.createRoute(journalId)
+                            )
+                        }
+                    )
+                }
+
+                // Bölüm Anıları Sayfası
+                composable(
+                    route = "episode_memories/{seasonId}/{episodeId}",
+                    arguments = listOf(
+                        navArgument("seasonId") { type = NavType.StringType },
+                        navArgument("episodeId") { type = NavType.StringType }
+                    )
+                ) {
+                    EpisodeMemoriesScreen(
+                        onBackClick = { navController.popBackStack() },
+                        onJournalClick = { journalId ->
+                            navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                        }
+                    )
+                }
             }
         }
     }
 }
-

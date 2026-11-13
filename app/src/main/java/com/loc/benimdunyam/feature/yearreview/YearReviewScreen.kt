@@ -1,5 +1,9 @@
 package com.loc.benimdunyam.feature.yearreview
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+import com.loc.benimdunyam.core.designsystem.AppThemeController
+import com.loc.benimdunyam.core.designsystem.AppThemePreset
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,13 +57,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Paper = Color(0xFFFAF7F2)
-private val Pale = Color(0xFFF2EADD)
-private val Ink = Color(0xFF322A24)
-private val Muted = Color(0xFF857A6F)
-private val Pine = Color(0xFF395C4A)
-private val Gold = Color(0xFFC8A36A)
-private val Line = Color(0xFFE7DDD0)
+private val Paper get() = AppThemeController.palette.paper
+private val Pale get() = AppThemeController.palette.softPrimary
+private val Ink get() = AppThemeController.palette.ink
+private val Muted get() = AppThemeController.palette.muted
+private val Pine get() = AppThemeController.palette.primary
+private val Gold get() = AppThemeController.palette.secondary
+private val Line get() = AppThemeController.palette.border
 private val Turkish = Locale.forLanguageTag("tr-TR")
 private val MonthLabels = listOf("OCA", "ŞUB", "MAR", "NİS", "MAY", "HAZ", "TEM", "AĞU", "EYL", "EKİ", "KAS", "ARA")
 private val MonthNames = listOf("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık")
@@ -133,7 +137,7 @@ fun YearReviewScreen(
     }
 
     Scaffold(
-        containerColor = Paper,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
@@ -149,7 +153,7 @@ fun YearReviewScreen(
                         Icon(Icons.Default.ArrowBack, contentDescription = "Geri dön", tint = Ink)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Paper)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
     ) { padding ->
@@ -181,7 +185,7 @@ fun YearReviewScreen(
                                         label = { Text(year.toString(), fontWeight = FontWeight.SemiBold) },
                                         colors = FilterChipDefaults.filterChipColors(
                                             selectedContainerColor = Pine,
-                                            selectedLabelColor = Color.White
+                                            selectedLabelColor = AppThemeController.palette.onPrimary
                                         )
                                     )
                                 }
@@ -200,7 +204,7 @@ fun YearReviewScreen(
                                         .padding(horizontal = 18.dp).height(54.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = Pine,
-                                        contentColor = Color.White
+                                        contentColor = AppThemeController.palette.onPrimary
                                     ),
                                     shape = RoundedCornerShape(18.dp)
                                 ) {
@@ -322,18 +326,27 @@ fun YearReviewScreen(
 
 @Composable
 private fun YearReviewPoster(report: YearReviewReport, modifier: Modifier = Modifier) {
+    val ocean = AppThemeController.selected == AppThemePreset.JELLYFISH_NIGHT
+    val movieGradient = if (ocean) listOf(
+        Color(0xFF07517A), Color(0xFF043A63), Color(0xFF061D39)
+    ) else if (AppThemeController.palette.isDark) listOf(
+        AppThemeController.palette.softPrimary, AppThemeController.palette.paper
+    ) else listOf(
+        AppThemeController.palette.primary, AppThemeController.palette.ink
+    )
+    val movieAccent = if (ocean) Color(0xFF80E8FD) else Color(0xFFFADE9C)
     Box(
         modifier = modifier.fillMaxWidth().heightIn(min = 330.dp)
             .clip(RoundedCornerShape(28.dp))
-            .background(Brush.linearGradient(listOf(Pine, Color(0xFF203B30), Color(0xFF172C25))))
+            .background(Brush.linearGradient(movieGradient))
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("BENİM DÜNYAM ORIGINAL STORY", color = Color(0xFFDED2B7), fontSize = 10.sp, letterSpacing = 2.1.sp)
+            Text("BENİM DÜNYAM ORIGINAL STORY", color = Color(0xFFD4EBF3), fontSize = 10.sp, letterSpacing = 2.1.sp)
             Spacer(Modifier.height(5.dp))
-            Text(report.seasonTitle ?: report.year.toString(), color = Gold,
+            Text(report.seasonTitle ?: report.year.toString(), color = movieAccent,
                 fontSize = if (report.seasonId == null) 84.sp else 32.sp,
                 lineHeight = if (report.seasonId == null) 88.sp else 39.sp,
                 fontWeight = FontWeight.Light, fontFamily = FontFamily.Serif)
@@ -343,7 +356,7 @@ private fun YearReviewPoster(report: YearReviewReport, modifier: Modifier = Modi
                 if (report.journalCount == 0) "Henüz yazılmayı bekleyen bir hikâye..."
                 else if (report.seasonId == null) "Bir yıl. Sayısız küçük an. Hepsi sana ait."
                 else "Bir dönem. Biriktirdiğin bütün anılar, sana ait.",
-                color = Color(0xFFE3E8E0), fontSize = 14.sp
+                color = Color(0xFFE1ECF7), fontSize = 14.sp
             )
             Spacer(Modifier.height(18.dp))
             HorizontalDivider(color = Color.White.copy(alpha = 0.25f))
@@ -362,7 +375,7 @@ private fun YearReviewPoster(report: YearReviewReport, modifier: Modifier = Modi
 private fun PosterMetric(value: String, label: String) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(value, color = Color.White, fontFamily = FontFamily.Serif, fontSize = 26.sp)
-        Text(label, color = Color(0xFFD3DACF), letterSpacing = 1.1.sp, fontSize = 10.sp)
+        Text(label, color = Color.White.copy(alpha = 0.82f), letterSpacing = 1.1.sp, fontSize = 10.sp)
     }
 }
 
@@ -380,7 +393,7 @@ private fun YearCard(modifier: Modifier = Modifier, content: @Composable ColumnS
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(23.dp),
-        color = Color(0xFFFFFDF9),
+        color = AppThemeController.palette.paper.copy(alpha = 0.94f),
         border = BorderStroke(1.dp, Line)
     ) {
         Column(
@@ -415,7 +428,7 @@ private fun YearMonthlyScene(report: YearReviewReport, modifier: Modifier = Modi
                             modifier = Modifier.width(15.dp)
                                 .height((12f + count * 86f / max).dp)
                                 .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
-                                .background(if (count == max) Gold else Color(0xFF99B1A3))
+                                .background(if (count == max) Gold else AppThemeController.palette.softPrimary)
                         )
                         Text(MonthLabels[index], color = Muted, fontSize = 8.sp)
                     }
@@ -556,7 +569,7 @@ private fun YearPhotoScene(
 @Composable
 private fun YearEndingCard(year: Int, modifier: Modifier = Modifier, seasonTitle: String? = null) {
     Box(modifier.fillMaxWidth().clip(RoundedCornerShape(25.dp))
-        .background(Brush.verticalGradient(listOf(Color(0xFFEEE1CC), Color(0xFFF7F0E4))))) {
+        .background(Brush.verticalGradient(listOf(AppThemeController.palette.tape, AppThemeController.palette.softPrimary)))) {
         Column(Modifier.fillMaxWidth().padding(26.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)) {

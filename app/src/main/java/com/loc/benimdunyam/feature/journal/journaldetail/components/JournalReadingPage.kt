@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.journal.journaldetail.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -49,9 +51,9 @@ fun JournalReadingPage(
     modifier: Modifier = Modifier,
     moodContent: @Composable () -> Unit = {}
 ) {
-    val ink = Color(0xFF362D26)
-    val secondaryInk = Color(0xFF796E62)
-    val accent = Color(0xFF476C58)
+    val ink = themedColor(Color(0xFF362D26))
+    val secondaryInk = themedColor(Color(0xFF796E62))
+    val accent = themedColor(Color(0xFF476C58))
     val scrollState = rememberScrollState()
     val displayedContent = content.ifBlank { "Bu anıya henüz bir not eklenmemiş." }
 
@@ -95,8 +97,8 @@ fun JournalReadingPage(
             Surface(
                 modifier = Modifier.width(49.dp).height(51.dp),
                 shape = RoundedCornerShape(11.dp),
-                color = Color(0xFFF0E6D6),
-                border = BorderStroke(1.dp, Color(0xFFDED2BE))
+                color = themedColor(Color(0xFFF0E6D6)),
+                border = BorderStroke(1.dp, themedColor(Color(0xFFDED2BE)))
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,

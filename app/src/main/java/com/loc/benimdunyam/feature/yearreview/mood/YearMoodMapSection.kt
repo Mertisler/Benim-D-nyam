@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.yearreview.mood
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -34,14 +36,14 @@ import androidx.compose.ui.unit.sp
 import java.util.Locale
 import kotlin.math.max
 
-private val Green = Color(0xFF395C4A)
-private val Ink = Color(0xFF302A24)
-private val Faint = Color(0xFF8B7C6D)
-private val Soft = Color(0xFFE5DBCF)
+private val Green get() = themedColor(Color(0xFF395C4A))
+private val Ink get() = themedColor(Color(0xFF302A24))
+private val Faint get() = themedColor(Color(0xFF8B7C6D))
+private val Soft get() = themedColor(Color(0xFFE5DBCF))
 private val MoodColors = listOf(
-    Color(0xFF547C67), Color(0xFFCE9B58), Color(0xFF7E91B4),
-    Color(0xFFB77E83), Color(0xFF8A7DB1), Color(0xFFCB8A5D),
-    Color(0xFF71A6A0), Color(0xFFA1A168)
+    themedColor(Color(0xFF547C67)), themedColor(Color(0xFFCE9B58)), themedColor(Color(0xFF7E91B4)),
+    themedColor(Color(0xFFB77E83)), themedColor(Color(0xFF8A7DB1)), themedColor(Color(0xFFCB8A5D)),
+    themedColor(Color(0xFF71A6A0)), themedColor(Color(0xFFA1A168))
 )
 private val MonthAbbreviations = listOf(
     "Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"
@@ -70,7 +72,7 @@ fun YearMoodMapSection(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF4EDE2))
+        colors = CardDefaults.cardColors(containerColor = themedColor(Color(0xFFF4EDE2)))
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(20.dp),

@@ -1,8 +1,8 @@
 package com.loc.benimdunyam.feature.journal.components
 
+import com.loc.benimdunyam.core.designsystem.AppThemeController
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -13,10 +13,10 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -63,10 +64,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
-private val FabGreen = Color(0xFF496B5B)
-private val FabBubble = Color(0xFFFFFEFA)
-private val FabBubbleBorder = Color(0xFFDDE8DF)
-private val FabHalo = Color(0xFFE6F1EA)
+private val FabGreen get() = AppThemeController.palette.primary
+private val FabBubble get() = AppThemeController.palette.paper
+private val FabBubbleBorder get() = AppThemeController.palette.border
+private val FabHalo get() = AppThemeController.palette.softPrimary
 private val DogBrown = Color(0xFFC98B58)
 private val DogDark = Color(0xFF4A3528)
 private val DogCream = Color(0xFFFDF0DE)
@@ -104,7 +105,7 @@ fun JournalDogActionFab(
     )
 
     val contentColor by animateColorAsState(
-        targetValue = if (showGreeting) FabGreen else Color.White,
+        targetValue = if (showGreeting) FabGreen else AppThemeController.palette.onPrimary,
         animationSpec = tween(420),
         label = "JournalDogFabContentColor"
     )

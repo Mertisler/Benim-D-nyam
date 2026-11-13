@@ -1,6 +1,7 @@
 
 package com.loc.benimdunyam.feature.home.components
 
+import com.loc.benimdunyam.core.designsystem.AppThemeController
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -206,8 +207,8 @@ fun SpeechBubble(
     text: String,
     modifier: Modifier = Modifier
 ) {
-    val bubbleColor = Color(0xFFFFFEFA)
-    val borderColor = Color(0xFFDDE8DF)
+    val bubbleColor = AppThemeController.palette.paper
+    val borderColor = AppThemeController.palette.border
 
     Column(
         modifier = modifier,
@@ -218,7 +219,7 @@ fun SpeechBubble(
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = bubbleColor,
-            contentColor = Color(0xFF385449),
+            contentColor = AppThemeController.palette.ink,
             border = BorderStroke(
                 width = 1.dp,
                 color = borderColor

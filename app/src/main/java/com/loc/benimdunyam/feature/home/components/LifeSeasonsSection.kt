@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.home.components
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
@@ -61,7 +63,7 @@ fun LifeSeasonsSection(
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 ),
-                color = Color(0xFF332D27)
+                color = themedColor(Color(0xFF332D27))
             )
 
             TextButton(
@@ -74,12 +76,12 @@ fun LifeSeasonsSection(
                 Text(
                     text = "Yönet / Ekle",
                     style = MaterialTheme.typography.labelLarge,
-                    color = Color(0xFF63816C)
+                    color = themedColor(Color(0xFF63816C))
                 )
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = null,
-                    tint = Color(0xFF63816C),
+                    tint = themedColor(Color(0xFF63816C)),
                     modifier = Modifier.size(17.dp)
                 )
             }
@@ -92,8 +94,8 @@ fun LifeSeasonsSection(
                     .fillMaxWidth()
                     .height(88.dp),
                 shape = RoundedCornerShape(20.dp),
-                color = Color(0xFFEDE6DC),
-                border = BorderStroke(1.dp, Color(0xFFE3D9CC))
+                color = themedColor(Color(0xFFEDE6DC)),
+                border = BorderStroke(1.dp, themedColor(Color(0xFFE3D9CC)))
             ) {
                 Box(
                     modifier = Modifier.padding(16.dp),
@@ -102,7 +104,7 @@ fun LifeSeasonsSection(
                     Text(
                         text = "Henüz bir yaşam dönemin yok. İlk dönemini oluşturmak için dokun ✨",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF756D62)
+                        color = themedColor(Color(0xFF756D62))
                     )
                 }
             }
@@ -147,7 +149,7 @@ fun MinimalSeasonCard(
     )
 
     val shape = RoundedCornerShape(if (isSelected) 22.dp else 19.dp)
-    val borderColor = if (isSelected) Color(0xFFE2B76F) else Color.Transparent
+    val borderColor = if (isSelected) themedColor(Color(0xFFE2B76F)) else Color.Transparent
 
     Surface(
         onClick = onClick,
@@ -181,15 +183,15 @@ fun MinimalSeasonCard(
                             Brush.verticalGradient(
                                 colors = if (isSelected) {
                                     listOf(
-                                        Color(0xFFD9D4C6),
-                                        Color(0xFF8D927B),
-                                        Color(0xFF465647)
+                                        themedColor(Color(0xFFD9D4C6)),
+                                        themedColor(Color(0xFF8D927B)),
+                                        themedColor(Color(0xFF465647))
                                     )
                                 } else {
                                     listOf(
-                                        Color(0xFFE9E3EB),
-                                        Color(0xFFBDB5C1),
-                                        Color(0xFF69646D)
+                                        themedColor(Color(0xFFE9E3EB)),
+                                        themedColor(Color(0xFFBDB5C1)),
+                                        themedColor(Color(0xFF69646D))
                                     )
                                 }
                             )
@@ -216,7 +218,7 @@ fun MinimalSeasonCard(
                         .align(Alignment.TopStart)
                         .padding(7.dp),
                     shape = RoundedCornerShape(50),
-                    color = Color(0xFFFFF8E8).copy(alpha = 0.96f)
+                    color = themedColor(Color(0xFFFFF8E8)).copy(alpha = 0.96f)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
@@ -226,7 +228,7 @@ fun MinimalSeasonCard(
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
-                            tint = Color(0xFF52745B),
+                            tint = themedColor(Color(0xFF52745B)),
                             modifier = Modifier.size(11.dp)
                         )
                         Text(
@@ -235,7 +237,7 @@ fun MinimalSeasonCard(
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = Color(0xFF52745B)
+                            color = themedColor(Color(0xFF52745B))
                         )
                     }
                 }

@@ -1,26 +1,29 @@
 package com.loc.benimdunyam.feature.journal.journaleditor.components
 
+import com.loc.benimdunyam.core.designsystem.AppThemeController
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.ui.graphics.Color
 
 internal object JournalEditorPalette {
 
-    val PaperInk = Color(0xFF33271F)
+    val PaperInk get() = AppThemeController.palette.ink
 
-    val TapeInk = Color(0xFF493B2B)
+    val TapeInk get() = AppThemeController.palette.ink
 
-    val TapeColor = Color(0xFFE8DDC9)
+    val TapeColor get() = AppThemeController.palette.tape
 
-    val SaveGreen = Color(0xFF365A43)
+    val SaveGreen get() = AppThemeController.palette.primary
 
-    val PaperWhite = Color(0xFFFCFBF8)
+    val PaperWhite get() = AppThemeController.palette.paper
 
-    val PaperText = Color(0xFF3E342C)
+    val PaperText get() = AppThemeController.palette.ink
 
-    val PaperPlaceholder = Color(0xFF9A8D7A)
+    val PaperPlaceholder get() = AppThemeController.palette.muted
 
-    val MentionBackground = Color(0xFFF4EDE2)
+    val MentionBackground get() = AppThemeController.palette.softPrimary
 
-    val ErrorBackground = Color(0xFFF0DAD3)
+    val ErrorBackground get() = Color(0xFFF0DAD3)
 
-    val ErrorText = Color(0xFF7B3028)
+    val ErrorText get() = Color(0xFF7B3028)
 }

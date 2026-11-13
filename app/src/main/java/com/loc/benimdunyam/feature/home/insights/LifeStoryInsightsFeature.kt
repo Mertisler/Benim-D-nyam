@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.home.insights
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -52,8 +54,8 @@ fun LifeStoryInsightsFeature(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAll by rememberSaveable { mutableStateOf(false) }
     val report = uiState.report
-    val ink = Color(0xFF513D32)
-    val paper = Color(0xFFFFFAF3)
+    val ink = themedColor(Color(0xFF513D32))
+    val paper = themedColor(Color(0xFFFFFAF3))
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -201,7 +203,7 @@ private fun InsightItem(
                 Text(
                     "Anıyı aç ›",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF79513A)
+                    color = themedColor(Color(0xFF79513A))
                 )
             }
         }

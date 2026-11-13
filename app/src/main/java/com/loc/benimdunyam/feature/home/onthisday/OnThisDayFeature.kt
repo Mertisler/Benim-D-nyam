@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.home.onthisday
 
+import com.loc.benimdunyam.core.designsystem.themedColor
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,10 +52,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import java.io.File
 
-private val MemoryInk = Color(0xFF4B392F)
-private val MemoryMuted = Color(0xFF826E5F)
-private val MemoryPaper = Color(0xFFFFFBF5)
-private val MemoryAccent = Color(0xFF6A806E)
+private val MemoryInk get() = themedColor(Color(0xFF4B392F))
+private val MemoryMuted get() = themedColor(Color(0xFF826E5F))
+private val MemoryPaper get() = themedColor(Color(0xFFFFFBF5))
+private val MemoryAccent get() = themedColor(Color(0xFF6A806E))
 
 /**
  * HomeScreen LazyColumn'ına tek item olarak eklenir.
@@ -86,7 +88,7 @@ fun OnThisDayFeature(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = MemoryPaper),
-        border = BorderStroke(1.dp, Color(0xFFE8DDCF))
+        border = BorderStroke(1.dp, themedColor(Color(0xFFE8DDCF)))
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -94,7 +96,7 @@ fun OnThisDayFeature(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    color = Color(0xFFE7EEE6),
+                    color = themedColor(Color(0xFFE7EEE6)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(
@@ -217,7 +219,7 @@ private fun OnThisDayMemoryRow(
                 )
             } else {
                 Surface(
-                    color = Color(0xFFF1E6D9),
+                    color = themedColor(Color(0xFFF1E6D9)),
                     modifier = Modifier.matchParentSize()
                 ) {
                     Box(contentAlignment = Alignment.Center) {

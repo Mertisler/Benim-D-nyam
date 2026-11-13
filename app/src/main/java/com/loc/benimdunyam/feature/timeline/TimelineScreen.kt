@@ -30,8 +30,10 @@ fun TimelineScreen(
     val dateFormat = SimpleDateFormat("dd MMMM yyyy", Locale("tr", "TR"))
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 title = { Text(text = "Yaşam Zaman Çizgisi") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
