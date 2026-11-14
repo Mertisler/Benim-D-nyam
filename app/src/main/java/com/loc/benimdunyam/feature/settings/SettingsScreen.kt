@@ -35,6 +35,7 @@ private enum class BackupPasswordAction {
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onDataCleared: () -> Unit,
+    onNavigateToCloudAccount: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -166,6 +167,34 @@ fun SettingsScreen(
             // Üç temanın minyatür önizlemeleri. Buradaki seçim tüm ekranlarda geçerli.
             AppearanceThemePicker(enabled = !isBusy)
 
+            // BULUT HESABIM: mevcut Room / yedekleme akışına dokunmaz.
+            Card(
+                onClick = onNavigateToCloudAccount,
+                enabled = !isBusy,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Cloud,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Bulut Hesabım", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "İsteğe bağlı Firebase hesabı, giriş ve güvenli bağlantı kontrolü",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = null)
+                }
+            }
+
             // GİZLİLİK
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -186,17 +215,17 @@ fun SettingsScreen(
                         )
 
                         Text(
-                            "Tamamen Yerel ve Gizli",
+                            "Yerel Anı Arşivi",
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
 
                     Text(
-                        "Anıların cihazında saklanır. " +
-                                "Uygulama kendi sunucusuna veri göndermez. " +
-                                "Yedekleme konumu olarak bir bulut " +
-                                "sağlayıcısı seçersen dosyan o " +
-                                "sağlayıcıda saklanabilir.",
+                        "Günlüklerin, kişilerin, dönemlerin ve fotoğrafların " +
+                                "şimdilik cihazında saklanır. Bulut hesabı yalnızca " +
+                                "kimlik doğrulama ve Firestore bağlantı testi yapar; " +
+                                "anılar kendiliğinden yüklenmez. Dosya yedeğini " +
+                                "bir bulut sağlayıcısına kaydetmeyi ayrıca seçebilirsin.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }

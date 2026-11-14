@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
+
+
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -85,5 +88,13 @@ dependencies {
 
     implementation("com.airbnb.android:lottie-compose:6.3.0") // En güncel kararlı sürüm
     implementation(kotlin("test"))
+
+    // Firebase: yalnızca bağlantı ve hesap altyapısı; otomatik veri aktarımı yok.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.kotlinx.coroutines.play.services)
+
+
 
 }

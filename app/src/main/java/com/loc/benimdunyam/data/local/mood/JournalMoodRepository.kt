@@ -2,6 +2,7 @@ package com.loc.benimdunyam.data.local.mood
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import com.loc.benimdunyam.domain.model.JournalMood
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -27,6 +28,23 @@ class JournalMoodRepository @Inject constructor(
     }
 
     fun observeAll(): Flow<List<JournalMoodRecord>> = db.moodDao().observeAll()
+
+    /** Cloud-only staging; rejects overwrites, even on crash/retry. */
+    suspend fun stageForCloudRestore(records: List<JournalMoodRecord>) = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            check(db.moodDao().countAll() == 0) {
+                "Cihazda ruh hali kayıtları bulunuyor. Var olan veriler korunuyor."
+            }
+            db.moodDao().insertForCloudRestore(records)
+        }
+    }
+
+    /** Compensating cleanup only if the primary Room transaction did not commit. */
+    suspend fun rollbackCloudRestoreStage(records: List<JournalMoodRecord>) = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            records.forEach { db.moodDao().deleteIfStillStaged(it.journalId, it.moodName, it.updatedAt) }
+        }
+    }
 
     suspend fun getMood(journalId: String): JournalMood? = withContext(Dispatchers.IO) {
         val savedName = db.moodDao().getName(journalId) ?: return@withContext null

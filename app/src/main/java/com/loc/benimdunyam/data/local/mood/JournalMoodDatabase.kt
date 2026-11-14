@@ -23,6 +23,15 @@ interface JournalMoodDao {
     @Query("SELECT * FROM journal_mood_records")
     fun observeAll(): Flow<List<JournalMoodRecord>>
 
+    @Query("SELECT COUNT(*) FROM journal_mood_records")
+    suspend fun countAll(): Int
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertForCloudRestore(records: List<JournalMoodRecord>)
+
+    @Query("DELETE FROM journal_mood_records WHERE journalId = :journalId AND moodName = :name AND updatedAt = :updatedAt")
+    suspend fun deleteIfStillStaged(journalId: String, name: String, updatedAt: Long)
+
     @Query("SELECT moodName FROM journal_mood_records WHERE journalId = :journalId LIMIT 1")
     suspend fun getName(journalId: String): String?
 

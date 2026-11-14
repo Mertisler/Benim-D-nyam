@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "474593330368",
+    "project_id": "benimdunyam-67e1b",
+    "storage_bucket": "benimdunyam-67e1b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:474593330368:android:de98c150c90bf0d2d79925",
+        "android_client_info": {
+          "package_name": "com.loc.benimdunyam"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJbfQq6ojI50xf6NcJ75GqiOasCjv7798"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

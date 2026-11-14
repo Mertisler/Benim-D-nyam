@@ -17,7 +17,16 @@ composeBom = "2024.09.00"
 
 gson = "2.10.1"
 
+firebaseBom = "33.16.0"
+googleServices = "4.5.0"
+coroutinesPlayServices = "1.9.0"
+
 [libraries]
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
+firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
+kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
+
 
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 
@@ -57,3 +66,5 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

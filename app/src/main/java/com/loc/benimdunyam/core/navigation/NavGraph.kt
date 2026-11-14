@@ -23,6 +23,7 @@ import com.loc.benimdunyam.feature.people.PersonEditorScreen
 import com.loc.benimdunyam.feature.people.network.PeopleNetworkScreen
 import com.loc.benimdunyam.feature.search.SearchScreen
 import com.loc.benimdunyam.feature.settings.SettingsScreen
+import com.loc.benimdunyam.feature.settings.cloudaccount.CloudAccountScreen
 import com.loc.benimdunyam.feature.onboarding.OnboardingScreen
 import com.loc.benimdunyam.feature.people.detail.PersonDetailScreen
 import com.loc.benimdunyam.feature.seasons.LifeSeasonsScreen
@@ -220,12 +221,20 @@ fun BenimDunyamNavGraph(
                 composable(route = Screen.Settings.route) {
                     SettingsScreen(
                         onNavigateBack = { navController.popBackStack() },
+                        onNavigateToCloudAccount = {
+                            navController.navigate(Screen.CloudAccount.route)
+                        },
                         onDataCleared = {
                             navController.navigate(Screen.Onboarding.route) {
                                 popUpTo(BottomNavScreen.Home.route) { inclusive = true }
                             }
                         }
                     )
+                }
+
+                // Bulut hesabı tamamen bağımsız: Room verisine ve yedeklemeye dokunmaz.
+                composable(route = Screen.CloudAccount.route) {
+                    CloudAccountScreen(onNavigateBack = { navController.popBackStack() })
                 }
 
                 // 11. Dönemler sekmesi: mevcut LifeSeasons ekranı aynı route ile kullanılır.

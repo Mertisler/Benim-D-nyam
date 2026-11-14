@@ -60,6 +60,7 @@ sealed class Screen(val route: String) {
     }
 
     object Settings : Screen("settings")
+    object CloudAccount : Screen("cloud_account")
     object LifeSeasons : Screen("life_seasons")
     object Timeline : Screen("timeline")
 }
@@ -68,10 +69,10 @@ sealed class BottomNavScreen(
     val route: String,
     val title: String,
     val iconResName: String
+
 ) {
+    object Seasons : BottomNavScreen("seasons", "Dönemler", "seasons")
     object Home : BottomNavScreen("home", "Ana Sayfa", "home")
     object Journals : BottomNavScreen("journals", "Günlükler", "book")
-    // Aynı ekranı iki farklı route ile tanımlamamak için mevcut dönem rotasını kullan.
-    object Seasons : BottomNavScreen(Screen.LifeSeasons.route, "Dönemler", "date_range")
     object People : BottomNavScreen("people", "İnsanlarım", "people")
 }
