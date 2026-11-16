@@ -2,6 +2,7 @@
 package com.loc.benimdunyam.data.backup
 
 import android.content.Context
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.*
@@ -47,7 +48,8 @@ class BackupCryptoException(
  */
 @Singleton
 class BackupCryptoManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val workspace: ActiveWorkspaceSession
 ) {
 
     private companion object {
@@ -573,10 +575,7 @@ class BackupCryptoManager @Inject constructor(
         extension: String
     ): File {
 
-        val directory = File(
-            context.noBackupFilesDir,
-            "backup_staging"
-        )
+        val directory = workspace.backupStagingRoot()
 
         if (!directory.exists() && !directory.mkdirs()) {
             throw IOException(

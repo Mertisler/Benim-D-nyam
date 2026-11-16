@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loc.benimdunyam.domain.model.CloudAuthError
 import com.loc.benimdunyam.domain.model.CloudAuthResult
+import com.loc.benimdunyam.domain.model.CloudProfileResult
+import com.loc.benimdunyam.domain.model.CloudProfileError
+import com.loc.benimdunyam.domain.model.CloudLocalArchiveOwnerState
 import com.loc.benimdunyam.domain.model.CloudConnectionStatus
 import com.loc.benimdunyam.domain.repository.CloudAuthRepository
 import com.loc.benimdunyam.domain.repository.CloudConnectionRepository
@@ -33,6 +36,7 @@ class CloudAccountViewModel @Inject constructor(
     val uiState: StateFlow<CloudAccountUiState> = _uiState.asStateFlow()
 
     private var connectionJob: Job? = null
+    private var profileJob: Job? = null
     private var archiveJob: Job? = null
 
     init {
@@ -42,9 +46,13 @@ class CloudAccountViewModel @Inject constructor(
                 if (previousUid != account?.uid) {
                     connectionJob?.cancel()
                     archiveJob?.cancel()
+                    profileJob?.cancel()
                     _uiState.update {
                         it.copy(
                             isArchiveBusy = false,
+                            isProfileBusy = false,
+                            profileMessage = null,
+                            profileError = null,
                             archiveAction = null,
                             latestArchive = null,
                             restorePreview = null,
@@ -58,7 +66,11 @@ class CloudAccountViewModel @Inject constructor(
                     }
                 }
                 _uiState.update {
-                    it.copy(isCheckingSession = false, account = account)
+                    it.copy(
+                        isCheckingSession = false,
+                        account = account,
+                        localArchiveOwnerState = archiveRepository.localArchiveOwnerState()
+                    )
                 }
             }
         }
@@ -148,8 +160,106 @@ class CloudAccountViewModel @Inject constructor(
         }
     }
 
+    /** Profil işlemi tipini kullanıcıya görünen metinden bağımsız tutuyoruz. */
+    private enum class ProfileAction {
+        SEND_VERIFICATION, REFRESH, UPDATE_NAME
+    }
+
+    /**
+     * Kullanıcı doğrulama e-postası isterse Firebase'e tek seferlik istek gönderir.
+     * Anıların, Room verisinin veya bulut arşivinin içeriği değişmez.
+     */
+    fun sendVerificationEmail() = launchProfileAction(ProfileAction.SEND_VERIFICATION) {
+        cloudAuthRepository.sendVerificationEmail()
+    }
+
+    /**
+     * E-postadaki bağlantı açıldıktan sonra güncel doğrulama durumunu sunucudan alır.
+     * Bu kontrol hesabı yeniden oluşturmaz ve oturumu kapatmaz.
+     */
+    fun refreshProfile() = launchProfileAction(ProfileAction.REFRESH) {
+        cloudAuthRepository.refreshProfile()
+    }
+
+    /**
+     * Kullanıcının görünen adını yalnızca Firebase Authentication profilinde değiştirir.
+     * Room içindeki Person ve JournalEntry kayıtlarından tamamen bağımsızdır.
+     */
+    fun updateDisplayName(name: String) {
+        val normalized = name.trim()
+        if (normalized.length !in 2..40 || normalized.any { it.isISOControl() }) {
+            _uiState.update {
+                it.copy(profileError = "Görünen ad 2–40 karakter olmalı ve kontrol karakteri içermemeli.")
+            }
+            return
+        }
+        launchProfileAction(ProfileAction.UPDATE_NAME) {
+            cloudAuthRepository.updateDisplayName(normalized)
+        }
+    }
+
+    /**
+     * Profil işlemleri kullanıcı oturumuna bağlanır. İşlem sürerken hesap değişirse
+     * eski hesap sonucu yeni hesabın arayüzüne aktarılmaz.
+     */
+    private fun launchProfileAction(
+        actionType: ProfileAction,
+        action: suspend () -> CloudProfileResult
+    ) {
+        val uid = _uiState.value.account?.uid ?: run {
+            _uiState.update { it.copy(profileError = "Önce bulut hesabına giriş yap.") }
+            return
+        }
+        if (_uiState.value.isProfileBusy || _uiState.value.isSubmitting || _uiState.value.isArchiveBusy) return
+        profileJob?.cancel()
+        profileJob = viewModelScope.launch {
+            _uiState.update { it.copy(isProfileBusy = true, profileError = null, profileMessage = null) }
+            try {
+                when (val result = action()) {
+                    is CloudProfileResult.Success -> if (_uiState.value.account?.uid == uid) {
+                        val message = when (actionType) {
+                            ProfileAction.SEND_VERIFICATION ->
+                                "Doğrulama bağlantısı e-postana gönderildi. Posta kutunu kontrol et."
+                            ProfileAction.UPDATE_NAME -> "Görünen adın güncellendi."
+                            ProfileAction.REFRESH -> if (result.account.isEmailVerified)
+                                "E-posta adresin doğrulanmış görünüyor."
+                            else "E-posta henüz doğrulanmamış. Bağlantıya tıkladıktan sonra yeniden kontrol et."
+                        }
+                        _uiState.update { it.copy(account = result.account, profileMessage = message) }
+                    }
+                    is CloudProfileResult.Failure -> if (_uiState.value.account?.uid == uid) {
+                        _uiState.update { it.copy(profileError = result.reason.toProfileMessage()) }
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (_uiState.value.account?.uid == uid) {
+                    _uiState.update { it.copy(profileError = "Profil işlemi tamamlanamadı. Tekrar dene.") }
+                }
+            } finally {
+                if (_uiState.value.account?.uid == uid) {
+                    _uiState.update { it.copy(isProfileBusy = false) }
+                }
+            }
+        }
+    }
+
+    fun dismissProfileMessage() {
+        _uiState.update { it.copy(profileMessage = null, profileError = null) }
+    }
+
+    private fun CloudProfileError.toProfileMessage(): String = when (this) {
+        CloudProfileError.SIGN_IN_REQUIRED -> "Oturum bulunamadı. Yeniden giriş yap."
+        CloudProfileError.ACCOUNT_CHANGED -> "İşlem sırasında hesap değişti. Lütfen tekrar dene."
+        CloudProfileError.NETWORK -> "İnternet bağlantısı kurulamadı."
+        CloudProfileError.RATE_LIMITED -> "Çok sayıda istek gönderildi. Bir süre sonra tekrar dene."
+        CloudProfileError.RECENT_LOGIN_REQUIRED -> "Güvenlik için hesabına yeniden giriş yapman gerekiyor."
+        CloudProfileError.UNKNOWN -> "Hesap işlemi tamamlanamadı. Biraz sonra tekrar dene."
+    }
+
     fun signOut() {
-        if (_uiState.value.isSubmitting || _uiState.value.isArchiveBusy) {
+        if (_uiState.value.isSubmitting || _uiState.value.isArchiveBusy || _uiState.value.isProfileBusy) {
             _uiState.update { it.copy(errorMessage = "Bulut arşivi işlemi devam ederken çıkış yapılamaz.") }
             return
         }
@@ -241,6 +351,13 @@ class CloudAccountViewModel @Inject constructor(
             _uiState.update { it.copy(archiveError = "Arşiv şifresi 12–128 karakter olmalı.") }
             return
         }
+        // Başka hesaba bağlanmış arşiv, yeni hesaba yanlışlıkla yüklenemez.
+        if (_uiState.value.localArchiveOwnerState == CloudLocalArchiveOwnerState.OTHER_ACCOUNT) {
+            _uiState.update {
+                it.copy(archiveError = "Yerel arşiv başka bir bulut hesabına bağlı. Yükleme engellendi.")
+            }
+            return
+        }
         val secret = passphrase.toCharArray()
         val job = launchArchiveAction("Şifreli arşiv gönderiliyor") { uid ->
             try {
@@ -251,6 +368,7 @@ class CloudAccountViewModel @Inject constructor(
                             latestArchive = result,
                             restorePreview = null,
                             syncAudit = null,
+                            localArchiveOwnerState = archiveRepository.localArchiveOwnerState(),
                             archiveError = null,
                             archiveMessage = "Şifreli bulut kopyası tamamlandı. Yerel veriler değiştirilmedi."
                         )
@@ -327,6 +445,7 @@ class CloudAccountViewModel @Inject constructor(
                             restorePreview = null,
                             localCoverage = null,
                             syncAudit = null,
+                            localArchiveOwnerState = archiveRepository.localArchiveOwnerState(),
                             archiveError = null,
                             archiveMessage = "Geri yükleme tamamlandı: ${result.journalCount} anı, " +
                                     "${result.personCount} kişi, ${result.seasonCount} dönem, " +
@@ -353,7 +472,7 @@ class CloudAccountViewModel @Inject constructor(
             _uiState.update { it.copy(archiveError = "Önce bulut hesabına giriş yap.") }
             return null
         }
-        if (_uiState.value.isArchiveBusy || _uiState.value.isSubmitting) return null
+        if (_uiState.value.isArchiveBusy || _uiState.value.isSubmitting || _uiState.value.isProfileBusy) return null
         // Aynı ekranın butonundan peş peşe iki işlem başlatılmasını engelle.
         _uiState.update { it.copy(isArchiveBusy = true, archiveAction = label, archiveError = null, archiveMessage = null) }
         return viewModelScope.launch {

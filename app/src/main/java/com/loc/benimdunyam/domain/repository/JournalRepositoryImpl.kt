@@ -1,5 +1,9 @@
 package com.loc.benimdunyam.data.repository
 
+import androidx.room.withTransaction
+import com.loc.benimdunyam.data.local.AppDatabase
+import com.loc.benimdunyam.data.sync.local.JournalSyncChangeRecorder
+import com.loc.benimdunyam.domain.sync.JournalSyncChangePolicy
 import com.loc.benimdunyam.data.local.dao.JournalDao
 import com.loc.benimdunyam.data.local.dao.JournalPersonMentionDao
 import com.loc.benimdunyam.data.local.entity.JournalEntryEntity
@@ -13,7 +17,9 @@ import javax.inject.Inject
 
 class JournalRepositoryImpl @Inject constructor(
     private val journalDao: JournalDao,
-    private val mentionDao: JournalPersonMentionDao
+    private val mentionDao: JournalPersonMentionDao,
+    private val database: AppDatabase,
+    private val changeRecorder: JournalSyncChangeRecorder
 ) : JournalRepository {
 
     override fun observeAllJournals(): Flow<List<JournalEntry>> {
@@ -67,51 +73,72 @@ class JournalRepositoryImpl @Inject constructor(
         )
     }
 
+    /**
+     * Anıyı, kişi etiketlerini ve yerel senkronizasyon olayını TEK transaction
+     * içinde kaydeder. Bir adım başarısız olursa hiçbiri yarım kalmaz.
+     */
     override suspend fun insertJournal(journal: JournalEntry, personIds: List<String>) {
-        val entity = JournalEntryEntity(
-            id = journal.id,
-            title = journal.title,
-            content = journal.content,
-            entryDate = journal.entryDate,
-            createdAt = journal.createdAt,
-            updatedAt = journal.updatedAt,
-            seasonId = journal.seasonId,
-            episodeId = journal.episodeId
-        )
-        journalDao.insertJournal(entity)
-
-        mentionDao.deleteAllMentionsForJournal(journal.id)
-        personIds.forEachIndexed { index, personId ->
-            mentionDao.insertMention(
-                JournalPersonMentionEntity(
-                    journalId = journal.id,
-                    personId = personId,
-                    mentionIndex = index,
-                    startOffset = null,
-                    endOffset = null
-                )
-            )
+        val actor = changeRecorder.requireWritableActor()
+        database.withTransaction {
+            changeRecorder.requireSameActor(actor)
+            val entity = journal.toRoomEntity()
+            journalDao.insertJournal(entity)
+            replaceMentions(journal.id, personIds)
+            changeRecorder.record(journal.id, actor, JournalSyncChangePolicy.UPSERT)
+            changeRecorder.requireSameActor(actor)
         }
     }
 
+    /** Kaydedilen anının son sürümü için UPSERT olayı güncellenir. */
     override suspend fun updateJournal(journal: JournalEntry, personIds: List<String>) {
-        val entity = JournalEntryEntity(
-            id = journal.id,
-            title = journal.title,
-            content = journal.content,
-            entryDate = journal.entryDate,
-            createdAt = journal.createdAt,
-            updatedAt = journal.updatedAt,
-            seasonId = journal.seasonId,
-            episodeId = journal.episodeId // <-- EKLENDİ (DÜZELTME)
-        )
-        journalDao.updateJournal(entity)
+        val actor = changeRecorder.requireWritableActor()
+        database.withTransaction {
+            changeRecorder.requireSameActor(actor)
+            check(journalDao.getJournalById(journal.id) != null) {
+                "Güncellenecek anı bulunamadı."
+            }
+            journalDao.updateJournal(journal.toRoomEntity())
+            replaceMentions(journal.id, personIds)
+            changeRecorder.record(journal.id, actor, JournalSyncChangePolicy.UPSERT)
+            changeRecorder.requireSameActor(actor)
+        }
+    }
 
-        mentionDao.deleteAllMentionsForJournal(journal.id)
+    /**
+     * Anı silinince DELETE kaydını aynı transaction'da saklıyoruz.
+     * Günlük satırı silinse de gelecekteki bulut eşitlemesi için kimliği kalır.
+     * Böylece silinen anının uzak cihazdan yeniden indirilmesini önleyebiliriz.
+     */
+    override suspend fun deleteJournal(id: String) {
+        val actor = changeRecorder.requireWritableActor()
+        database.withTransaction {
+            changeRecorder.requireSameActor(actor)
+            mentionDao.deleteAllMentionsForJournal(id)
+            journalDao.deleteJournalById(id)
+            changeRecorder.record(id, actor, JournalSyncChangePolicy.DELETE)
+            changeRecorder.requireSameActor(actor)
+        }
+    }
+
+    /** Bütün CRUD işlemlerinde aynı Room alanlarının kullanılması sağlanır. */
+    private fun JournalEntry.toRoomEntity() = JournalEntryEntity(
+        id = id,
+        title = title,
+        content = content,
+        entryDate = entryDate,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        seasonId = seasonId,
+        episodeId = episodeId
+    )
+
+    /** Kişi etiketleri de günlükle aynı transaction'dadır. */
+    private suspend fun replaceMentions(journalId: String, personIds: List<String>) {
+        mentionDao.deleteAllMentionsForJournal(journalId)
         personIds.forEachIndexed { index, personId ->
             mentionDao.insertMention(
                 JournalPersonMentionEntity(
-                    journalId = journal.id,
+                    journalId = journalId,
                     personId = personId,
                     mentionIndex = index,
                     startOffset = null,
@@ -119,11 +146,6 @@ class JournalRepositoryImpl @Inject constructor(
                 )
             )
         }
-    }
-
-    override suspend fun deleteJournal(id: String) {
-        mentionDao.deleteAllMentionsForJournal(id)
-        journalDao.deleteJournalById(id)
     }
 
     override fun searchJournals(query: String): Flow<List<JournalEntry>> {

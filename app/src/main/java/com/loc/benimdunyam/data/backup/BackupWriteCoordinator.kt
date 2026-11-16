@@ -28,6 +28,21 @@ class BackupWriteCoordinator @Inject constructor() {
 
     private val mutex = Mutex()
     private val _isRestoring = MutableStateFlow(false)
+    // Hesap alanı seçimi kaydedildikten sonra eski Room'a yeni yazı düşmesini önler.
+    // Bu işaret uygulama süreciyle birlikte sıfırlanır; kalıcı veritabanı ayarı değildir.
+    private val writesFrozen = AtomicBoolean(false)
+
+    /** Yalnızca kontrollü çalışma alanı geçişi tamamlandığında çağrılır. */
+    fun freezeWritesUntilRestart() {
+        writesFrozen.set(true)
+        _isRestoring.value = true
+    }
+
+    private fun requireWritable() {
+        check(!writesFrozen.get()) {
+            "Hesap alanı değişti. Veri kaybını önlemek için uygulamayı tamamen kapatıp yeniden aç."
+        }
+    }
 
     val isRestoring: StateFlow<Boolean> = _isRestoring.asStateFlow()
 
@@ -41,6 +56,7 @@ class BackupWriteCoordinator @Inject constructor() {
     suspend fun <T> withRegularWrite(
         action: suspend () -> T
     ): T {
+        requireWritable()
         val inherited = currentCoroutineContext()[WriteLease]
 
         // Yalnızca aktif kilidin içindeki çağrılar yeniden girişli olabilir.
@@ -49,6 +65,8 @@ class BackupWriteCoordinator @Inject constructor() {
         }
 
         return mutex.withLock {
+            // Beklerken çalışma alanı değişmiş olabilir; ikinci kez kontrol şart.
+            requireWritable()
             val lease = WriteLease(this@BackupWriteCoordinator)
             try {
                 withContext(lease) {
@@ -64,12 +82,15 @@ class BackupWriteCoordinator @Inject constructor() {
     suspend fun <T> withExclusiveRestore(
         action: suspend () -> T
     ): T {
+        requireWritable()
         val inherited = currentCoroutineContext()[WriteLease]
         check(inherited?.coordinator !== this || !inherited.active.get()) {
             "Geri yükleme korumalı bir yazma işleminin içinden başlatılamaz."
         }
 
         return mutex.withLock {
+            // Beklerken çalışma alanı değişmiş olabilir; ikinci kez kontrol şart.
+            requireWritable()
             val lease = WriteLease(this@BackupWriteCoordinator)
             _isRestoring.value = true
             try {
@@ -78,7 +99,8 @@ class BackupWriteCoordinator @Inject constructor() {
                 }
             } finally {
                 lease.active.set(false)
-                _isRestoring.value = false
+                // Seçim değişmişse ekranların veri yazmasına izin vermiyoruz.
+                _isRestoring.value = writesFrozen.get()
             }
         }
     }

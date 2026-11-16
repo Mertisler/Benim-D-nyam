@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.withTransaction
 import com.loc.benimdunyam.domain.model.JournalMood
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,13 +18,14 @@ import kotlinx.coroutines.withContext
  */
 @Singleton
 class JournalMoodRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val session: ActiveWorkspaceSession
 ) {
     private val db: JournalMoodDatabase by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         Room.databaseBuilder(
             context.applicationContext,
             JournalMoodDatabase::class.java,
-            "benimdunyam_journal_moods_v1.db"
+            session.databaseNames()[1]
         ).build()
     }
 

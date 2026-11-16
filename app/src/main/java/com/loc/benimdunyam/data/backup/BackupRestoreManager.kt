@@ -2,6 +2,7 @@
 package com.loc.benimdunyam.data.backup
 
 import android.content.Context
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import com.loc.benimdunyam.domain.repository.BackupRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.BufferedOutputStream
@@ -49,6 +50,7 @@ data class RestoreSummary(
 @Singleton
 class BackupRestoreManager @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val workspace: ActiveWorkspaceSession,
     private val backupRepository: BackupRepository
 ) {
 
@@ -237,7 +239,7 @@ class BackupRestoreManager @Inject constructor(
                 archivePath
             )
 
-        val filesRoot = context.filesDir.canonicalFile
+        val filesRoot = workspace.mediaRoot().canonicalFile
 
         val destinationDirectory = File(
             filesRoot,

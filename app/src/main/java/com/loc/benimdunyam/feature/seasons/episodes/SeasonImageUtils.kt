@@ -1,6 +1,7 @@
 package com.loc.benimdunyam.feature.seasons.episodes
 
 import android.content.Context
+import com.loc.benimdunyam.data.local.isolation.WorkspaceMediaPaths
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import java.io.File
@@ -16,7 +17,7 @@ internal fun copySeasonCoverToInternalStorage(
     sourceUri: Uri
 ): String {
 
-    val seasonDirectory = File(context.filesDir, "seasons")
+    val seasonDirectory = File(WorkspaceMediaPaths.root(context), "seasons")
 
     if (!seasonDirectory.exists() && !seasonDirectory.mkdirs()) {
         throw IOException("Fotoğraf klasörü oluşturulamadı.")
@@ -64,7 +65,7 @@ internal fun deleteSeasonCoverFromInternalStorage(
     if (path.isNullOrBlank()) return
 
     try {
-        val seasonDirectory = File(context.filesDir, "seasons").canonicalFile
+        val seasonDirectory = File(WorkspaceMediaPaths.root(context), "seasons").canonicalFile
         val imageFile = File(path).canonicalFile
 
         if (imageFile.parentFile == seasonDirectory) {

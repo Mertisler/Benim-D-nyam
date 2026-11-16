@@ -67,14 +67,25 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.loc.benimdunyam.domain.model.CloudConnectionStatus
+import com.loc.benimdunyam.data.local.isolation.WorkspaceMode
+import dagger.hilt.android.EntryPointAccessors
+import com.loc.benimdunyam.data.local.isolation.WorkspaceMediaEntryPoint
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CloudAccountScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToAuthEntry: () -> Unit,
     viewModel: CloudAccountViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // Yeni boş hesapta eski arşivin taşıma hazırlığı seçeneklerini gizle.
+    val appContext = LocalContext.current.applicationContext
+    val activeStorage = remember(appContext) {
+        EntryPointAccessors.fromApplication(appContext, WorkspaceMediaEntryPoint::class.java)
+            .activeWorkspaceSession().mode
+    }
     var isRegistration by rememberSaveable { mutableStateOf(false) }
     var email by rememberSaveable { mutableStateOf("") }
     // Hesap şifresini kalıcı UI state'ine veya SavedStateHandle'a kaydetmiyoruz.
@@ -222,6 +233,15 @@ fun CloudAccountScreen(
                             }
                             Text(if (isRegistration) "Hesap oluştur" else "Giriş yap")
                         }
+                        // Hesabı olmayan veya oturumunu kapatan kullanıcı yeni tasarımı
+                        // buradan açabilir. Test etmek için uygulama verisini silmesi gerekmez.
+                        OutlinedButton(
+                            onClick = onNavigateToAuthEntry,
+                            enabled = !state.isSubmitting,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Yeni giriş ve kayıt ekranlarını aç")
+                        }
                     }
                 }
             } else {
@@ -238,6 +258,30 @@ fun CloudAccountScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        // Faz 2F.1: kullanıcı başlatırsa tanılama kuyruğunu ve WorkManager'ı kontrol eder.
+                        // Hiçbir günlük içeriği bu bileşen üzerinden Firestore'a gönderilmez.
+                        SyncFoundationSection(uid = account.uid)
+
+                        // Faz 2E: Hesap profili, e-posta doğrulaması ve yerel veri güvenliği.
+                        // Eski bulut arşivi ve geri yükleme bileşenleri aynen korunur.
+                        CloudProfileSection(
+                            state = state,
+                            onSendVerificationEmail = viewModel::sendVerificationEmail,
+                            onRefreshProfile = viewModel::refreshProfile,
+                            onUpdateDisplayName = viewModel::updateDisplayName,
+                            onDismissProfileMessage = viewModel::dismissProfileMessage
+                        )
+                        // Faz 2E.2: Hesap bazlı ayırımdan önce dört Room dosyasının ve
+                        // cihaz içi fotoğraf klasörlerinin salt-okunur kapsam kontrolü.
+                        // Burada herhangi bir veritabanını taşımıyoruz veya silmiyoruz.
+                        LocalStoragePreflightSection()
+                        // Eski arşivin taşıma hazırlığı yeni boş hesapta gösterilmez.
+                        if (activeStorage == WorkspaceMode.LEGACY) {
+                            AccountMigrationSection()
+                        }
+                        // Faz 2E.6: tam içerik ve fotoğraf karşılaştırması yapılmadan
+                        // hazırlanan Room kopyası aktif edilemez. Yeni boş hesaplarda görünmez.
+                        AccountPromotionSection()
                         HorizontalDivider()
                         Text("Firestore erişim testi", style = MaterialTheme.typography.titleMedium)
                         Text(
@@ -283,7 +327,9 @@ fun CloudAccountScreen(
                         }
                         Button(
                             onClick = { archiveDialog = "upload" },
-                            enabled = !state.isArchiveBusy && !state.isSubmitting && !state.isCheckingConnection,
+                            enabled = !state.isArchiveBusy && !state.isSubmitting && !state.isCheckingConnection &&
+                                    !state.isProfileBusy &&
+                                    state.localArchiveOwnerState != com.loc.benimdunyam.domain.model.CloudLocalArchiveOwnerState.OTHER_ACCOUNT,
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("Şifreli kopya oluştur") }
                         OutlinedButton(
@@ -359,8 +405,9 @@ fun CloudAccountScreen(
                                     "Yalnızca açık onayla şifreli metin arşivi kopyası oluşturulabilir; " +
                                     "fotoğraflar aktarılmaz. Doğrulanmış arşivler yalnızca boş cihaza " +
                                     "ayrı onayla içe aktarılabilir. " +
-                                    "Hesap değiştirsen veya çıkış yapsan bile cihazdaki anıların görünmeye devam eder. " +
-                                    "Paylaşılan cihazlarda yerel arşivine erişimi ayrıca koru.",
+                                    "Yerel arşiv bir bulut hesabına bağlıysa çıkış yaptığında anı ekranları kilitlenir; " +
+                                    "aynı hesapla yeniden giriş yapınca erişebilirsin. " +
+                                    "Bu koruma henüz Room dosyalarını hesap başına ayırmaz.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -442,7 +489,9 @@ fun CloudAccountScreen(
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showSignOutConfirmation = false },
             title = { Text("Bulut hesabından çıkış yapılsın mı?") },
-            text = { Text("Firebase oturumu kapanacak. Room'daki yerel günlükler ve fotoğraflar silinmeyecek.") },
+            text = { Text("Firebase oturumu kapanacak. Yerel anılar silinmeyecek; bağlı bir arşiv varsa " +
+                    "aynı hesapla yeniden giriş yapana kadar anı ekranları kilitli kalacak. " +
+                    "Çıkış yapmadan önce hesap bilgilerini bildiğinden emin ol.") },
             confirmButton = {
                 TextButton(onClick = {
                     showSignOutConfirmation = false

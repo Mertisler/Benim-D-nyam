@@ -1,6 +1,7 @@
 package com.loc.benimdunyam.data.backup
 
 import android.content.Context
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import com.loc.benimdunyam.domain.repository.BackupRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -23,6 +24,7 @@ data class RestoreRecoveryReport(
 @Singleton
 class RestoreRecoveryManager @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val workspace: ActiveWorkspaceSession,
     private val backupRepository: BackupRepository,
     private val coordinator: BackupWriteCoordinator
 ) {
@@ -51,7 +53,7 @@ class RestoreRecoveryManager @Inject constructor(
                     }
                 }
 
-                val root = context.filesDir.canonicalFile
+                val root = workspace.mediaRoot().canonicalFile
                 val targets = mutableListOf<File>()
                 safeDirectory(root, "seasons")?.let(targets::add)
                 safeDirectory(root, "people")?.let { people ->

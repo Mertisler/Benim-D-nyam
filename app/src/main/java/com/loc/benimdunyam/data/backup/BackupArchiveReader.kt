@@ -2,6 +2,7 @@
 package com.loc.benimdunyam.data.backup
 
 import android.content.Context
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.loc.benimdunyam.domain.repository.BackupRepository
@@ -73,6 +74,7 @@ class PreparedBackup internal constructor(
 @Singleton
 class BackupArchiveReader @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val workspace: ActiveWorkspaceSession,
     private val backupValidator: BackupValidator
 ) {
 
@@ -683,10 +685,7 @@ class BackupArchiveReader @Inject constructor(
 
     private fun createStagingDirectory(): File {
 
-        val base = File(
-            context.noBackupFilesDir,
-            "backup_staging"
-        )
+        val base = workspace.backupStagingRoot()
 
         if (!base.exists() && !base.mkdirs()) {
             throw IOException(

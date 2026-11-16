@@ -3,6 +3,8 @@ package com.loc.benimdunyam.di
 import android.content.Context
 import androidx.room.Room
 import com.loc.benimdunyam.data.local.AppDatabase
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
+import com.loc.benimdunyam.data.local.dao.JournalSyncEventDao
 import com.loc.benimdunyam.data.local.dao.JournalDao
 import com.loc.benimdunyam.data.local.dao.JournalPersonMentionDao
 import com.loc.benimdunyam.data.local.dao.LifeEpisodeDao
@@ -22,20 +24,27 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideAppDatabase(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context,
+        session: ActiveWorkspaceSession
     ): AppDatabase {
 
         return Room.databaseBuilder(
             context,
             AppDatabase::class.java,
-            AppDatabase.DATABASE_NAME
+            session.databaseNames()[0]
         )
             .addMigrations(
                 AppDatabase.MIGRATION_5_6,
-                AppDatabase.MIGRATION_6_7
+                AppDatabase.MIGRATION_6_7,
+                AppDatabase.MIGRATION_7_8
             )
             .build()
     }
+
+    /** Yerel günlük işlemlerinin atomik kuyruk kaydı için kullanılan DAO. */
+    @Provides
+    fun provideJournalSyncEventDao(database: AppDatabase): JournalSyncEventDao =
+        database.journalSyncEventDao()
 
     @Provides
     @Singleton

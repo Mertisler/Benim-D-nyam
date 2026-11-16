@@ -2,6 +2,7 @@
 package com.loc.benimdunyam.data.backup
 
 import android.content.Context
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import android.net.Uri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -21,7 +22,8 @@ data class StagedEncryptedBackup(
 
 @Singleton
 class BackupDocumentStore @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val workspace: ActiveWorkspaceSession
 ) {
 
     private companion object {
@@ -189,10 +191,7 @@ class BackupDocumentStore @Inject constructor(
     }
 
     private fun createTemporaryFile(): File {
-        val directory = File(
-            context.noBackupFilesDir,
-            "backup_staging"
-        )
+        val directory = workspace.backupStagingRoot()
 
         if (!directory.exists() && !directory.mkdirs()) {
             throw IOException(

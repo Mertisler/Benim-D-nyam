@@ -13,6 +13,13 @@ sealed class Screen(val route: String) {
     // İnsanlarım > Hayatımın İnsan Haritası
     object PeopleNetwork : Screen("people_network")
 
+    // Faz 2D: giriş ve kayıt akışı, mevcut Room ekranlarından bağımsızdır.
+    object Startup : Screen("startup")
+    object AuthWelcome : Screen("auth_welcome")
+    object AuthSignIn : Screen("auth_sign_in")
+    object AuthRegister : Screen("auth_register")
+    object AuthForgotPassword : Screen("auth_forgot_password")
+
     object Onboarding : Screen("onboarding")
     object Main : Screen("main")
 
@@ -69,10 +76,10 @@ sealed class BottomNavScreen(
     val route: String,
     val title: String,
     val iconResName: String
-
 ) {
-    object Seasons : BottomNavScreen("seasons", "Dönemler", "seasons")
     object Home : BottomNavScreen("home", "Ana Sayfa", "home")
     object Journals : BottomNavScreen("journals", "Günlükler", "book")
+    // Var olan "life_seasons" rotasını yeniden kullanarak dönemler sekmesini koruruz.
+    object Seasons : BottomNavScreen(Screen.LifeSeasons.route, "Dönemler", "date_range")
     object People : BottomNavScreen("people", "İnsanlarım", "people")
 }

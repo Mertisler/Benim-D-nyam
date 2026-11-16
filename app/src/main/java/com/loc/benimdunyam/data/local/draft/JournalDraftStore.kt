@@ -1,6 +1,7 @@
 package com.loc.benimdunyam.data.local.draft
 
 import android.content.Context
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -68,13 +69,14 @@ abstract class JournalDraftDatabase : RoomDatabase() {
 
 @Singleton
 class JournalDraftStore @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val session: ActiveWorkspaceSession
 ) {
     private val database: JournalDraftDatabase by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         Room.databaseBuilder(
             context.applicationContext,
             JournalDraftDatabase::class.java,
-            "benim_dunyam_journal_drafts.db"
+            session.databaseNames()[2]
         ).build()
     }
 

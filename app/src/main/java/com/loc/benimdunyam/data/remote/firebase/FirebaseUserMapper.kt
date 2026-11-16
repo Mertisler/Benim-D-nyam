@@ -6,5 +6,6 @@ import com.loc.benimdunyam.domain.model.CloudAccount
 internal fun FirebaseUser.toCloudAccount(): CloudAccount = CloudAccount(
     uid = uid,
     email = email,
-    isEmailVerified = isEmailVerified
+    isEmailVerified = isEmailVerified,
+    displayName = displayName?.trim()?.takeIf { it.isNotEmpty() }
 )

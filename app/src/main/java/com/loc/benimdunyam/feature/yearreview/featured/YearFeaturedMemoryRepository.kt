@@ -1,6 +1,7 @@
 package com.loc.benimdunyam.feature.yearreview.featured
 
 import android.content.Context
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import androidx.room.Room
 import androidx.room.withTransaction
 import com.loc.benimdunyam.domain.model.JournalEntry
@@ -15,13 +16,14 @@ enum class FeaturedToggleResult { ADDED, REMOVED, LIMIT_REACHED }
 
 @Singleton
 class YearFeaturedMemoryRepository @Inject constructor(
-    @ApplicationContext context: Context
+    @ApplicationContext context: Context,
+    private val session: ActiveWorkspaceSession
 ) {
     private val database: YearFeaturedMemoryDatabase by lazy {
         Room.databaseBuilder(
             context.applicationContext,
             YearFeaturedMemoryDatabase::class.java,
-            "benim_dunyam_featured_memories.db"
+            session.databaseNames()[3]
         ).build()
     }
 

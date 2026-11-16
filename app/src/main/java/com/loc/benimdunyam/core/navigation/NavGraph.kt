@@ -1,11 +1,27 @@
 package com.loc.benimdunyam.core.navigation
 
+import androidx.compose.runtime.key
+import com.loc.benimdunyam.domain.model.LocalArchiveAccessDecision
+import com.loc.benimdunyam.feature.auth.LocalArchiveAccessViewModel
+import com.loc.benimdunyam.feature.auth.LocalArchiveGateScreen
+
 import com.loc.benimdunyam.core.designsystem.ThemeScenicBackground
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.loc.benimdunyam.feature.auth.StartupViewModel
+import com.loc.benimdunyam.feature.auth.StartupDestination
+import com.loc.benimdunyam.feature.auth.WelcomeScreen
+import com.loc.benimdunyam.feature.auth.SignInScreen
+import com.loc.benimdunyam.feature.auth.RegisterScreen
+import com.loc.benimdunyam.feature.auth.ForgotPasswordScreen
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -33,11 +49,66 @@ import com.loc.benimdunyam.feature.seasons.episodes.LifeEpisodesViewModel
 import com.loc.benimdunyam.feature.timeline.TimelineScreen
 import com.loc.benimdunyam.feature.yearreview.YearReviewScreen
 
+/**
+ * En dış uygulama kapısı: farklı Firebase hesabı yerel arşivi göremez.
+ *
+ * Kilitliyken NavHost hiç oluşturulmaz. Böylece önceki sayfanın görüntüsü,
+ * ViewModel'leri ve geri yığınındaki ekranlar ekranda kalmaz.
+ */
 @Composable
 fun BenimDunyamNavGraph(
-    startDestination: String = Screen.Onboarding.route
+    startDestination: String = Screen.Startup.route
 ) {
+    val accessViewModel: LocalArchiveAccessViewModel = hiltViewModel()
+    val state by accessViewModel.uiState.collectAsStateWithLifecycle()
+
+    when (state.decision) {
+        LocalArchiveAccessDecision.CHECKING -> {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+        LocalArchiveAccessDecision.ALLOWED -> {
+            // Her hesap değişiminde NavController ve geçmişi yeniden kurulur.
+            key(state.sessionGeneration) {
+                BenimDunyamContentNavGraph(startDestination = startDestination)
+            }
+        }
+        LocalArchiveAccessDecision.CONSENT_REQUIRED,
+        LocalArchiveAccessDecision.LOCKED -> {
+            Box(modifier = Modifier.fillMaxSize()) {
+                ThemeScenicBackground(modifier = Modifier.matchParentSize())
+                LocalArchiveGateScreen(
+                    state = state,
+                    onConfirmLink = accessViewModel::confirmLinkToCurrentAccount,
+                    onContinueAsGuest = accessViewModel::continueAsGuest,
+                    onCreateEmptyWorkspace = accessViewModel::createEmptyWorkspace,
+                    onReturnToLegacy = accessViewModel::returnToLegacyWorkspace
+                )
+            }
+        }
+    }
+}
+
+/** Önceden çalışan bütün navigasyon rotaları burada aynen korunur. */
+@Composable
+private fun BenimDunyamContentNavGraph(startDestination: String) {
     val navController = rememberNavController()
+
+    // Giriş akışı ilk açılışta da, Ayarlar içinden açıldığında da güvenli biçimde
+    // sonlanır. Ana Sayfa zaten geçmişteyse yeni bir kopya oluşturulmaz.
+    val goHomeAfterAuth: () -> Unit = {
+        val returnedToExistingHome = navController.popBackStack(
+            BottomNavScreen.Home.route,
+            inclusive = false
+        )
+        if (!returnedToExistingHome) {
+            navController.navigate(BottomNavScreen.Home.route) {
+                popUpTo(Screen.AuthWelcome.route) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         ThemeScenicBackground(modifier = Modifier.matchParentSize())
@@ -52,6 +123,68 @@ fun BenimDunyamNavGraph(
                 startDestination = startDestination,
                 modifier = Modifier.padding(paddingValues)
             ) {
+                // Faz 2D: önce oturum ve ilk kullanım tercihini kontrol et.
+                // Bu rota yalnızca yönlendirme yapar; Room verilerini değiştirmez.
+                composable(route = Screen.Startup.route) {
+                    val startupViewModel: StartupViewModel = hiltViewModel()
+                    val destination by startupViewModel.nextDestination.collectAsStateWithLifecycle()
+
+                    LaunchedEffect(destination) {
+                        val route = when (destination) {
+                            StartupDestination.HOME -> BottomNavScreen.Home.route
+                            StartupDestination.WELCOME -> Screen.AuthWelcome.route
+                            null -> null
+                        }
+                        if (route != null) {
+                            navController.navigate(route) {
+                                popUpTo(Screen.Startup.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                // Karşılama ekranında giriş zorunlu değildir; hesapsız kullanım korunur.
+                composable(route = Screen.AuthWelcome.route) {
+                    WelcomeScreen(
+                        onSignIn = { navController.navigate(Screen.AuthSignIn.route) },
+                        onRegister = { navController.navigate(Screen.AuthRegister.route) },
+                        onContinueAsGuest = goHomeAfterAuth
+                    )
+                }
+
+                composable(route = Screen.AuthSignIn.route) {
+                    SignInScreen(
+                        onBack = { navController.popBackStack() },
+                        onRegister = {
+                            navController.navigate(Screen.AuthRegister.route) {
+                                popUpTo(Screen.AuthSignIn.route) { inclusive = true }
+                            }
+                        },
+                        onForgotPassword = { navController.navigate(Screen.AuthForgotPassword.route) },
+                        onAuthenticated = goHomeAfterAuth
+                    )
+                }
+
+                composable(route = Screen.AuthRegister.route) {
+                    RegisterScreen(
+                        onBack = { navController.popBackStack() },
+                        onSignIn = {
+                            navController.navigate(Screen.AuthSignIn.route) {
+                                popUpTo(Screen.AuthRegister.route) { inclusive = true }
+                            }
+                        },
+                        onAuthenticated = goHomeAfterAuth
+                    )
+                }
+
+                composable(route = Screen.AuthForgotPassword.route) {
+                    ForgotPasswordScreen(onBack = { navController.popBackStack() })
+                }
+
                 // 1. Onboarding
                 composable(route = Screen.Onboarding.route) {
                     OnboardingScreen(
@@ -234,7 +367,12 @@ fun BenimDunyamNavGraph(
 
                 // Bulut hesabı tamamen bağımsız: Room verisine ve yedeklemeye dokunmaz.
                 composable(route = Screen.CloudAccount.route) {
-                    CloudAccountScreen(onNavigateBack = { navController.popBackStack() })
+                    CloudAccountScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToAuthEntry = {
+                            navController.navigate(Screen.AuthWelcome.route)
+                        }
+                    )
                 }
 
                 // 11. Dönemler sekmesi: mevcut LifeSeasons ekranı aynı route ile kullanılır.

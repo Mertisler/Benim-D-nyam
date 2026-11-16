@@ -1,6 +1,7 @@
 package com.loc.benimdunyam.data.backup
 
 import android.content.Context
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import com.google.gson.Gson
 import com.loc.benimdunyam.domain.repository.BackupRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -19,6 +20,7 @@ import kotlinx.coroutines.withContext
 @Singleton
 class BackupArchiveManager @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val workspace: ActiveWorkspaceSession,
     private val backupRepository: BackupRepository,
     private val backupValidator: BackupValidator
 ) {
@@ -115,10 +117,7 @@ class BackupArchiveManager @Inject constructor(
             }
 
             // 4. Uygulamanın özel geçici alanını hazırla.
-            val temporaryDirectory = File(
-                context.noBackupFilesDir,
-                "backup_staging"
-            )
+            val temporaryDirectory = workspace.backupStagingRoot()
 
             if (!temporaryDirectory.exists() &&
                 !temporaryDirectory.mkdirs()
@@ -228,7 +227,7 @@ class BackupArchiveManager @Inject constructor(
         }
 
         val allowedDirectory = File(
-            context.filesDir,
+            workspace.mediaRoot(),
             localFolder
         ).canonicalFile
 

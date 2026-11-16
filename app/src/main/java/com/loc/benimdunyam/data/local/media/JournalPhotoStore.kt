@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.AtomicFile
 import com.loc.benimdunyam.data.backup.BackupWriteCoordinator
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.io.FileOutputStream
@@ -46,7 +47,8 @@ private data class PhotoLayout(
 @Singleton
 class JournalPhotoStore @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val writeCoordinator: BackupWriteCoordinator
+    private val writeCoordinator: BackupWriteCoordinator,
+    private val session: ActiveWorkspaceSession
 ) {
     companion object {
         const val MAX_PHOTOS_PER_JOURNAL = 12
@@ -57,10 +59,10 @@ class JournalPhotoStore @Inject constructor(
     }
 
     private val publishedRoot: File
-        get() = File(context.filesDir, "benim_dunyam_journal_photos")
+        get() = File(session.mediaRoot(), "benim_dunyam_journal_photos")
 
     private val draftRoot: File
-        get() = File(context.filesDir, "benim_dunyam_journal_photo_drafts")
+        get() = File(session.mediaRoot(), "benim_dunyam_journal_photo_drafts")
 
     private fun hash(value: String): String =
         MessageDigest.getInstance("SHA-256")

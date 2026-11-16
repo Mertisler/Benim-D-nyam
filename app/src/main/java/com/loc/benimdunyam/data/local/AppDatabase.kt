@@ -4,6 +4,8 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.loc.benimdunyam.data.local.dao.JournalSyncEventDao
+import com.loc.benimdunyam.data.local.entity.JournalSyncEventEntity
 import com.loc.benimdunyam.data.local.dao.JournalDao
 import com.loc.benimdunyam.data.local.dao.JournalPersonMentionDao
 import com.loc.benimdunyam.data.local.dao.LifeEpisodeDao
@@ -24,17 +26,19 @@ import com.loc.benimdunyam.data.local.dao.BackupRestoreDao
 @Database(
     entities = [
         JournalEntryEntity::class,
+        JournalSyncEventEntity::class,
         PersonEntity::class,
         JournalPersonMentionEntity::class,
         LifeSeasonEntity::class,
         LifeEpisodeEntity::class,
         PersonSpecialMemoryEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
+    abstract fun journalSyncEventDao(): JournalSyncEventDao
     abstract fun journalDao(): JournalDao
     abstract fun personDao(): PersonDao
     abstract fun journalPersonMentionDao(): JournalPersonMentionDao
@@ -91,6 +95,35 @@ abstract class AppDatabase : RoomDatabase() {
                     """CREATE INDEX IF NOT EXISTS
                         `index_person_special_memories_journalId_personId`
                         ON `person_special_memories` (`journalId`, `personId`)
+                    """.trimIndent()
+                )
+            }
+        }
+
+        /**
+         * Versiyon 7 -> 8:
+         * Yalnızca yeni journal_sync_events tablosu oluşturulur.
+         * Mevcut günlükler, kişi ilişkileri, fotoğraflar ve yedek biçimi
+         * değiştirilmez. Eski kayıtlar otomatik olarak bulut kuyruğuna ALINMAZ.
+         * Başlangıç aktarımı sonraki aşamada açık kullanıcı onayıyla yapılır.
+         */
+        val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `journal_sync_events` (
+                        `journalId` TEXT NOT NULL,
+                        `ownerUid` TEXT NOT NULL,
+                        `changeType` TEXT NOT NULL,
+                        `state` TEXT NOT NULL,
+                        `changeVersion` INTEGER NOT NULL,
+                        `updatedAtMillis` INTEGER NOT NULL,
+                        PRIMARY KEY(`journalId`)
+                    )""".trimIndent()
+                )
+                database.execSQL(
+                    """CREATE INDEX IF NOT EXISTS
+                        `index_journal_sync_events_ownerUid_state`
+                        ON `journal_sync_events` (`ownerUid`, `state`)
                     """.trimIndent()
                 )
             }

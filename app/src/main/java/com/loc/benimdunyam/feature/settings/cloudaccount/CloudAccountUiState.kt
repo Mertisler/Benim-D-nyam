@@ -6,11 +6,17 @@ import com.loc.benimdunyam.domain.model.CloudArchiveSummary
 import com.loc.benimdunyam.domain.model.CloudRestorePreview
 import com.loc.benimdunyam.domain.model.CloudLocalCoverage
 import com.loc.benimdunyam.domain.model.CloudSyncAuditReport
+import com.loc.benimdunyam.domain.model.CloudLocalArchiveOwnerState
 
 /** Yalnızca bulut hesabı ekranının durumu. Room arşivi bu sınıfa bağlı değildir. */
 data class CloudAccountUiState(
     val isCheckingSession: Boolean = true,
     val account: CloudAccount? = null,
+    // UID yerine yalnızca yerel arşivin hesapla bağ durumunu taşır.
+    val localArchiveOwnerState: CloudLocalArchiveOwnerState = CloudLocalArchiveOwnerState.NOT_BOUND,
+    val isProfileBusy: Boolean = false,
+    val profileMessage: String? = null,
+    val profileError: String? = null,
     val isSubmitting: Boolean = false,
     val isCheckingConnection: Boolean = false,
     val connectionStatus: CloudConnectionStatus? = null,

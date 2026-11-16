@@ -4,5 +4,7 @@ package com.loc.benimdunyam.domain.model
 data class CloudAccount(
     val uid: String,
     val email: String?,
-    val isEmailVerified: Boolean
+    val isEmailVerified: Boolean,
+    // Firebase Authentication üzerinde tutulan görünen ad; günlüklerden bağımsızdır.
+    val displayName: String? = null
 )

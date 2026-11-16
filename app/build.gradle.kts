@@ -4,8 +4,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
-
-
     alias(libs.plugins.google.services)
 }
 
@@ -45,6 +43,12 @@ android {
 }
 
 dependencies {
+    // Firebase: yalnızca bağlantı ve hesap altyapısı; otomatik veri aktarımı yok.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.kotlinx.coroutines.play.services)
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -68,6 +72,9 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
+    // Faz 2F.1: WorkManager kalıcı iş planlaması (henüz bulut aktarımı yapmaz).
+    implementation(libs.androidx.work.runtime.ktx)
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -88,13 +95,5 @@ dependencies {
 
     implementation("com.airbnb.android:lottie-compose:6.3.0") // En güncel kararlı sürüm
     implementation(kotlin("test"))
-
-    // Firebase: yalnızca bağlantı ve hesap altyapısı; otomatik veri aktarımı yok.
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth)
-    implementation(libs.firebase.firestore)
-    implementation(libs.kotlinx.coroutines.play.services)
-
-
 
 }

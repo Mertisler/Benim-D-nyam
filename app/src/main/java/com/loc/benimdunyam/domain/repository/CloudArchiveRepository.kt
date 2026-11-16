@@ -5,12 +5,19 @@ import com.loc.benimdunyam.domain.model.CloudRestorePreview
 import com.loc.benimdunyam.domain.model.CloudRestoreResult
 import com.loc.benimdunyam.domain.model.CloudLocalCoverage
 import com.loc.benimdunyam.domain.model.CloudSyncAuditReport
+import com.loc.benimdunyam.domain.model.CloudLocalArchiveOwnerState
 
 /**
  * Faz 2B: kullanıcının açık onayıyla şifreli bulut arşivi.
  * Yalnızca boş cihaza kontrollü içe aktarmaya izin verir; otomatik senkronizasyon yoktur.
  */
 interface CloudArchiveRepository {
+    /**
+     * Daha önce bulut arşivi oluşturulurken bağlanan hesabı kontrol eder.
+     * Bu metot Room / Firestore verisi değiştirmez ve UID bilgisini paylaşmaz.
+     */
+    fun localArchiveOwnerState(): CloudLocalArchiveOwnerState
+
     /** Herhangi bir veriyi buluta göndermeden, cihazdaki kayıt ve fotoğrafları sayar. */
     suspend fun inspectLocalCoverage(): CloudLocalCoverage
 

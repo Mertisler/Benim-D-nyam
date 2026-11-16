@@ -12,12 +12,15 @@ import com.google.gson.Gson
 import com.loc.benimdunyam.data.backup.BackupData
 import com.loc.benimdunyam.data.backup.BackupValidator
 import com.loc.benimdunyam.data.local.media.JournalPhotoStore
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
+import com.loc.benimdunyam.data.local.isolation.WorkspaceMode
 import com.loc.benimdunyam.data.local.mood.JournalMoodRecord
 import com.loc.benimdunyam.data.local.mood.JournalMoodRepository
 import com.loc.benimdunyam.domain.model.CloudArchiveSummary
 import com.loc.benimdunyam.domain.model.CloudRestorePreview
 import com.loc.benimdunyam.domain.model.CloudLocalCoverage
 import com.loc.benimdunyam.domain.model.CloudSyncAuditReport
+import com.loc.benimdunyam.domain.model.CloudLocalArchiveOwnerState
 import com.loc.benimdunyam.domain.model.CloudRestoreResult
 import com.loc.benimdunyam.domain.model.JournalMood
 import com.loc.benimdunyam.domain.repository.BackupRepository
@@ -44,7 +47,8 @@ class FirebaseCloudArchiveRepository @Inject constructor(
     private val moodRepository: JournalMoodRepository,
     private val validator: BackupValidator,
     private val importer: CloudArchiveLocalImporter,
-    private val photoStore: JournalPhotoStore
+    private val photoStore: JournalPhotoStore,
+    private val workspace: ActiveWorkspaceSession
 ) : CloudArchiveRepository {
 
     private val gson = Gson()
@@ -58,6 +62,20 @@ class FirebaseCloudArchiveRepository @Inject constructor(
         private const val OWNER_KEY = "archive_owner_uid"
         private const val FORMAT_VERSION = 1L
     }
+
+    /**
+     * Hesap değiştirildiğinde yerel arşivin farklı UID'ye bağlı olup olmadığını
+     * kontrol eder. Yerel arşiv okunur fakat hiçbir veri değiştirilmez.
+     */
+    override fun localArchiveOwnerState(): CloudLocalArchiveOwnerState =
+        if (workspace.mode == WorkspaceMode.ACCOUNT && workspace.isReadyFor(auth.currentUser?.uid)) {
+            CloudLocalArchiveOwnerState.CURRENT_ACCOUNT
+        } else {
+            CloudLocalArchiveOwnerState.from(
+                preferences.getString(OWNER_KEY, null),
+                auth.currentUser?.uid
+            )
+        }
 
     /**
      * Bulut kotası veya kullanıcı hesabı gerektirmeyen yerel kapsam denetimi.
@@ -179,7 +197,7 @@ class FirebaseCloudArchiveRepository @Inject constructor(
         // İlk bilinçli aktarımda cihazın bulut kopyasını tek UID'ye bağlarız.
         // Bu yalnızca istemci tarafında ek bir korumadır; asıl izolasyonu Firestore Rules sağlar.
         withContext(Dispatchers.IO) {
-            if (preferences.getString(OWNER_KEY, null) == null) {
+            if (workspace.mode == WorkspaceMode.LEGACY && preferences.getString(OWNER_KEY, null) == null) {
                 check(preferences.edit().putString(OWNER_KEY, uid).commit()) {
                     "Hesap bağlantısı yerel olarak kaydedilemedi. Aktarım durduruldu."
                 }
@@ -243,7 +261,9 @@ class FirebaseCloudArchiveRepository @Inject constructor(
         val localCount = importer.localRecordCount()
         val owner = preferences.getString(OWNER_KEY, null)
         val blockedReason = when {
-            owner != null && owner != uid ->
+            workspace.mode == WorkspaceMode.ACCOUNT && !workspace.isReadyFor(uid) ->
+                "Bu süreçte açık Room alanı Firebase hesabıyla eşleşmiyor. Uygulamayı yeniden başlat."
+            workspace.mode != WorkspaceMode.ACCOUNT && owner != null && owner != uid ->
                 "Bu cihaz daha önce farklı bir bulut hesabına bağlanmış. Hesaplar birleştirilmez."
             localCount > 0 ->
                 "Cihazda $localCount kayıt var. Bu sürüm yalnızca boş cihaza güvenli içe aktarmayı destekliyor."
@@ -278,7 +298,7 @@ class FirebaseCloudArchiveRepository @Inject constructor(
         // Bind the local archive to one Firebase user BEFORE staging import rows.
         // If a restore fails, conservatively keep the binding instead of mixing accounts.
         withContext(Dispatchers.IO) {
-            if (preferences.getString(OWNER_KEY, null) == null) {
+            if (workspace.mode == WorkspaceMode.LEGACY && preferences.getString(OWNER_KEY, null) == null) {
                 check(preferences.edit().putString(OWNER_KEY, uid).commit()) {
                     "Bulut hesap bağlantısı kaydedilemedi. İçe aktarma durduruldu."
                 }
@@ -375,6 +395,16 @@ class FirebaseCloudArchiveRepository @Inject constructor(
     }
 
     private fun ensureAccountCanUpload(uid: String) {
+        check(workspace.mode != WorkspaceMode.LOCKED) {
+            "Hesap alanı kilitli. Bulut işlemi güvenlik için durduruldu."
+        }
+        if (workspace.mode == WorkspaceMode.ACCOUNT) {
+            check(workspace.isReadyFor(uid)) {
+                "Aktif hesap ile yerel çalışma alanı uyuşmuyor. Güvenlik için işlem durduruldu."
+            }
+            return
+        }
+        // Eski arşivin sahipliğini yalnızca eski çalışma alanında kontrol et.
         val owner = preferences.getString(OWNER_KEY, null)
         check(owner == null || owner == uid) {
             "Bu cihazdaki arşiv başka bir bulut hesabına bağlanmış. " +

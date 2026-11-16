@@ -2,6 +2,7 @@
 package com.loc.benimdunyam.data.backup
 
 import android.content.Context
+import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import com.loc.benimdunyam.domain.repository.BackupRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -40,6 +41,7 @@ data class BackupCleanupReport(
 @Singleton
 class BackupMaintenanceManager @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val workspace: ActiveWorkspaceSession,
     private val backupRepository: BackupRepository
 ) {
 
@@ -174,7 +176,7 @@ class BackupMaintenanceManager @Inject constructor(
                 inspectImage(
                     path = season.coverImagePath,
                     expectedDirectory = File(
-                        context.filesDir,
+                        workspace.mediaRoot(),
                         "seasons"
                     )
                 )
@@ -183,7 +185,7 @@ class BackupMaintenanceManager @Inject constructor(
             data.people.forEach { person ->
 
                 val directory = File(
-                    context.filesDir,
+                    workspace.mediaRoot(),
                     "people/${person.id}"
                 )
 
@@ -317,10 +319,7 @@ class BackupMaintenanceManager @Inject constructor(
         now: Long
     ): List<File> {
 
-        val root = File(
-            context.noBackupFilesDir,
-            "backup_staging"
-        ).canonicalFile
+        val root = workspace.backupStagingRoot().canonicalFile
 
         if (!root.isDirectory) return emptyList()
 
@@ -417,12 +416,12 @@ class BackupMaintenanceManager @Inject constructor(
         val result = mutableListOf<File>()
 
         val seasonRoot = File(
-            context.filesDir,
+            workspace.mediaRoot(),
             "seasons"
         ).canonicalFile
 
         val peopleRoot = File(
-            context.filesDir,
+            workspace.mediaRoot(),
             "people"
         ).canonicalFile
 
