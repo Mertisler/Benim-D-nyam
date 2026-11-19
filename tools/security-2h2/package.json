@@ -9,7 +9,7 @@
   "scripts": {
     "preflight": "node preflight.mjs",
     "functions": "node verify-functions.mjs",
-    "rules": "firebase emulators:exec --project demo-benimdunyam-2h2 --config firebase.emulator.json --only firestore,storage \"node verify-rules.mjs\"",
+    "rules": "firebase emulators:exec --project demo-benimdunyam-2h2 --config firebase.emulator.json --only firestore,storage \"node verify-rules.mjs && node verify-rules-coverage.mjs\"",
     "verify": "npm run preflight && npm run functions && npm run rules",
     "iam": "node audit-iam.mjs ./iam-evidence-2h2"
   },
