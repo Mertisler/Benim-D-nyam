@@ -3,6 +3,8 @@ package com.loc.benimdunyam.data.backup
 
 import android.content.Context
 import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
+import com.loc.benimdunyam.data.local.mood.JournalMoodRecord
+import com.loc.benimdunyam.data.local.mood.JournalMoodRepository
 import com.loc.benimdunyam.domain.repository.BackupRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.BufferedOutputStream
@@ -34,7 +36,9 @@ data class RestoreSummary(
     val episodeCount: Int,
     val mentionCount: Int,
     val specialMemoryCount: Int,
-    val imageCount: Int
+    val imageCount: Int,
+    /** null: yedek ruh hali içermiyordu (arşiv sürüm 1); cihazdakiler korundu. */
+    val moodCount: Int? = null
 )
 
 /**
@@ -51,7 +55,8 @@ data class RestoreSummary(
 class BackupRestoreManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val workspace: ActiveWorkspaceSession,
-    private val backupRepository: BackupRepository
+    private val backupRepository: BackupRepository,
+    private val moodRepository: JournalMoodRepository
 ) {
 
     private val restoreMutex = Mutex()
@@ -154,11 +159,35 @@ class BackupRestoreManager @Inject constructor(
                     people = restoredPeople
                 )
 
-                // 4. Room kayıtlarını atomik değiştir.
-                backupRepository
-                    .replaceDatabaseWithVerifiedBackup(
-                        restoredData
-                    )
+                // 4. Ruh hallerini (ayrı Room) değiştir, ardından ana
+                // Room kayıtlarını atomik değiştir. İki veritabanı tek
+                // transaction olamayacağından ana işlem başarısız olursa
+                // ruh halleri önceki durumuna geri kurulur (telafi).
+                val previousMoods: List<JournalMoodRecord>? =
+                    preparedBackup.moods?.let {
+                        moodRepository.replaceAllForVerifiedRestore(it)
+                    }
+
+                try {
+                    backupRepository
+                        .replaceDatabaseWithVerifiedBackup(
+                            restoredData
+                        )
+                } catch (exception: Exception) {
+                    if (previousMoods != null) {
+                        withContext(NonCancellable) {
+                            runCatching {
+                                moodRepository
+                                    .replaceAllForVerifiedRestore(
+                                        previousMoods
+                                    )
+                            }.onFailure {
+                                exception.addSuppressed(it)
+                            }
+                        }
+                    }
+                    throw exception
+                }
 
                 // 5. Sonuç oluştur.
                 RestoreSummary(
@@ -169,7 +198,8 @@ class BackupRestoreManager @Inject constructor(
                     mentionCount = restoredData.mentions.size,
                     specialMemoryCount =
                         restoredData.specialMemories.size,
-                    imageCount = installedFiles.size
+                    imageCount = installedFiles.size,
+                    moodCount = preparedBackup.moods?.size
                 )
 
             } catch (exception: Exception) {

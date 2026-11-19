@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Tek Room örneği. AndroidManifest/DI modülünde ek kayıt gerekmez.
- * Not: Bu ayrı veritabanı, eski .bdbackup paketine henüz dahil değildir.
+ * .bdbackup arşiv sürüm 2'den itibaren bu kayıtlar `data/moods.json` olarak yedeklenir.
  */
 @Singleton
 class JournalMoodRepository @Inject constructor(
@@ -82,6 +82,32 @@ class JournalMoodRepository @Inject constructor(
         writeCoordinator.withRegularWrite { db.withTransaction {
             records.forEach { db.moodDao().deleteIfStillStaged(it.journalId, it.moodName, it.updatedAt) }
         } }
+    }
+
+    /** .bdbackup oluşturma: tüm ruh hali kayıtlarının salt okunur görüntüsü. */
+    suspend fun snapshotForBackup(): List<JournalMoodRecord> = withContext(Dispatchers.IO) {
+        db.moodDao().getAll()
+    }
+
+    /**
+     * Doğrulanmış .bdbackup geri yüklemesi: tüm ruh hallerini tek transaction'da
+     * yedektekilerle değiştirir ve önceki kayıtları döndürür.
+     *
+     * Ana Room ayrı bir veritabanı olduğundan ikisi tek ACID işlemde birleşemez.
+     * Ana işlem başarısız olursa çağıran, dönen listeyle bu metodu tekrar
+     * çağırarak eski durumu geri kurar (telafi adımı).
+     */
+    suspend fun replaceAllForVerifiedRestore(
+        records: List<JournalMoodRecord>
+    ): List<JournalMoodRecord> = withContext(Dispatchers.IO) {
+        writeCoordinator.withRegularWrite {
+            db.withTransaction {
+                val previous = db.moodDao().getAll()
+                db.moodDao().deleteAll()
+                db.moodDao().insertAll(records)
+                previous
+            }
+        }
     }
 
     suspend fun getMood(journalId: String): JournalMood? = withContext(Dispatchers.IO) {

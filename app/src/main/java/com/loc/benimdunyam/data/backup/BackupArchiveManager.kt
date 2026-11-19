@@ -2,6 +2,7 @@ package com.loc.benimdunyam.data.backup
 
 import android.content.Context
 import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
+import com.loc.benimdunyam.data.local.mood.JournalMoodRepository
 import com.google.gson.Gson
 import com.loc.benimdunyam.domain.repository.BackupRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,7 +23,8 @@ class BackupArchiveManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val workspace: ActiveWorkspaceSession,
     private val backupRepository: BackupRepository,
-    private val backupValidator: BackupValidator
+    private val backupValidator: BackupValidator,
+    private val moodRepository: JournalMoodRepository
 ) {
 
     private val gson = Gson()
@@ -50,6 +52,19 @@ class BackupArchiveManager @Inject constructor(
 
             require(originalData.version == 2) {
                 "Desteklenmeyen yedek veri sürümü."
+            }
+
+            // Ruh halleri ayrı Room'da durur. Çağıran (CreateBackupUseCase)
+            // ortak yazma kilidini tuttuğu için korumalı yazmalar araya giremez.
+            val moodBytes = BackupMoodCodec.encode(
+                BackupMoodCodec.selectForBackup(
+                    records = moodRepository.snapshotForBackup(),
+                    journalIds = originalData.journals.map { it.id }.toSet()
+                )
+            )
+
+            require(moodBytes.size.toLong() <= BackupMoodCodec.MAX_BYTES) {
+                "Ruh hali verileri boyut sınırını aşıyor."
             }
 
             // ZIP yolu -> cihazdaki gerçek görsel dosyası
@@ -153,6 +168,13 @@ class BackupArchiveManager @Inject constructor(
                         bytes = jsonBytes
                     )
 
+                    // Ruh halleri (arşiv sürüm 2)
+                    writeBytes(
+                        zip = zip,
+                        entryName = BackupMoodCodec.ENTRY,
+                        bytes = moodBytes
+                    )
+
                     // Sezon ve kişi fotoğrafları
                     for ((archivePath, sourceFile) in images) {
 
@@ -178,7 +200,9 @@ class BackupArchiveManager @Inject constructor(
                         createdAt = portableData.exportTimestamp,
                         dataSizeBytes = jsonBytes.size.toLong(),
                         dataSha256 = sha256(jsonBytes),
-                        mediaFiles = mediaManifest
+                        mediaFiles = mediaManifest,
+                        moodsSizeBytes = moodBytes.size.toLong(),
+                        moodsSha256 = sha256(moodBytes)
                     )
 
                     writeBytes(

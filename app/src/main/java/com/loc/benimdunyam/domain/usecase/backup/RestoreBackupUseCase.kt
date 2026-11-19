@@ -24,7 +24,9 @@ data class BackupPreview(
     val mentionCount: Int,
     val specialMemoryCount: Int,
     val imageCount: Int,
-    val encryptedSha256: String
+    val encryptedSha256: String,
+    /** null: eski yedek (arşiv sürüm 1) ruh hali içermiyor. */
+    val moodCount: Int? = null
 )
 
 @Singleton
@@ -54,7 +56,8 @@ class RestoreBackupUseCase @Inject constructor(
                     mentionCount = verified.mentionCount,
                     specialMemoryCount = verified.specialMemoryCount,
                     imageCount = verified.imageCount,
-                    encryptedSha256 = verified.encryptedSha256
+                    encryptedSha256 = verified.encryptedSha256,
+                    moodCount = verified.moodCount
                 )
             }
         } finally {

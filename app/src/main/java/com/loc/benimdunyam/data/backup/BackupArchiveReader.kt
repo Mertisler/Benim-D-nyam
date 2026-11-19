@@ -3,6 +3,7 @@ package com.loc.benimdunyam.data.backup
 
 import android.content.Context
 import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
+import com.loc.benimdunyam.data.local.mood.JournalMoodRecord
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.loc.benimdunyam.domain.repository.BackupRepository
@@ -31,7 +32,12 @@ import kotlinx.coroutines.withContext
 class PreparedBackup internal constructor(
     val data: BackupData,
     val manifest: BackupArchiveManifest,
-    private val stagingDirectory: File
+    private val stagingDirectory: File,
+    /**
+     * Doğrulanmış ruh halleri. null: arşiv sürüm 1 (ruh hali içermez);
+     * bu durumda geri yükleme cihazdaki ruh hallerine dokunmaz.
+     */
+    val moods: List<JournalMoodRecord>? = null
 ) : Closeable {
 
     private val knownPaths =
@@ -160,8 +166,12 @@ class BackupArchiveReader @Inject constructor(
                 .map { it.archivePath }
                 .toSet()
 
+            val hasMoods = manifest.archiveVersion >=
+                    BackupArchiveManifest.CURRENT_ARCHIVE_VERSION
+
             val expectedPaths = mediaPaths +
-                    setOf(DATA_ENTRY, MANIFEST_ENTRY)
+                    setOf(DATA_ENTRY, MANIFEST_ENTRY) +
+                    (if (hasMoods) setOf(BackupMoodCodec.ENTRY) else emptySet())
 
             if (entries.keys != expectedPaths) {
                 throw IOException(
@@ -207,6 +217,33 @@ class BackupArchiveReader @Inject constructor(
                 throw IOException(
                     "Yedek oluşturma bilgileri uyuşmuyor."
                 )
+            }
+
+            // 5b. Ruh halleri (arşiv sürüm 2): boyut, özet ve anı ilişkisi.
+            val moods = if (hasMoods) {
+                val moodEntry = entries[BackupMoodCodec.ENTRY]
+                    ?: throw IOException("Ruh hali verisi bulunamadı.")
+
+                val moodBytes = readLimited(
+                    zip = zip,
+                    entry = moodEntry,
+                    maxBytes = BackupMoodCodec.MAX_BYTES
+                )
+
+                if (moodBytes.size.toLong() != manifest.moodsSizeBytes ||
+                    sha256(moodBytes) != manifest.moodsSha256
+                ) {
+                    throw IOException(
+                        "Ruh hali verisinin boyutu veya özeti uyuşmuyor."
+                    )
+                }
+
+                BackupMoodCodec.decodeAndValidate(
+                    bytes = moodBytes,
+                    journalIds = backupData.journals.map { it.id }.toSet()
+                )
+            } else {
+                null
             }
 
             // 6. JSON'daki bütün görsel referanslarını kontrol et.
@@ -266,7 +303,8 @@ class BackupArchiveReader @Inject constructor(
                 val preparedBackup = PreparedBackup(
                     data = backupData,
                     manifest = manifest,
-                    stagingDirectory = stagingDirectory
+                    stagingDirectory = stagingDirectory,
+                    moods = moods
                 )
 
                 completed = true
@@ -296,7 +334,7 @@ class BackupArchiveReader @Inject constructor(
             val entry = enumeration.nextElement()
             val name = entry.name
 
-            if (result.size >= MAX_MEDIA_COUNT + 2) {
+            if (result.size >= MAX_MEDIA_COUNT + 3) {
                 throw IOException(
                     "ZIP dosyasında çok fazla giriş var."
                 )
@@ -323,6 +361,7 @@ class BackupArchiveReader @Inject constructor(
     private fun isAllowedEntryName(name: String): Boolean {
         return name == MANIFEST_ENTRY ||
                 name == DATA_ENTRY ||
+                name == BackupMoodCodec.ENTRY ||
                 mediaPathRegex.matches(name)
     }
 
@@ -367,11 +406,37 @@ class BackupArchiveReader @Inject constructor(
         )
 
         if (format != "benim-dunyam" ||
-            archiveVersion != 1 ||
+            archiveVersion !in
+            BackupArchiveManifest.LEGACY_ARCHIVE_VERSION..
+            BackupArchiveManifest.CURRENT_ARCHIVE_VERSION ||
             dataVersion != 2
         ) {
             throw IOException(
                 "Desteklenmeyen yedek arşivi sürümü."
+            )
+        }
+
+        // Sürüm 2: ruh hali girişi zorunlu ve özetle bağlı.
+        // Sürüm 1: bu alanlar bulunmamalı.
+        var moodsSize: Long? = null
+        var moodsHash: String? = null
+
+        if (archiveVersion >= BackupArchiveManifest.CURRENT_ARCHIVE_VERSION) {
+            val size = readLong(root, "moodsSizeBytes")
+            val hash = readString(root, "moodsSha256")
+
+            if (size !in 1..BackupMoodCodec.MAX_BYTES ||
+                !shaRegex.matches(hash)
+            ) {
+                throw IOException(
+                    "Manifest ruh hali bilgileri geçersiz."
+                )
+            }
+            moodsSize = size
+            moodsHash = hash
+        } else if (root.has("moodsSizeBytes") || root.has("moodsSha256")) {
+            throw IOException(
+                "Manifest sürümü ile içeriği uyuşmuyor."
             )
         }
 
@@ -462,7 +527,9 @@ class BackupArchiveReader @Inject constructor(
             createdAt = createdAt,
             dataSizeBytes = dataSize,
             dataSha256 = dataHash,
-            mediaFiles = mediaFiles
+            mediaFiles = mediaFiles,
+            moodsSizeBytes = moodsSize,
+            moodsSha256 = moodsHash
         )
     }
 

@@ -47,6 +47,16 @@ interface JournalMoodDao {
 
     @Query("DELETE FROM journal_mood_records WHERE journalId = :journalId")
     suspend fun delete(journalId: String)
+
+    /** .bdbackup için kararlı sırada tüm kayıtlar. */
+    @Query("SELECT * FROM journal_mood_records ORDER BY journalId")
+    suspend fun getAll(): List<JournalMoodRecord>
+
+    @Query("DELETE FROM journal_mood_records")
+    suspend fun deleteAll()
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAll(records: List<JournalMoodRecord>)
 }
 
 @Database(entities = [JournalMoodRecord::class], version = 1, exportSchema = false)

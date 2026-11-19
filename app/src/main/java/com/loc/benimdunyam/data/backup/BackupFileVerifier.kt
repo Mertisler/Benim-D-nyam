@@ -15,7 +15,9 @@ data class BackupVerificationResult(
     val mentionCount: Int,
     val specialMemoryCount: Int,
     val imageCount: Int,
-    val encryptedSha256: String
+    val encryptedSha256: String,
+    /** null: arşiv sürüm 1, ruh hali içermiyor. */
+    val moodCount: Int? = null
 )
 
 /**
@@ -82,7 +84,8 @@ class BackupFileVerifier @Inject constructor(
                             data.specialMemories.size,
                         imageCount =
                             prepared.manifest.mediaFiles.size,
-                        encryptedSha256 = staged.sha256
+                        encryptedSha256 = staged.sha256,
+                        moodCount = prepared.moods?.size
                     )
                 }
 
