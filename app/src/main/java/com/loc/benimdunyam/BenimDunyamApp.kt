@@ -2,6 +2,7 @@ package com.loc.benimdunyam
 
 import android.app.Application
 import android.util.Log
+import com.google.firebase.FirebaseApp
 import com.loc.benimdunyam.data.backup.RestoreRecoveryManager
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -22,6 +23,13 @@ class BenimDunyamApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Faz 2G.4C: Cloud Functions App Check doğrulaması için cihaz kimliği.
+        // Firebase Console'da Play Integrity kaydı yapılmadan temizleme açılmaz.
+        FirebaseApp.initializeApp(this)
+        // Faz 2H.1: Debug sağlayıcısı yalnızca debug derlemesinde bulunur.
+        // Release derlemesi her zaman Play Integrity kullanır; dağıtımdaki
+        // Firebase App Check korumasını debug token'ıyla zayıflatmayız.
+        AppCheckProviderInstaller.install()
 
         applicationScope.launch {
             try {

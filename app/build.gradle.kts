@@ -40,13 +40,49 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        // JVM birim testlerinde Android stub metotları hata yerine varsayılan değer döndürür.
+        unitTests.isReturnDefaultValues = true
+        // Robolectric testleri (ör. Room migration) için Android kaynakları.
+        unitTests.isIncludeAndroidResources = true
+        // Türkçe Windows'ta "windows".lowercase() -> "wındows" olur ve Robolectric'in
+        // Conscrypt yerel kütüphanesi bulunamaz. Test JVM'ini İngilizce yerelle başlat.
+        unitTests.all { test ->
+            test.jvmArgs("-Duser.language=en", "-Duser.country=US")
+        }
+    }
+}
+
+// Room şemalarını sürüm kontrolüne alınabilecek JSON dosyaları olarak dışa aktarır.
+// Gelecekteki migration'lar MigrationTestHelper ile bu dosyalara karşı sınanabilir.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
-    // Firebase: yalnızca bağlantı ve hesap altyapısı; otomatik veri aktarımı yok.
+    // Firebase BoM: Firebase kütüphanelerinin
+    // birbiriyle uyumlu sürümlerini yönetir.
     implementation(platform(libs.firebase.bom))
+
+    // Firebase Authentication
     implementation(libs.firebase.auth)
+
+    // Cloud Firestore
     implementation(libs.firebase.firestore)
+
+    // Cloud Storage: fotoğraf ve kapak dosyaları.
+    // Sürümü BoM belirlediği için ayrıca yazmıyoruz.
+    implementation(libs.firebase.storage)
+
+    // Faz 2G.4C: Sunucu üzerinden sürüm koşullu medya temizleme.
+    implementation(libs.firebase.functions)
+    // Cloud Functions enforceAppCheck=true için Play Integrity sağlayıcısı.
+    implementation(libs.firebase.appcheck.playintegrity)
+    // Faz 2H.1: yalnızca debug varyantında App Check debug sağlayıcısı.
+    // Play Integrity release'de kalır; debug token üretim APK'sine girmez.
+    debugImplementation(libs.firebase.appcheck.debug)
+
+    // Firebase Task API ile Kotlin Coroutines uyumu.
     implementation(libs.kotlinx.coroutines.play.services)
 
     implementation(libs.androidx.core.ktx)
@@ -77,6 +113,10 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(kotlin("test"))
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
@@ -94,6 +134,8 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
 
     implementation("com.airbnb.android:lottie-compose:6.3.0") // En güncel kararlı sürüm
-    implementation(kotlin("test"))
+
+
+
 
 }

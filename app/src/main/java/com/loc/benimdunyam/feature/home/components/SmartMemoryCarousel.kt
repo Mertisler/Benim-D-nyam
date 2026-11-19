@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.loc.benimdunyam.feature.home.SmartMemoryItem
 import com.loc.benimdunyam.feature.home.insights.LifeStoryInsight
+import com.loc.benimdunyam.feature.home.analytics.LocalStoryAnalyticsSheet
 
 private val TunnelInk get() = AppThemeController.palette.ink
 private val TunnelPine get() = AppThemeController.palette.primary
@@ -93,6 +94,8 @@ fun SmartMemoryCarousel(
 
     val pagerState = rememberPagerState(pageCount = { cards.size })
     var showAll by rememberSaveable { mutableStateOf(false) }
+    // Faz 2I.2: Ayrı bir kart eklemek yerine isteğe bağlı yerel analiz paneli.
+    var showAnalytics by rememberSaveable { mutableStateOf(false) }
 
     // Kullanıcı anı sildiğinde geçerli sayfa sınırlar dışında kalmasın.
     LaunchedEffect(cards.size) {
@@ -116,18 +119,27 @@ fun SmartMemoryCarousel(
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold
                 ),
-                color = TunnelInk
+                color = TunnelInk,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            if (cards.isNotEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Kullanıcı açmadıkça ekranı doldurmayan, tamamen yerel analiz girişi.
                 TextButton(
-                    onClick = { showAll = true },
+                    onClick = { showAnalytics = true },
                     contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp)
                 ) {
-                    Text(
-                        text = "Tümü",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = themedColor(Color(0xFF63816C))
-                    )
+                    Text("Analiz", style = MaterialTheme.typography.labelMedium, color = TunnelPine)
+                }
+                if (cards.isNotEmpty()) {
+                    TextButton(
+                        onClick = { showAll = true },
+                        contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp)
+                    ) {
+                        Text("Tümü", style = MaterialTheme.typography.labelMedium,
+                            color = themedColor(Color(0xFF63816C)))
+                    }
                 }
             }
         }
@@ -197,6 +209,10 @@ fun SmartMemoryCarousel(
                 }
             }
         }
+    }
+
+    if (showAnalytics) {
+        LocalStoryAnalyticsSheet(onDismiss = { showAnalytics = false })
     }
 
     if (showAll && cards.isNotEmpty()) {

@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.loc.benimdunyam.data.local.AppDatabase
 import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
 import com.loc.benimdunyam.data.local.dao.JournalSyncEventDao
+import com.loc.benimdunyam.data.local.dao.PendingMoodMergeDao
 import com.loc.benimdunyam.data.local.dao.JournalDao
 import com.loc.benimdunyam.data.local.dao.JournalPersonMentionDao
 import com.loc.benimdunyam.data.local.dao.LifeEpisodeDao
@@ -36,10 +37,16 @@ object DatabaseModule {
             .addMigrations(
                 AppDatabase.MIGRATION_5_6,
                 AppDatabase.MIGRATION_6_7,
-                AppDatabase.MIGRATION_7_8
+                AppDatabase.MIGRATION_7_8,
+                AppDatabase.MIGRATION_8_9
             )
             .build()
     }
+
+    /** Ayrı ruh hali Room'u için atomik kurtarma işareti DAO'su. */
+    @Provides
+    fun providePendingMoodMergeDao(database: AppDatabase): PendingMoodMergeDao =
+        database.pendingMoodMergeDao()
 
     /** Yerel günlük işlemlerinin atomik kuyruk kaydı için kullanılan DAO. */
     @Provides

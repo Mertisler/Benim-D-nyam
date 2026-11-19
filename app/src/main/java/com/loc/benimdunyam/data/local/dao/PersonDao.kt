@@ -34,4 +34,11 @@ interface PersonDao {
 
     @Query("SELECT * FROM people WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
     fun searchPeople(query: String): Flow<List<PersonEntity>>
+
+    // Faz 2G.1: Buluttan gelen görsel yalnızca boş alana yazılır; mevcut path korunur.
+    @Query("UPDATE people SET profileImagePath = :path WHERE id = :id AND (profileImagePath IS NULL OR profileImagePath = '')")
+    suspend fun setProfileImageIfEmpty(id: String, path: String): Int
+
+    @Query("UPDATE people SET coverImagePath = :path WHERE id = :id AND (coverImagePath IS NULL OR coverImagePath = '')")
+    suspend fun setCoverImageIfEmpty(id: String, path: String): Int
 }

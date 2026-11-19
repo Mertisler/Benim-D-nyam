@@ -39,10 +39,15 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    // Faz 2I.3: medya arşiv işi sürerken ana ekranın geri tuşunu da kilitle.
+    val mediaBackupViewModel: JournalMediaBackupViewModel = hiltViewModel()
+    // Faz 2I.4: iki SAF yedeğinin dosya bazında salt-okunur doğrulanması.
+    val backupCoverageViewModel: BackupCoverageViewModel = hiltViewModel()
     val uiState = viewModel.uiState
     val isBusy = uiState.isLoading ||
             uiState.isBackupHealthLoading ||
-            uiState.isBackupSelfCheckLoading
+            uiState.isBackupSelfCheckLoading || mediaBackupViewModel.state.busy ||
+            backupCoverageViewModel.ui.busy
 
     var showClearDialog by remember {
         mutableStateOf(false)
@@ -349,6 +354,13 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            // Faz 2I.3: .bdbackup dosyasının kapsamadığı anı fotoğrafları için
+            // ayrı şifreli .bdmedia arşivi; mevcut yedek ekranı değişmez.
+            JournalMediaBackupSection(viewModel = mediaBackupViewModel)
+
+            // Faz 2I.4: doğrulanan gerçek yedek dosyalarının sağlık/kapasite özeti.
+            BackupCoverageSection(viewModel = backupCoverageViewModel)
 
             // ----------------------------------------
             // ARŞİV SAĞLIĞI

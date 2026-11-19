@@ -7,13 +7,11 @@ import androidx.room.Query
 import com.loc.benimdunyam.data.local.entity.JournalSyncEventEntity
 
 /**
- * Anı değişiklikleri için güvenli işlem kuyruğu.
+ * Ana Room içindeki atomik anı değişikliği kuyruğu.
  *
- * JournalRepositoryImpl bu DAO'yu journal_entries ile AYNI Room transaction'ında
- * kullanır. Bu yüzden uygulama işlem ortasında kapanırsa hem anı değişikliği
- * hem de kuyruk olayı birlikte geri alınır.
- *
- * DIAGNOSTIC işleri Faz 2F.1'deki ayrı SyncOutboxDatabase'de kalır.
+ * SYNCED güncellemesi yalnızca gönderilen sürüm hâlâ PENDING ise yapılır.
+ * Kullanıcı yükleme esnasında anıyı yeniden düzenlemişse yeni PENDING olayına
+ * dokunulmaz; böylece daha yeni bir değişiklik kaybolmaz.
  */
 @Dao
 interface JournalSyncEventDao {
@@ -23,17 +21,37 @@ interface JournalSyncEventDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun save(event: JournalSyncEventEntity)
 
+    /**
+     * İlk aktarım, mevcut değişiklik olaylarını ASLA değiştirmez.
+     * Başka coroutine bir olay eklediyse IGNORE ile geri çekilir.
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertBootstrapIfAbsent(event: JournalSyncEventEntity): Long
+
+    /** Aktif çalışma alanında farklı UID'ye ait kuyruk varsa işlemi durdur. */
+    @Query("SELECT COUNT(*) FROM journal_sync_events WHERE ownerUid != :uid")
+    suspend fun countOtherOwners(uid: String): Int
+
     @Query("SELECT COUNT(*) FROM journal_sync_events WHERE ownerUid = :uid AND state = 'PENDING' AND changeType = 'UPSERT'")
     suspend fun pendingUpserts(uid: String): Int
 
     @Query("SELECT COUNT(*) FROM journal_sync_events WHERE ownerUid = :uid AND state = 'PENDING' AND changeType = 'DELETE'")
     suspend fun pendingDeletes(uid: String): Int
 
-    /**
-     * İleride sunucu işlemleri devreye girdiğinde yalnızca doğru hesap
-     * ve doğru sürümün işlenmesi için kullanılabilecek salt-okunur görünüm.
-     * Faz 2F.2 bu kayıtları DONE/SYNCED durumuna ALMAZ.
-     */
     @Query("SELECT * FROM journal_sync_events WHERE ownerUid = :uid AND state = 'PENDING' ORDER BY updatedAtMillis, journalId LIMIT :limit")
     suspend fun pendingForAccount(uid: String, limit: Int): List<JournalSyncEventEntity>
+
+    /** Başarıdan sonra dahi başka bir sürümü yanlışlıkla tamamlanmış sayma. */
+    @Query("""
+        UPDATE journal_sync_events SET state = 'SYNCED'
+        WHERE journalId = :journalId AND ownerUid = :uid
+          AND changeVersion = :version AND changeType = :operation
+          AND state = 'PENDING'
+    """)
+    suspend fun markSyncedIfUnchanged(
+        journalId: String,
+        uid: String,
+        version: Long,
+        operation: String
+    ): Int
 }

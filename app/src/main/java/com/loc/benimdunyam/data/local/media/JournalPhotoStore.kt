@@ -37,7 +37,9 @@ data class JournalEditorPhotoSnapshot(
 
 private data class PhotoLayout(
     val order: List<String>,
-    val coverId: String?
+    val coverId: String?,
+    // Yalnızca buluttan yeni getirilen fotoğrafların varsayılan düzeni uzaktan tamamlanabilir.
+    val cloudDefault: Boolean = false
 )
 
 /**
@@ -48,7 +50,8 @@ private data class PhotoLayout(
 class JournalPhotoStore @Inject constructor(
     @ApplicationContext private val context: Context,
     private val writeCoordinator: BackupWriteCoordinator,
-    private val session: ActiveWorkspaceSession
+    private val session: ActiveWorkspaceSession,
+    private val deletionLedger: PublishedPhotoDeletionLedger
 ) {
     companion object {
         const val MAX_PHOTOS_PER_JOURNAL = 12
@@ -102,7 +105,7 @@ class JournalPhotoStore @Inject constructor(
         val order = (0 until array.length()).map { array.getString(it) }
             .filter { VALID_FILE.matches(it) }.distinct()
         val coverId = json.optString("coverId").takeIf { VALID_FILE.matches(it) }
-        return PhotoLayout(order, coverId)
+        return PhotoLayout(order, coverId, cloudDefault = json.optBoolean("cloudDefault", false))
     }
 
     /** AtomicFile keeps the previous metadata if a write is interrupted. */
@@ -112,6 +115,7 @@ class JournalPhotoStore @Inject constructor(
             put("version", 1)
             put("order", JSONArray().apply { layout.order.forEach { put(it) } })
             put("coverId", layout.coverId ?: JSONObject.NULL)
+            put("cloudDefault", layout.cloudDefault)
         }.toString()
         val atomic = AtomicFile(File(dir, LAYOUT_FILE))
         var stream: FileOutputStream? = null
@@ -220,6 +224,66 @@ class JournalPhotoStore @Inject constructor(
         }
     }
 
+    /**
+     * Faz 2G.2: Şifreli bulut fotoğraf düzenini ancak fotoğrafların tamamı inmiş,
+     * dosya adları birebir eşleşmiş ve kullanıcı bu cihazda düzeni değiştirmemişse uygular.
+     * Eski (cloudDefault işareti olmayan) kullanıcı düzenlerine ASLA dokunulmaz.
+     */
+    suspend fun applyCloudLayoutIfUnmodified(
+        journalId: String,
+        expectedIds: List<String>,
+        requestedOrder: List<String>,
+        coverId: String?
+    ): Boolean = writeCoordinator.withRegularWrite {
+        withContext(Dispatchers.IO) {
+            require(expectedIds.size in 1..MAX_PHOTOS_PER_JOURNAL &&
+                    expectedIds.size == expectedIds.distinct().size &&
+                    expectedIds.all { VALID_FILE.matches(it) }) { "Bulut fotoğraf kimlikleri geçersiz." }
+            require(requestedOrder.size == expectedIds.size &&
+                    requestedOrder.toSet() == expectedIds.toSet() &&
+                    (coverId == null || coverId in expectedIds)) { "Bulut fotoğraf sırası geçersiz." }
+            val dir = publishedDir(journalId)
+            val layout = readLayout(dir)
+            val files = validFiles(dir).map { it.name }
+            if (layout?.cloudDefault != true || files.toSet() != expectedIds.toSet() ||
+                files.size != expectedIds.size) return@withContext false
+            writeLayout(dir, PhotoLayout(requestedOrder, coverId, cloudDefault = false))
+            true
+        }
+    }
+
+    /**
+     * Faz 2G.3: Kullanıcı uzaktaki sıralamayı açıkça seçtiğinde bile yerel
+     * fotoğraf kimlikleri, sıra ve kapak önizlemeden beri değişmediyse uygula.
+     * Bu işlem fotoğraf DOSYALARINI hiçbir zaman değiştirmez.
+     */
+    suspend fun applyApprovedCloudLayoutIfUnmodified(
+        journalId: String,
+        expectedLocalOrder: List<String>,
+        expectedLocalCover: String?,
+        requestedOrder: List<String>,
+        requestedCover: String?
+    ): Boolean = writeCoordinator.withRegularWrite {
+        withContext(Dispatchers.IO) {
+            require(requestedOrder.size in 1..MAX_PHOTOS_PER_JOURNAL &&
+                    requestedOrder.all(VALID_FILE::matches) &&
+                    requestedOrder.distinct().size == requestedOrder.size &&
+                    requestedOrder.toSet() == expectedLocalOrder.toSet() &&
+                    (requestedCover == null || requestedCover in requestedOrder)) {
+                "Bulut fotoğraf dizilimi geçersiz."
+            }
+            val current = publishedPhotosInternal(journalId)
+            val currentOrder = current.map { it.id }
+            val currentCover = current.firstOrNull { it.isCover }?.id
+            if (currentOrder != expectedLocalOrder || currentCover != expectedLocalCover) {
+                // Kullanıcı fotoğrafları değiştirmiş: yeni önizleme zorunlu.
+                return@withContext false
+            }
+            writeLayout(publishedDir(journalId), PhotoLayout(requestedOrder, requestedCover))
+            true
+        }
+    }
+
     suspend fun setPublishedCover(journalId: String, photoId: String) {
         writeCoordinator.withRegularWrite {
             withContext(Dispatchers.IO) {
@@ -321,7 +385,12 @@ class JournalPhotoStore @Inject constructor(
             withContext(Dispatchers.IO) {
                 val dir = publishedDir(journalId)
                 val target = File(dir, photoId)
-                if (target.exists() && !target.delete()) throw IOException("Fotoğraf silinemedi.")
+                // Faz 2G.3: Silme işareti önce yazılır. Uygulama fotoğraf
+                // silindikten hemen sonra kapansa bile buluttan geri gelmez.
+                if (target.isFile) {
+                    deletionLedger.record(journalId, photoId)
+                    if (!target.delete()) throw IOException("Fotoğraf silinemedi; silme kaydı korundu.")
+                }
                 val rest = publishedPhotosInternal(journalId)
                 if (rest.isNotEmpty()) {
                     writeLayout(dir, PhotoLayout(rest.map { it.id }, rest.firstOrNull { it.isCover }?.id))
@@ -423,6 +492,8 @@ class JournalPhotoStore @Inject constructor(
         writeCoordinator.withRegularWrite {
             withContext(Dispatchers.IO) {
                 val dir = publishedDir(journalId)
+                // Günlük bütünüyle silinse bile fotoğraf işaretleri korunur.
+                validFiles(dir).forEach { deletionLedger.record(journalId, it.name) }
                 if (dir.exists() && !dir.deleteRecursively()) throw IOException("Günlük fotoğrafları temizlenemedi.")
             }
         }
@@ -437,4 +508,54 @@ class JournalPhotoStore @Inject constructor(
             }
         }
     }
+
+    /**
+     * Faz 2G.1: Bulut görselini yalnızca YOKSA geri yükler.
+     * Geçici çözülmüş dosya güvenli/özel klasöre kopyalanır, görsel tekrar doğrulanır.
+     * Var olan anı fotoğrafı ve kapak seçimi değiştirilmez.
+     */
+    suspend fun restoreMissingFromCloud(journalId: String, photoId: String, source: File): Boolean =
+        writeCoordinator.withRegularWrite {
+            withContext(Dispatchers.IO) {
+                require(VALID_FILE.matches(photoId)) { "Bulut fotoğraf kimliği güvenli değil." }
+                require(source.isFile && source.length() in 1..MAX_FILE_SIZE_BYTES)
+                // Aynı yazma kilidi altında yerel silme defterini tekrar kontrol et.
+                // Böylece indirme ile kullanıcının silme eylemi yarışmaz.
+                if (deletionLedger.contains(journalId, photoId)) return@withContext false
+                val dir = publishedDir(journalId)
+                val before = publishedPhotosInternal(journalId)
+                if (before.any { it.id == photoId }) return@withContext false
+                require(before.size < MAX_PHOTOS_PER_JOURNAL) { "Anı fotoğraf sınırı dolmuş." }
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(source.absolutePath, bounds)
+                val pixels = bounds.outWidth.toLong() * bounds.outHeight.toLong()
+                require(pixels in 1..MAX_PIXEL_COUNT) { "Bulut resmi geçerli değil." }
+                if (!dir.isDirectory && !dir.mkdirs()) throw IOException("Anı fotoğraf klasörü açılamadı.")
+                val target = File(dir, photoId)
+                if (target.exists()) return@withContext false
+                val temp = File(dir, "$photoId.cloudpart")
+                try {
+                    source.inputStream().use { input ->
+                        temp.outputStream().use { output -> input.copyTo(output, 32 * 1024) }
+                    }
+                    // Kaynak hiç silinmez; yalnızca yeni fotoğraf kimliği yazılır.
+                    if (!temp.renameTo(target)) throw IOException("Bulut resmi kaydedilemedi.")
+                    try {
+                        val all = before.map { it.id } + photoId
+                        val previous = readLayout(dir)
+                        writeLayout(dir, PhotoLayout(
+                            order = all,
+                            coverId = before.firstOrNull { it.isCover }?.id ?: photoId,
+                            // Önceden kullanıcı düzeni varsa asla bulut düzeniyle ezilmez.
+                            cloudDefault = before.isEmpty() || previous?.cloudDefault == true
+                        ))
+                    } catch (e: Exception) {
+                        // Fotoğraf korunur; metadata başarısızsa sonraki listeleme yine dosyayı bulur.
+                        throw e
+                    }
+                    true
+                } finally { temp.delete() }
+            }
+        }
+
 }

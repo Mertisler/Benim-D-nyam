@@ -24,7 +24,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  *
  * Faz 2F.2 ile anı değişikliklerinin SAYISINI da gösterir.
  * Günlükleri eşitlemez; yalnızca kullanıcı onayıyla tanılama işi oluşturur.
- * UPSERT / DELETE işlemleri yerelde kaydedilir, Firestore'a GÖNDERİLMEZ.
+ * UPSERT / DELETE işlemleri yerelde kaydedilir; Faz 2F.3 ile ancak
+ * kullanıcı açıkça onayladığında ŞİFRELİ olay olarak gönderilebilir.
  */
 @Composable
 internal fun SyncFoundationSection(
@@ -40,10 +41,11 @@ internal fun SyncFoundationSection(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Senkronizasyon altyapısı · Faz 2F.2", style = MaterialTheme.typography.titleMedium)
+            Text("Eşitleme tanılama", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Anı oluşturma, düzenleme ve silme olayları ana Room içinde kalıcı olarak izlenir. " +
-                        "Buluta otomatik yükleme/indirme henüz kapalıdır.",
+                        "Otomatik yükleme/indirme henüz kapalıdır. " +
+                        "Anılarımı Eşitle > Anılarımı Gönder sayfasından onay vererek şifreli anı gönderebilirsin.",
                 style = MaterialTheme.typography.bodySmall
             )
             Text(

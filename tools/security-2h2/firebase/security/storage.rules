@@ -1,0 +1,31 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Faz 2H.1: yalnızca 2G.1'in AES-GCM şifreli medya yolu.
+    // Canlı kural setine EKLERKEN eski geniş izinleri mutlaka kaldırın.
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    match /users/{uid}/encrypted_media_v1/{fileName} {
+      // Faz 2G.4 raporlama sayfalı list() API'sini kullanır.
+      allow list: if owner(uid);
+      allow get: if owner(uid)
+        && fileName.matches('^[0-9a-f]{64}\\.bin$');
+      // Şifreli dosya 25 MiB görüntü sınırı + 32 KiB başlık payı.
+      // Sadece ilk yazma; şifresiz image/* MIME kabul edilmez.
+
+allow create: if owner(uid)
+  && resource == null
+  && fileName.matches('^[0-9a-f]{64}\\.bin$')
+  && request.resource.contentType == 'application/octet-stream'
+  && request.resource.size >= 49
+  && request.resource.size <= 26247168;
+
+allow update, delete: if false;
+
+    }
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

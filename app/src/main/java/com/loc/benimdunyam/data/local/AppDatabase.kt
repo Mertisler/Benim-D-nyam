@@ -5,6 +5,8 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.loc.benimdunyam.data.local.dao.JournalSyncEventDao
+import com.loc.benimdunyam.data.local.dao.PendingMoodMergeDao
+import com.loc.benimdunyam.data.local.entity.PendingMoodMergeEntity
 import com.loc.benimdunyam.data.local.entity.JournalSyncEventEntity
 import com.loc.benimdunyam.data.local.dao.JournalDao
 import com.loc.benimdunyam.data.local.dao.JournalPersonMentionDao
@@ -27,18 +29,20 @@ import com.loc.benimdunyam.data.local.dao.BackupRestoreDao
     entities = [
         JournalEntryEntity::class,
         JournalSyncEventEntity::class,
+        PendingMoodMergeEntity::class,
         PersonEntity::class,
         JournalPersonMentionEntity::class,
         LifeSeasonEntity::class,
         LifeEpisodeEntity::class,
         PersonSpecialMemoryEntity::class
     ],
-    version = 8,
-    exportSchema = false
+    version = 9,
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun journalSyncEventDao(): JournalSyncEventDao
+    abstract fun pendingMoodMergeDao(): PendingMoodMergeDao
     abstract fun journalDao(): JournalDao
     abstract fun personDao(): PersonDao
     abstract fun journalPersonMentionDao(): JournalPersonMentionDao
@@ -125,6 +129,30 @@ abstract class AppDatabase : RoomDatabase() {
                         `index_journal_sync_events_ownerUid_state`
                         ON `journal_sync_events` (`ownerUid`, `state`)
                     """.trimIndent()
+                )
+            }
+        }
+
+        /**
+         * 8 -> 9: Sadece yeni, boş kurtarma işareti tablosu oluşturulur.
+         * Günlük, ilişki, ruh hali ve fotoğraf içeriklerine dokunulmaz.
+         */
+        val MIGRATION_8_9: Migration = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `pending_mood_merges` (
+                        `journalId` TEXT NOT NULL,
+                        `ownerUid` TEXT NOT NULL,
+                        `moodName` TEXT NOT NULL,
+                        `moodUpdatedAt` INTEGER NOT NULL,
+                        `remoteRevision` INTEGER NOT NULL,
+                        `remoteChangedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`journalId`)
+                    )""".trimIndent()
+                )
+                database.execSQL(
+                    """CREATE INDEX IF NOT EXISTS `index_pending_mood_merges_ownerUid`
+                        ON `pending_mood_merges` (`ownerUid`)""".trimIndent()
                 )
             }
         }

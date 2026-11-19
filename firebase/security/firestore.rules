@@ -1,0 +1,165 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Faz 2H.1: bu dosya yerel kaynak koda göre hazırlanan TAM KURAL ADAYIDIR.
+    // CANLI kuralları görmeden doğrudan dağıtmayın. Geniş bir eski allow
+    // aynı kayda uygulanırsa bu dar kurallar onu GEÇERSİZ KILAMAZ (OR).
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function hex64(value) {
+      return value is string && value.matches('^[0-9a-f]{64}$');
+    }
+    function textBetween(value, minLength, maxLength) {
+      return value is string && value.size() >= minLength && value.size() <= maxLength;
+    }
+    function integerBetween(value, minValue, maxValue) {
+      return value is int && value >= minValue && value <= maxValue;
+    }
+    function serverTime(field) {
+      return field is timestamp && field == request.time;
+    }
+
+    // Yalnızca bağlantı sağlık kontrolü: belgenin olmaması hata değildir.
+    match /users/{uid}/_meta/connection {
+      allow get: if owner(uid);
+      allow list, create, update, delete: if false;
+    }
+
+    // Eski hesapların içerikleri yalnızca sahibine okunabilir, arşiv değişmezdir.
+    match /users/{uid}/cloud_archives/{archiveId} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid)
+        && request.resource.data.keys().hasOnly([
+          'formatVersion','createdAt','partCount','encryptedBytes','sha256',
+          'journalCount','peopleCount','seasonCount','episodeCount',
+          'mentionCount','specialMemoryCount','moodCount'])
+        && request.resource.data.formatVersion == 1
+        && serverTime(request.resource.data.createdAt)
+        && integerBetween(request.resource.data.partCount, 1, 120)
+        && integerBetween(request.resource.data.encryptedBytes, 1, 10000000)
+        && hex64(request.resource.data.sha256)
+        && integerBetween(request.resource.data.journalCount, 0, 1000000)
+        && integerBetween(request.resource.data.peopleCount, 0, 1000000)
+        && integerBetween(request.resource.data.seasonCount, 0, 1000000)
+        && integerBetween(request.resource.data.episodeCount, 0, 1000000)
+        && integerBetween(request.resource.data.mentionCount, 0, 2000000)
+        && integerBetween(request.resource.data.specialMemoryCount, 0, 1000000)
+        && integerBetween(request.resource.data.moodCount, 0, 1000000);
+      allow update, delete: if false;
+      match /parts/{partId} {
+        allow get, list: if owner(uid);
+        // Parçalar manifestten ÖNCE oluşturulur; parent varlığı istenemez.
+        allow create: if owner(uid)
+          && partId.matches('^part_[0-9]{4}$')
+          && request.resource.data.keys().hasOnly(['formatVersion','index','data'])
+          && request.resource.data.formatVersion == 1
+          && integerBetween(request.resource.data.index, 0, 119)
+          && textBetween(request.resource.data.data, 1, 100000);
+        allow update, delete: if false;
+      }
+    }
+
+    match /users/{uid}/journal_change_events/{eventId} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid)
+        && request.resource.data.keys().hasOnly([
+          'formatVersion','ownerUid','journalHash','operation',
+          'revision','encryptedPayload','uploadedAt'])
+        && request.resource.data.ownerUid == uid
+        && request.resource.data.formatVersion == 1
+        && hex64(request.resource.data.journalHash)
+        && request.resource.data.operation in ['UPSERT','DELETE']
+        && integerBetween(request.resource.data.revision, 1, 9007199254740991)
+        && textBetween(request.resource.data.encryptedPayload, 1, 600000)
+        && serverTime(request.resource.data.uploadedAt);
+      allow update, delete: if false;
+    }
+
+    match /users/{uid}/sync_dependency_snapshots/{snapshotId} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid)
+        && request.resource.data.keys().hasOnly([
+          'formatVersion','ownerUid','createdAt','capturedAtMillis',
+          'partCount','encodedLength','sha256'])
+        && request.resource.data.formatVersion == 1
+        && request.resource.data.ownerUid == uid
+        && serverTime(request.resource.data.createdAt)
+        && integerBetween(request.resource.data.capturedAtMillis, 1, 9007199254740991)
+        && integerBetween(request.resource.data.partCount, 1, 80)
+        && integerBetween(request.resource.data.encodedLength, 1, 8000000)
+        && hex64(request.resource.data.sha256);
+      allow update, delete: if false;
+      match /parts/{partId} {
+        allow get, list: if owner(uid);
+        allow create: if owner(uid)
+          && partId.matches('^part_[0-9]{4}$')
+          && request.resource.data.keys().hasOnly(['formatVersion','index','data'])
+          && request.resource.data.formatVersion == 1
+          && integerBetween(request.resource.data.index, 0, 79)
+          && textBetween(request.resource.data.data, 1, 100000);
+        allow update, delete: if false;
+      }
+    }
+
+    match /users/{uid}/encrypted_media_entries/{mediaId} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid) && hex64(mediaId)
+        && request.resource.data.keys().hasOnly([
+          'formatVersion','ownerUid','storagePath','kind',
+          'ownerHash','fileNameHash','createdAt'])
+        && request.resource.data.ownerUid == uid
+        && request.resource.data.formatVersion == 1
+        && request.resource.data.storagePath ==
+          ('users/' + uid + '/encrypted_media_v1/' + mediaId + '.bin')
+        && request.resource.data.kind in [
+          'JOURNAL_PHOTO','SEASON_COVER','PERSON_PROFILE','PERSON_COVER']
+        && hex64(request.resource.data.ownerHash)
+        && hex64(request.resource.data.fileNameHash)
+        && serverTime(request.resource.data.createdAt);
+      // Başarılı 2G.4C silmesinden sonra yalnızca Admin SDK manifest kaldırır.
+      allow update, delete: if false;
+    }
+
+    match /users/{uid}/encrypted_photo_layouts/{layoutId} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid) && hex64(layoutId)
+        && request.resource.data.keys().hasOnly([
+          'formatVersion','ownerUid','ownerHash','encryptedPayload','createdAt'])
+        && request.resource.data.formatVersion == 2
+        && request.resource.data.ownerUid == uid
+        && hex64(request.resource.data.ownerHash)
+        && textBetween(request.resource.data.encryptedPayload, 1, 500000)
+        && serverTime(request.resource.data.createdAt);
+      allow update, delete: if false;
+    }
+
+    match /users/{uid}/encrypted_media_deletions/{markerId} {
+      allow get, list: if owner(uid);
+      allow create: if owner(uid) && hex64(markerId)
+        && request.resource.data.keys().hasOnly([
+          'formatVersion','ownerUid','ownerHash','fileNameHash',
+          'encryptedPayload','createdAt'])
+        && request.resource.data.formatVersion == 3
+        && request.resource.data.ownerUid == uid
+        && hex64(request.resource.data.ownerHash)
+        && hex64(request.resource.data.fileNameHash)
+        && textBetween(request.resource.data.encryptedPayload, 51, 500000)
+        && serverTime(request.resource.data.createdAt);
+      // Marker asla değiştirilmemeli: sunucu bekleme süresi buna dayanır.
+      allow update, delete: if false;
+    }
+
+    match /users/{uid}/_server_media_cleanup_permits_v2/{permitId} {
+      allow read, write: if false;
+    }
+    match /users/{uid}/_server_media_cleanup_audit/{auditId} {
+      allow read, write: if false;
+    }
+
+    // Kaynak kodda kanıtlanmamış tüm yollar yetkisizdir.
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

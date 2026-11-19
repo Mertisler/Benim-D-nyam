@@ -1,0 +1,5 @@
+# Yerel raporları ve gelecekteki kanıt dosyalarını Git'e göndermeyin.
+reports/
+*.token
+*credentials*.json
+*policy*.json

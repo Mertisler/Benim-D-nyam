@@ -11,6 +11,9 @@ hiltNavigationCompose = "1.2.0"
 
 coreKtx = "1.13.1"
 junit = "4.13.2"
+mockk = "1.13.12"
+robolectric = "4.14.1"
+androidxTestCore = "1.6.1"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 lifecycleRuntimeKtx = "2.8.6"
@@ -60,8 +63,18 @@ androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navig
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+
+# Firebase Storage: sürümü mevcut Firebase BoM belirler.
+firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
+# Faz 2G.4C — Callable Cloud Functions ve App Check; sürümler mevcut Firebase BoM'dan gelir.
+firebase-functions = { group = "com.google.firebase", name = "firebase-functions" }
+firebase-appcheck-playintegrity = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity" }
+firebase-appcheck-debug = { group = "com.google.firebase", name = "firebase-appcheck-debug" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -35,6 +35,13 @@ interface JournalMoodDao {
     @Query("SELECT moodName FROM journal_mood_records WHERE journalId = :journalId LIMIT 1")
     suspend fun getName(journalId: String): String?
 
+    /** Buluttan içe aktarılan ruh hali var olan kullanıcı tercihini EZEMEZ. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfAbsent(record: JournalMoodRecord): Long
+
+    @Query("SELECT * FROM journal_mood_records WHERE journalId = :journalId LIMIT 1")
+    suspend fun getRecord(journalId: String): JournalMoodRecord?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun save(record: JournalMoodRecord)
 

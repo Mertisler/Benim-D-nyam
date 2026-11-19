@@ -20,4 +20,8 @@ interface LifeSeasonDao {
 
     @Delete
     suspend fun deleteSeason(season: LifeSeasonEntity)
+
+    // Faz 2G.1: Eski dönem kapağı varsa üzerine yazmak YASAKTIR.
+    @Query("UPDATE life_seasons SET coverImagePath = :path WHERE id = :id AND (coverImagePath IS NULL OR coverImagePath = '')")
+    suspend fun setCoverImageIfEmpty(id: String, path: String): Int
 }

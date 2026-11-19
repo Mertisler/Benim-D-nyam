@@ -1,7 +1,6 @@
 package com.loc.benimdunyam.feature.settings.cloudaccount
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,17 +14,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.key
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -35,7 +32,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,18 +43,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import java.text.DateFormat
-import java.util.Date
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -66,8 +59,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.loc.benimdunyam.domain.model.CloudConnectionStatus
-import com.loc.benimdunyam.data.local.isolation.WorkspaceMode
 import dagger.hilt.android.EntryPointAccessors
 import com.loc.benimdunyam.data.local.isolation.WorkspaceMediaEntryPoint
 import androidx.compose.ui.platform.LocalContext
@@ -80,6 +71,23 @@ fun CloudAccountScreen(
     viewModel: CloudAccountViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // V2: Alt ekranlar aynı NavGraph hedefindedir; eski ekran rotaları değişmez.
+    var selectedPageName by rememberSaveable { mutableStateOf(CloudHubPage.HOME.name) }
+    val selectedPage = CloudHubPage.fromName(selectedPageName)
+    val pageScroll = rememberScrollState()
+    // Alt ekrana girince önceki ekranın aşağı kaydırılmış konumu taşınmaz.
+    LaunchedEffect(selectedPage, state.account?.uid) {
+        pageScroll.scrollTo(0)
+    }
+    fun goBackInsideHub() {
+        if (state.account != null && selectedPage != CloudHubPage.HOME) {
+            selectedPageName = selectedPage.parent().name
+        } else onNavigateBack()
+    }
+    // Android sistem geri hareketi de ekranın sol üstündeki geri oku gibi çalışır.
+    BackHandler(enabled = state.account != null && selectedPage != CloudHubPage.HOME) {
+        selectedPageName = selectedPage.parent().name
+    }
     // Yeni boş hesapta eski arşivin taşıma hazırlığı seçeneklerini gizle.
     val appContext = LocalContext.current.applicationContext
     val activeStorage = remember(appContext) {
@@ -104,6 +112,12 @@ fun CloudAccountScreen(
         if (state.account != null) {
             password = ""
             passwordConfirmation = ""
+        } else {
+            // Hesaptan çıkıldığında başka hesaba ait alt sayfa seçimi kalmasın.
+            selectedPageName = CloudHubPage.HOME.name
+            archiveDialog = null
+            archivePassphrase = ""
+            archiveRepeat = ""
         }
     }
 
@@ -111,9 +125,9 @@ fun CloudAccountScreen(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
-                title = { Text("Bulut Hesabım") },
+                title = { Text(if (state.account == null) "Bulut Hesabım" else selectedPage.title) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = ::goBackInsideHub) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
                     }
                 },
@@ -123,26 +137,30 @@ fun CloudAccountScreen(
     ) { paddingValues ->
         Column(
             modifier = Modifier.fillMaxSize().padding(paddingValues)
-                .verticalScroll(rememberScrollState()).padding(16.dp),
+                .verticalScroll(pageScroll).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text("İsteğe bağlı bulut hesabı", style = MaterialTheme.typography.titleLarge)
+            if (state.account == null) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text("İsteğe bağlı bulut hesabı", style = MaterialTheme.typography.titleLarge)
+                        }
+                        Text(
+                            "Günlüklerin ve fotoğrafların cihazındaki yerel depoda saklanır. " +
+                                    "İsteğinle şifreli metin arşivi oluşturabilir, yeni/boş cihaza geri yükleyebilirsin. " +
+                                    "Metin anıları için otomatik eşitleme ayrıca onaylanabilir; " +
+                                    "Spark ücretsiz modunda bulut medya aktarımı kapalıdır.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
-                    Text(
-                        "Günlüklerin ve fotoğrafların cihazındaki yerel depoda saklanır. " +
-                                "İsteğinle şifreli metin arşivi oluşturabilir, yeni/boş cihaza geri yükleyebilirsin. " +
-                                "Otomatik senkronizasyon henüz etkin değil.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
                 }
+
             }
 
             if (state.isCheckingSession) {
@@ -245,143 +263,18 @@ fun CloudAccountScreen(
                     }
                 }
             } else {
-                val account = state.account!!
-                Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Text("Firebase oturumu açık", style = MaterialTheme.typography.titleLarge)
-                        }
-                        Text("E-posta: ${account.email ?: "Belirtilmemiş"}")
-                        Text(
-                            if (account.isEmailVerified) "E-posta doğrulandı" else "E-posta henüz doğrulanmadı",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        // Faz 2F.1: kullanıcı başlatırsa tanılama kuyruğunu ve WorkManager'ı kontrol eder.
-                        // Hiçbir günlük içeriği bu bileşen üzerinden Firestore'a gönderilmez.
-                        SyncFoundationSection(uid = account.uid)
-
-                        // Faz 2E: Hesap profili, e-posta doğrulaması ve yerel veri güvenliği.
-                        // Eski bulut arşivi ve geri yükleme bileşenleri aynen korunur.
-                        CloudProfileSection(
-                            state = state,
-                            onSendVerificationEmail = viewModel::sendVerificationEmail,
-                            onRefreshProfile = viewModel::refreshProfile,
-                            onUpdateDisplayName = viewModel::updateDisplayName,
-                            onDismissProfileMessage = viewModel::dismissProfileMessage
-                        )
-                        // Faz 2E.2: Hesap bazlı ayırımdan önce dört Room dosyasının ve
-                        // cihaz içi fotoğraf klasörlerinin salt-okunur kapsam kontrolü.
-                        // Burada herhangi bir veritabanını taşımıyoruz veya silmiyoruz.
-                        LocalStoragePreflightSection()
-                        // Eski arşivin taşıma hazırlığı yeni boş hesapta gösterilmez.
-                        if (activeStorage == WorkspaceMode.LEGACY) {
-                            AccountMigrationSection()
-                        }
-                        // Faz 2E.6: tam içerik ve fotoğraf karşılaştırması yapılmadan
-                        // hazırlanan Room kopyası aktif edilemez. Yeni boş hesaplarda görünmez.
-                        AccountPromotionSection()
-                        HorizontalDivider()
-                        Text("Firestore erişim testi", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Sadece kendi hesabına ait /users/{uid}/_meta/connection yolunu sunucudan okumayı dener. " +
-                                    "Test belgesinin önceden oluşturulması gerekmez; hiçbir veri yazılmaz.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Button(
-                            onClick = viewModel::checkConnection,
-                            enabled = !state.isCheckingConnection && !state.isSubmitting,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            if (state.isCheckingConnection) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(Icons.Default.Refresh, contentDescription = null)
-                            }
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (state.isCheckingConnection) "Bağlantı kontrol ediliyor..." else "Bağlantıyı kontrol et")
-                        }
-                        state.connectionStatus?.let { ConnectionResult(it) }
-                        HorizontalDivider()
-                        Text("Şifreli Bulut Arşivi · Deneme", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "Bu, henüz otomatik veya çift yönlü senkronizasyon DEĞİL. " +
-                                    "Onay verirsen günlük metinlerinin, kişi/dönem/bölüm bilgilerinin, " +
-                                    "anı ilişkilerinin ve ruh hallerinin şifreli kopyası hesabına yüklenir. " +
-                                    "Fotoğraflar ve kapak görselleri aktarılmaz. Geri yükleme yalnızca boş cihaza, ayrı onayla yapılır.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "Ayrı bir arşiv şifresi belirlemelisin. Bu şifre sunucuya gönderilmez " +
-                                    "ve uygulama tarafından saklanmaz. Unutursan bu kopyayı açamazsın.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (state.isArchiveBusy) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                Text(state.archiveAction ?: "Bulut arşivi işleniyor...")
-                            }
-                        }
-                        Button(
-                            onClick = { archiveDialog = "upload" },
-                            enabled = !state.isArchiveBusy && !state.isSubmitting && !state.isCheckingConnection &&
-                                    !state.isProfileBusy &&
-                                    state.localArchiveOwnerState != com.loc.benimdunyam.domain.model.CloudLocalArchiveOwnerState.OTHER_ACCOUNT,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Şifreli kopya oluştur") }
-                        OutlinedButton(
-                            onClick = viewModel::loadLatestArchive,
-                            enabled = !state.isArchiveBusy && !state.isSubmitting,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Buluttaki son kopyayı göster") }
-                        state.latestArchive?.let { last ->
-                            val formatted = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-                                .format(Date(last.createdAtMillis))
-                            Text("Son kopya: $formatted", style = MaterialTheme.typography.labelLarge)
-                            Text(
-                                "${last.journalCount} anı · ${last.peopleCount} kişi · " +
-                                        "${last.seasonCount} dönem · ${last.episodeCount} bölüm · " +
-                                        "${last.moodCount} ruh hali",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            OutlinedButton(
-                                onClick = { archiveDialog = "verify" },
-                                enabled = !state.isArchiveBusy,
-                                modifier = Modifier.fillMaxWidth()
-                            ) { Text("Şifre ve bütünlük kontrolü yap") }
-                        }
-                        CloudRestoreSection(
-                            state = state,
-                            onPreview = viewModel::previewCloudRestore,
-                            onImport = viewModel::importPreviewedCloudRestore,
-                            onClearPreview = viewModel::clearRestorePreview
-                        )
-                        // Faz 2C: geri yükleme yapmadan farkları ve eksik medya kapsamını gösterir.
-                        CloudSyncAuditSection(
-                            state = state,
-                            onInspect = viewModel::inspectCloudReadiness,
-                            onCompare = viewModel::compareCloudArchive
-                        )
-                        state.archiveError?.let {
-                            StatusMessage(it, isError = true, onDismiss = viewModel::dismissArchiveMessage)
-                        }
-                        state.archiveMessage?.let {
-                            StatusMessage(it, isError = false, onDismiss = viewModel::dismissArchiveMessage)
-                        }
-                        HorizontalDivider()
-                        OutlinedButton(
-                            onClick = { showSignOutConfirmation = true },
-                            enabled = !state.isArchiveBusy && !state.isSubmitting,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.Logout, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Bulut hesabından çıkış yap")
-                        }
-                    }
+                // V2: Var olan tüm senkronizasyon ve güvenlik bileşenleri alt ekranlarda.
+                // Aynı CloudAccountViewModel kullanılır; onay akışlarına müdahale etmiyoruz.
+                key(selectedPage) {
+                    CloudAccountV2Content(
+                        page = selectedPage,
+                        state = state,
+                        viewModel = viewModel,
+                        activeStorage = activeStorage,
+                        navigate = { selectedPageName = it.name },
+                        openArchiveDialog = { archiveDialog = it },
+                        requestSignOut = { showSignOutConfirmation = true }
+                    )
                 }
             }
 
@@ -392,27 +285,7 @@ fun CloudAccountScreen(
                 StatusMessage(message = message, isError = false, onDismiss = viewModel::dismissMessage)
             }
 
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f)),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(Icons.Default.Info, contentDescription = null)
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Veriler hakkında", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "Otomatik Room–Firestore eşitlemesi henüz aktif değil. " +
-                                    "Yalnızca açık onayla şifreli metin arşivi kopyası oluşturulabilir; " +
-                                    "fotoğraflar aktarılmaz. Doğrulanmış arşivler yalnızca boş cihaza " +
-                                    "ayrı onayla içe aktarılabilir. " +
-                                    "Yerel arşiv bir bulut hesabına bağlıysa çıkış yaptığında anı ekranları kilitlenir; " +
-                                    "aynı hesapla yeniden giriş yapınca erişebilirsin. " +
-                                    "Bu koruma henüz Room dosyalarını hesap başına ayırmaz.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            }
+            // Teknik açıklamalar kullanıcı ana ekranından Gelişmiş İşlemler bölümüne taşındı.
             Spacer(Modifier.height(12.dp))
         }
     }
@@ -501,31 +374,6 @@ fun CloudAccountScreen(
                 }) { Text("Çıkış yap") }
             },
             dismissButton = { TextButton(onClick = { showSignOutConfirmation = false }) { Text("İptal") } }
-        )
-    }
-}
-
-@Composable
-private fun ConnectionResult(status: CloudConnectionStatus) {
-    val success = status == CloudConnectionStatus.Reachable
-    val message = when (status) {
-        CloudConnectionStatus.Reachable -> "Firestore sunucusuna güvenli erişim başarılı. Test belgesi bulunmak zorunda değil."
-        CloudConnectionStatus.SignInRequired -> "Bağlantıyı kontrol etmek için giriş yapmalısın."
-        CloudConnectionStatus.PermissionDenied -> "İzin reddedildi. Firebase Console'da Firestore güvenlik kurallarını kontrol et."
-        CloudConnectionStatus.NetworkUnavailable -> "Sunucuya ulaşılamadı. İnternetini kontrol edip yeniden dene."
-        CloudConnectionStatus.UnknownError -> "Bağlantı doğrulanamadı. Firebase projesini ve Firestore ayarlarını kontrol et."
-    }
-    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(
-            if (success) Icons.Default.CheckCircle else Icons.Default.CloudOff,
-            contentDescription = null,
-            tint = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-        )
-        Text(
-            message,
-            color = if (success) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.weight(1f)
         )
     }
 }

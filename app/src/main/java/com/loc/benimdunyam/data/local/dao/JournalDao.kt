@@ -14,6 +14,28 @@ interface JournalDao {
     @Query("SELECT * FROM journal_entries")
     suspend fun getAllJournalEntities(): List<JournalEntryEntity>
 
+    /** Faz 2F.9: İlk aktarım önizlemesi. Anı metinlerini buluta göndermez. */
+    @Query("SELECT COUNT(*) FROM journal_entries")
+    suspend fun countAllForBootstrap(): Int
+
+    /** Daha önce PENDING veya SYNCED olayı olan anılar tekrar sıraya alınmaz. */
+    @Query("""
+        SELECT COUNT(*) FROM journal_entries j
+        LEFT JOIN journal_sync_events e ON e.journalId = j.id
+        WHERE e.journalId IS NULL
+    """)
+    suspend fun countUntrackedForBootstrap(): Int
+
+    /** Yalnızca en eski beş izlenmeyen anı. Bütün içerik ekrana taşınmaz. */
+    @Query("""
+        SELECT j.* FROM journal_entries j
+        LEFT JOIN journal_sync_events e ON e.journalId = j.id
+        WHERE e.journalId IS NULL
+        ORDER BY j.createdAt ASC, j.id ASC
+        LIMIT :limit
+    """)
+    suspend fun getBootstrapCandidates(limit: Int): List<JournalEntryEntity>
+
     @Query("SELECT * FROM journal_entries ORDER BY entryDate DESC")
     fun observeAllJournals(): Flow<List<JournalEntryEntity>>
 

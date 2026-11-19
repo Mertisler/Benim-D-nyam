@@ -13,3 +13,10 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Kotlin derleyici hata günlükleri
+.kotlin/
+
+# Node bağımlılıkları ve yerel günlükler (firebase emülatörü vb.)
+node_modules/
+*.log

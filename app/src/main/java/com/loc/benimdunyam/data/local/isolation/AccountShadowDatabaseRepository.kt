@@ -141,7 +141,8 @@ class AccountShadowDatabaseRepository @Inject constructor(
                         .addMigrations(
                             AppDatabase.MIGRATION_5_6,
                             AppDatabase.MIGRATION_6_7,
-                            AppDatabase.MIGRATION_7_8
+                            AppDatabase.MIGRATION_7_8,
+                            AppDatabase.MIGRATION_8_9
                         )
                         .build().also(opened::add)
                     val moodDb = Room.databaseBuilder(context, JournalMoodDatabase::class.java, dbNames[1])
@@ -315,7 +316,8 @@ class AccountShadowDatabaseRepository @Inject constructor(
                 .addMigrations(
                     AppDatabase.MIGRATION_5_6,
                     AppDatabase.MIGRATION_6_7,
-                    AppDatabase.MIGRATION_7_8
+                    AppDatabase.MIGRATION_7_8,
+                    AppDatabase.MIGRATION_8_9
                 )
                 .build().also(opened::add)
             val mood = Room.databaseBuilder(context, JournalMoodDatabase::class.java, names[1])
