@@ -53,4 +53,7 @@ object AutomaticJournalSyncPolicy {
 
     /** Faz C: uygulanabilecek uzak düzenleme var mı? */
     fun canApplyEdits(remoteEdits: Int): Boolean = remoteEdits > 0
+
+    /** Faz B: "Son silinenler"e taşınacak uzak silme var mı? */
+    fun canApplyDeletes(remoteDeletesToTrash: Int): Boolean = remoteDeletesToTrash > 0
 }

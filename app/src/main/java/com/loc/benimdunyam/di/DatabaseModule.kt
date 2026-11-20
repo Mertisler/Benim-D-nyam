@@ -11,6 +11,7 @@ import com.loc.benimdunyam.data.local.dao.JournalPersonMentionDao
 import com.loc.benimdunyam.data.local.dao.LifeEpisodeDao
 import com.loc.benimdunyam.data.local.dao.LifeSeasonDao
 import com.loc.benimdunyam.data.local.dao.PersonDao
+import com.loc.benimdunyam.data.local.dao.TrashedJournalDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -34,12 +35,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             session.databaseNames()[0]
         )
-            .addMigrations(
-                AppDatabase.MIGRATION_5_6,
-                AppDatabase.MIGRATION_6_7,
-                AppDatabase.MIGRATION_7_8,
-                AppDatabase.MIGRATION_8_9
-            )
+            .addMigrations(*AppDatabase.ALL_MIGRATIONS)
             .build()
     }
 
@@ -76,6 +72,11 @@ object DatabaseModule {
     fun provideLifeSeasonDao(database: AppDatabase): LifeSeasonDao {
         return database.lifeSeasonDao()
     }
+
+    /** Faz B: "Son silinenler". */
+    @Provides
+    fun provideTrashedJournalDao(database: AppDatabase): TrashedJournalDao =
+        database.trashedJournalDao()
 
     @Provides
     @Singleton

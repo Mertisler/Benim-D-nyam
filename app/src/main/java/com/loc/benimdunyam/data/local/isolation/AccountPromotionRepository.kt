@@ -171,12 +171,7 @@ class AccountPromotionRepository @Inject constructor(
                 // Faz 2F.2'de ana veritabanı 8. sürüme geçti.
                 // Hazırlanmış 7. sürüm Room kopyasını doğrulayabilmek için
                 // senkronizasyon tablosunu ekleyen migration da kayıtlı olmalıdır.
-                .addMigrations(
-                    AppDatabase.MIGRATION_5_6,
-                    AppDatabase.MIGRATION_6_7,
-                    AppDatabase.MIGRATION_7_8,
-                    AppDatabase.MIGRATION_8_9
-                )
+                .addMigrations(*AppDatabase.ALL_MIGRATIONS)
                 .build().also(opened::add)
             val moodDb = Room.databaseBuilder(context, JournalMoodDatabase::class.java, names[1])
                 .build().also(opened::add)

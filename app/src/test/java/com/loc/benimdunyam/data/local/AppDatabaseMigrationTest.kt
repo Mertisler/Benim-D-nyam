@@ -21,8 +21,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Eski sürümlerde (5–8) oluşturulmuş gerçek bir veritabanının, uygulamanın
- * kullandığı migration zinciriyle sürüm 9'a yükseltildiğini sınar.
+ * Eski sürümlerde (5–9) oluşturulmuş gerçek bir veritabanının, uygulamanın
+ * kullandığı migration zinciriyle güncel sürüme (10) yükseltildiğini sınar.
  *
  * Room açılışta şemayı varlık (entity) tanımlarıyla karşılaştırır; bir sütun,
  * indeks veya yabancı anahtar uyuşmazsa açılış hata verir. Bu yüzden
@@ -40,12 +40,7 @@ class AppDatabaseMigrationTest {
     private val dbName = "migration-test.db"
 
     /** Uygulamadaki üç Room.databaseBuilder çağrısının kullandığı zincirle aynı. */
-    private val allMigrations = arrayOf(
-        AppDatabase.MIGRATION_5_6,
-        AppDatabase.MIGRATION_6_7,
-        AppDatabase.MIGRATION_7_8,
-        AppDatabase.MIGRATION_8_9
-    )
+    private val allMigrations = AppDatabase.ALL_MIGRATIONS
 
     private var room: AppDatabase? = null
 
@@ -141,7 +136,7 @@ class AppDatabaseMigrationTest {
         assertEquals("e1", db.string("SELECT episodeId FROM journal_entries WHERE id='j1'"))
         assertEquals("Çocukluk arkadaşı", db.string("SELECT note FROM people WHERE id='p1'"))
         assertEquals("/data/kapak.jpg", db.string("SELECT coverImagePath FROM life_seasons WHERE id='s1'"))
-        assertEquals(9, db.version)
+        assertEquals(10, db.version)
     }
 
     // ------------------------------------------------------------------
@@ -161,6 +156,7 @@ class AppDatabaseMigrationTest {
         assertEquals(0, db.count("person_special_memories"))
         assertEquals(0, db.count("journal_sync_events"))
         assertEquals(0, db.count("pending_mood_merges"))
+        assertEquals(0, db.count("trashed_journals"))
     }
 
     @Test
@@ -191,10 +187,24 @@ class AppDatabaseMigrationTest {
     }
 
     @Test
-    fun yeniKurulumSurum9OlarakAcilir() {
+    fun surum9dan10aSonSilinenlerTablosuEklenir() {
+        createDatabaseAt(9)
+        insertRaw("INSERT INTO pending_mood_merges VALUES ('j1','uid-1','HAPPY',10,2,20)")
+
         val db = openWithRoom()
-        assertEquals(9, db.version)
+        assertUserDataPreserved(db)
+        assertEquals(1, db.count("pending_mood_merges"))
+        assertEquals(0, db.count("trashed_journals"))
+        db.execSQL("INSERT INTO trashed_journals VALUES ('j9','uid-1','REMOTE_DELETE',1,2,3,'Başlık','{}')")
+        assertEquals(1, db.count("trashed_journals"))
+    }
+
+    @Test
+    fun yeniKurulumSurum10OlarakAcilir() {
+        val db = openWithRoom()
+        assertEquals(10, db.version)
         assertEquals(0, db.count("journal_entries"))
+        assertEquals(0, db.count("trashed_journals"))
     }
 
     @Test

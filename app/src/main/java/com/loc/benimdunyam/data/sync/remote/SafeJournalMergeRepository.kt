@@ -1,5 +1,10 @@
 package com.loc.benimdunyam.data.sync.remote
 
+import com.loc.benimdunyam.data.trash.JournalTrashWriter
+import com.loc.benimdunyam.data.local.entity.TrashReason
+import com.loc.benimdunyam.data.local.dao.TrashedJournalDao
+import com.loc.benimdunyam.domain.sync.RemoteDeletePolicy
+import com.loc.benimdunyam.domain.sync.RemoteDeleteDecision
 import com.loc.benimdunyam.domain.sync.RemoteEditPolicy
 import com.loc.benimdunyam.domain.sync.RemoteEditDecision
 import android.util.Base64
@@ -64,8 +69,13 @@ data class SafeMergePreview(
     /** Faz C: iki tarafta da değişmiş, kullanıcı kararı bekleyen anılar. */
     val editConflicts: Int = 0,
     /** Aynı sürümde birden fazla farklı bulut olayı olan anılar (atlanır). */
-    val inconsistentHeads: Int = 0
+    val inconsistentHeads: Int = 0,
+    /** Faz B: diğer cihazda silinmiş, bu cihazda değişmemiş; "Son silinenler"e taşınacak. */
+    val remoteDeletesToTrash: Int = 0
 )
+
+/** Faz B: "Son silinenler"e taşınan anı sayısı. */
+data class RemoteDeleteResult(val movedToTrash: Int)
 
 /** Faz C: uygulanan uzak düzenleme sayısı. */
 data class RemoteEditResult(val updatedJournals: Int)
@@ -95,7 +105,8 @@ private data class MergePlan(
     val summary: SafeMergePreview,
     val catalog: SyncDependencyCatalog,
     val eligible: List<MergeRemoteEvent>,
-    val updates: List<MergeRemoteEvent> = emptyList()
+    val updates: List<MergeRemoteEvent> = emptyList(),
+    val trashable: List<MergeRemoteEvent> = emptyList()
 )
 
 private data class RemoteEventSet(
@@ -135,7 +146,8 @@ class SafeJournalMergeRepository @Inject constructor(
     private val specialDao: PersonSpecialMemoryDao,
     private val pendingMoodDao: PendingMoodMergeDao,
     private val moodRepository: JournalMoodRepository,
-    private val writeCoordinator: BackupWriteCoordinator
+    private val writeCoordinator: BackupWriteCoordinator,
+    private val trashDao: TrashedJournalDao
 ) {
     private val mutex = Mutex()
     private val gson = Gson()
@@ -234,6 +246,8 @@ class SafeJournalMergeRepository @Inject constructor(
                             }
                         }
                         journalDao.insertJournal(journal)
+                        // Başka cihazda geri getirildi: bu cihazdaki çöp kaydı artık geçersiz.
+                        trashDao.delete(journal.id)
                         remote.mentions.forEach { mentionDao.insertMention(it) }
                         catalog.specialMemories.filter { it.journalId == journal.id }
                             .forEach { specialDao.insert(it) }
@@ -603,6 +617,83 @@ class SafeJournalMergeRepository @Inject constructor(
         }
     }
 
+    /**
+     * Faz B: önizlemede bulunan uzak silmeleri uygular (en çok beş anı).
+     * Anılar kalıcı silinmez; tam görüntüleriyle "Son silinenler"e taşınır ve
+     * 30 gün boyunca geri getirilebilir. Fotoğraflar bu süre içinde silinmez.
+     */
+    suspend fun applyRemoteDeletes(
+        uid: String,
+        password: CharArray,
+        expectedFingerprint: String,
+        userConfirmed: Boolean
+    ): RemoteDeleteResult = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            require(userConfirmed) { "Uzak silmeleri uygulamak için açık onay gerekiyor." }
+            require(expectedFingerprint.matches(Regex("[a-f0-9]{64}"))) {
+                "Önizleme doğrulama anahtarı geçersiz."
+            }
+            requireAccount(uid)
+            val plan = prepare(uid, password)
+            check(plan.summary.fingerprint == expectedFingerprint) {
+                "Bulut olayları veya katalog değişmiş. Yeniden önizleme yap."
+            }
+            val batch = plan.trashable.take(MAX_IMPORT_PER_CONFIRMATION)
+            if (batch.isEmpty()) return@withContext RemoteDeleteResult(0)
+
+            writeCoordinator.withExclusiveRestore {
+                requireAccount(uid)
+                // Ruh hali ayrı veritabanındadır; görüntüsü transaction'dan ÖNCE alınır.
+                // Özel geri yükleme kilidi tutulduğu için arada ruh hali yazılamaz.
+                val moods = batch.associate { it.journalId to moodRepository.recordFor(it.journalId) }
+                val now = System.currentTimeMillis()
+                database.withTransaction {
+                    requireAccount(uid)
+                    for (remote in batch) {
+                        val localEvent = eventDao.findByJournalId(remote.journalId)
+                        check(RemoteDeletePolicy.classify(
+                            localJournalExists = journalDao.getJournalById(remote.journalId) != null,
+                            localState = localEvent?.state,
+                            localChangeType = localEvent?.changeType,
+                            localVersion = localEvent?.changeVersion,
+                            remoteRevision = remote.revision
+                        ) == RemoteDeleteDecision.MOVE_TO_TRASH &&
+                                pendingMoodDao.find(remote.journalId) == null) {
+                            "Yerel kayıtlar değişti. Uzak silme uygulanmadan işlem durduruldu."
+                        }
+                    }
+                    for (remote in batch) {
+                        JournalTrashWriter.moveToTrash(
+                            journalDao = journalDao,
+                            mentionDao = mentionDao,
+                            specialDao = specialDao,
+                            eventDao = eventDao,
+                            trashDao = trashDao,
+                            uid = uid,
+                            journalId = remote.journalId,
+                            reason = TrashReason.REMOTE_DELETE,
+                            remoteRevision = remote.revision,
+                            mood = moods[remote.journalId],
+                            now = now
+                        )
+                    }
+                    requireAccount(uid)
+                }
+                // Ana Room commit edildi. Ruh hali görüntüsü çöp kaydında saklı;
+                // silinemezse yalnızca yetim kayıt kalır (katalog bunları zaten atlar).
+                for (remote in batch) {
+                    try {
+                        moodRepository.deleteForJournal(remote.journalId)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                    }
+                }
+                RemoteDeleteResult(batch.size)
+            }
+        }
+    }
+
     private suspend fun isSafeNewRecord(
         uid: String, remote: MergeRemoteEvent, catalog: SyncDependencyCatalog
     ): Boolean {
@@ -610,8 +701,13 @@ class SafeJournalMergeRepository @Inject constructor(
         if (remote.operation != JournalSyncChangePolicy.UPSERT ||
             remote.changeRecordedAt > catalog.capturedAtMillis ||
             journal.id !in catalog.journalIds) return false
+        val localEvent = eventDao.findByJournalId(journal.id)
+        // Faz B: bu cihazda silinmiş ama başka cihazda geri getirilmiş anı yeni gibi alınabilir.
+        val restoredElsewhere = localEvent != null && RemoteDeletePolicy.isRestoredElsewhere(
+            localEvent.state, localEvent.changeType, localEvent.changeVersion, remote.revision
+        )
         if (journalDao.getJournalById(journal.id) != null ||
-            eventDao.findByJournalId(journal.id) != null ||
+            (localEvent != null && !restoredElsewhere) ||
             pendingMoodDao.find(journal.id) != null) return false
         // Başka kayıttan kalan ruh hali varsa asla üzerine yazmayız.
         if (moodRepository.getMood(journal.id) != null) return false
@@ -655,6 +751,7 @@ class SafeJournalMergeRepository @Inject constructor(
         val eventsToken = remoteSet.token
         val eligible = mutableListOf<MergeRemoteEvent>()
         val updates = mutableListOf<MergeRemoteEvent>()
+        val trashable = mutableListOf<MergeRemoteEvent>()
         var editConflicts = 0
         var existing = 0
         var deletes = 0
@@ -666,15 +763,34 @@ class SafeJournalMergeRepository @Inject constructor(
             requireAccount(uid)
             if (remote.operation == JournalSyncChangePolicy.DELETE) {
                 deletes++
-                if (journalDao.getJournalById(remote.journalId) != null ||
-                    eventDao.findByJournalId(remote.journalId)?.state ==
-                    JournalSyncChangePolicy.PENDING) deleteConflicts++
-                continue // Faz 2F.8'e kadar otomatik DELETE yok.
+                // Faz B: yalnızca diğer cihaz sildiyse anı kalıcı silinmez,
+                // "Son silinenler"e taşınır. Bekleyen yerel değişiklik varsa dokunulmaz.
+                val localEvent = eventDao.findByJournalId(remote.journalId)
+                when (RemoteDeletePolicy.classify(
+                    localJournalExists = journalDao.getJournalById(remote.journalId) != null,
+                    localState = localEvent?.state,
+                    localChangeType = localEvent?.changeType,
+                    localVersion = localEvent?.changeVersion,
+                    remoteRevision = remote.revision
+                )) {
+                    RemoteDeleteDecision.MOVE_TO_TRASH ->
+                        if (pendingMoodDao.find(remote.journalId) == null &&
+                            trashDao.find(remote.journalId) == null) trashable += remote
+                        else deleteConflicts++
+                    RemoteDeleteDecision.CONFLICT -> deleteConflicts++
+                    RemoteDeleteDecision.ALREADY_GONE ->
+                        if (localEvent?.state == JournalSyncChangePolicy.PENDING) deleteConflicts++
+                }
+                continue
             }
             if (remote.changeRecordedAt > catalog.capturedAtMillis) { stale++; continue }
             val localJournal = journalDao.getJournalById(remote.journalId)
             val localEvent = eventDao.findByJournalId(remote.journalId)
-            if (localJournal != null || localEvent != null) {
+            val restoredElsewhere = localJournal == null && localEvent != null &&
+                    RemoteDeletePolicy.isRestoredElsewhere(
+                        localEvent.state, localEvent.changeType, localEvent.changeVersion, remote.revision
+                    )
+            if (!restoredElsewhere && (localJournal != null || localEvent != null)) {
                 // Faz C: cihazda zaten olan anının buluttaki düzenlemesi.
                 when (RemoteEditPolicy.classify(
                     localJournalExists = localJournal != null,
@@ -706,8 +822,9 @@ class SafeJournalMergeRepository @Inject constructor(
                 MAX_IMPORT_PER_CONFIRMATION,
                 remoteEdits = updates.size,
                 editConflicts = editConflicts,
-                inconsistentHeads = remoteSet.inconsistentJournals),
-            catalog, eligible, updates
+                inconsistentHeads = remoteSet.inconsistentJournals,
+                remoteDeletesToTrash = trashable.size),
+            catalog, eligible, updates, trashable
         )
     }
 

@@ -1,5 +1,6 @@
 package com.loc.benimdunyam
 
+import com.loc.benimdunyam.data.trash.JournalTrashRepository
 import android.app.Application
 import android.util.Log
 import com.google.firebase.FirebaseApp
@@ -18,6 +19,9 @@ class BenimDunyamApp : Application() {
 
     @Inject
     lateinit var restoreRecoveryManager: RestoreRecoveryManager
+
+    @Inject
+    lateinit var journalTrashRepository: JournalTrashRepository
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -42,6 +46,15 @@ class BenimDunyamApp : Application() {
                 throw e
             } catch (e: Exception) {
                 Log.w("BackupRecovery", "Kurtarma temizliği çalıştırılamadı.", e)
+            }
+            // Faz B: 30 günü dolan "Son silinenler" kayıtları.
+            try {
+                val purged = journalTrashRepository.purgeExpired()
+                if (purged > 0) Log.d("JournalTrash", "Süresi dolan silinen anı: $purged")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("JournalTrash", "Son silinenler temizliği çalıştırılamadı.", e)
             }
         }
     }

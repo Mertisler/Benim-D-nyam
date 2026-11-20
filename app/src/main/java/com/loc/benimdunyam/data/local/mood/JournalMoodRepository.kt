@@ -110,6 +110,31 @@ class JournalMoodRepository @Inject constructor(
         }
     }
 
+    /** Faz B: çöpe taşımadan önce ruh halinin tam kaydı (tarihiyle). */
+    suspend fun recordFor(journalId: String): JournalMoodRecord? = withContext(Dispatchers.IO) {
+        db.moodDao().getRecord(journalId)
+    }
+
+    /**
+     * Faz B: çöp kutusundan geri getirilen anının ruh hali. Bu arada cihazda
+     * yeni bir ruh hali yazılmışsa EZİLMEZ.
+     * @return true: eklendi veya aynısı zaten var
+     */
+    suspend fun restoreIfAbsent(record: JournalMoodRecord): Boolean = withContext(Dispatchers.IO) {
+        require(record.journalId.isNotBlank() &&
+                JournalMood.entries.any { it.name == record.moodName }) { "Ruh hali kaydı geçersiz." }
+        writeCoordinator.withRegularWrite {
+            db.withTransaction {
+                val existing = db.moodDao().getRecord(record.journalId)
+                when {
+                    existing == record -> true
+                    existing != null -> false
+                    else -> db.moodDao().insertIfAbsent(record) != -1L
+                }
+            }
+        }
+    }
+
     suspend fun getMood(journalId: String): JournalMood? = withContext(Dispatchers.IO) {
         val savedName = db.moodDao().getName(journalId) ?: return@withContext null
         JournalMood::class.java.enumConstants

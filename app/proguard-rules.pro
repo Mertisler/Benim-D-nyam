@@ -53,6 +53,9 @@
 -keep class com.loc.benimdunyam.data.remote.firebase.archive.CloudArchivePayload { <fields>; <init>(...); }
 -keep class com.loc.benimdunyam.data.sync.remote.SyncDependencyCatalog { <fields>; <init>(...); }
 
+# "Son silinenler" anlık görüntüsü (trashed_journals.snapshotJson)
+-keep class com.loc.benimdunyam.data.trash.TrashedJournalSnapshot { <fields>; <init>(...); }
+
 # -----------------------------------------------------------------------------
 # Adıyla saklanan / okunan enum'lar (JournalMood.name, AppThemeCategory.valueOf...)
 # -----------------------------------------------------------------------------

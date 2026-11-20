@@ -43,6 +43,8 @@ fun SettingsScreen(
     val mediaBackupViewModel: JournalMediaBackupViewModel = hiltViewModel()
     // Faz 2I.4: iki SAF yedeğinin dosya bazında salt-okunur doğrulanması.
     val backupCoverageViewModel: BackupCoverageViewModel = hiltViewModel()
+    // Faz B: başka cihazda silinen anılar için 30 günlük "Son silinenler".
+    val recentlyDeletedViewModel: RecentlyDeletedViewModel = hiltViewModel()
     val uiState = viewModel.uiState
     val isBusy = uiState.isLoading ||
             uiState.isBackupHealthLoading ||
@@ -361,6 +363,9 @@ fun SettingsScreen(
 
             // Faz 2I.4: doğrulanan gerçek yedek dosyalarının sağlık/kapasite özeti.
             BackupCoverageSection(viewModel = backupCoverageViewModel)
+
+            // Faz B: "Son silinenler" — yanlışlıkla silmeye karşı 30 günlük güvence.
+            RecentlyDeletedSection(viewModel = recentlyDeletedViewModel)
 
             // ----------------------------------------
             // ARŞİV SAĞLIĞI

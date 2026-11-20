@@ -71,6 +71,9 @@ class AutomaticJournalSyncWorker(
                 }
                 ensureAllowed(uid, scheduler, permission)
 
+                // Faz B: 30 günü dolan "Son silinenler" kayıtlarını temizle (yalnızca yerel).
+                entry.trash().purgeExpired()
+
                 // Faz 2I.1: Her 15 dakikada bir TÜM bulutu taramak Firestore
                 // okuma kotasını tüketebilir. Gönderim ayrı akıştır ve yukarıda
                 // eskisi gibi yapılır. Yalnızca tam sunucu taraması seyreltilir.
@@ -125,6 +128,19 @@ class AutomaticJournalSyncWorker(
                             ).updatedJournals
                         }
 
+                        // Faz B: diğer cihazda silinen ve burada değişmemiş anılar
+                        // kalıcı silinmez; 30 gün "Son silinenler"de tutulur.
+                        var trashed = 0
+                        if (AutomaticJournalSyncPolicy.canApplyDeletes(preview.remoteDeletesToTrash)) {
+                            ensureAllowed(uid, scheduler, permission)
+                            trashed = merger.applyRemoteDeletes(
+                                uid = uid,
+                                password = secret,
+                                expectedFingerprint = preview.fingerprint,
+                                userConfirmed = true
+                            ).movedToTrash
+                        }
+
                         // Tek çalışma sınırı 5 anı. Kalanlar için tarama ertelenmez.
                         allImportableHandled = AutomaticJournalSyncPolicy.scanCompleted(
                             eligibleBefore = preview.eligible,
@@ -132,7 +148,7 @@ class AutomaticJournalSyncWorker(
                             pendingMoodFinishesAfter = pendingAfter,
                             editsBefore = preview.remoteEdits,
                             editsApplied = editsApplied
-                        )
+                        ) && trashed >= preview.remoteDeletesToTrash
                     }
                     ensureAllowed(uid, scheduler, permission)
                     if (allImportableHandled) {
@@ -185,4 +201,5 @@ interface AutomaticJournalSyncEntryPoint {
     fun merger(): SafeJournalMergeRepository
     fun catalog(): SyncDependencyCoverageRepository
     fun catalogFreshness(): SyncCatalogFreshness
+    fun trash(): com.loc.benimdunyam.data.trash.JournalTrashRepository
 }

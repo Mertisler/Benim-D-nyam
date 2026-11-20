@@ -24,6 +24,8 @@ import com.loc.benimdunyam.data.local.entity.PersonSpecialMemoryEntity
 import com.loc.benimdunyam.data.local.entity.PersonEntity
 
 import com.loc.benimdunyam.data.local.dao.BackupRestoreDao
+import com.loc.benimdunyam.data.local.dao.TrashedJournalDao
+import com.loc.benimdunyam.data.local.entity.TrashedJournalEntity
 
 @Database(
     entities = [
@@ -34,9 +36,10 @@ import com.loc.benimdunyam.data.local.dao.BackupRestoreDao
         JournalPersonMentionEntity::class,
         LifeSeasonEntity::class,
         LifeEpisodeEntity::class,
-        PersonSpecialMemoryEntity::class
+        PersonSpecialMemoryEntity::class,
+        TrashedJournalEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -52,6 +55,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun personConnectionDao(): PersonConnectionDao
     abstract fun peopleNetworkDao(): PeopleNetworkDao
     abstract fun backupRestoreDao(): BackupRestoreDao
+    abstract fun trashedJournalDao(): TrashedJournalDao
 
     companion object {
         const val DATABASE_NAME = "benim_dunyam_db"
@@ -156,5 +160,43 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+    
+        /**
+         * 9 -> 10 (Faz B): yalnızca yeni, boş "Son silinenler" tablosu.
+         * Mevcut anılara, ilişkilere ve kuyruğa dokunulmaz.
+         */
+        val MIGRATION_9_10: Migration = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `trashed_journals` (
+                        `journalId` TEXT NOT NULL,
+                        `ownerUid` TEXT,
+                        `reason` TEXT NOT NULL,
+                        `trashedAt` INTEGER NOT NULL,
+                        `expiresAt` INTEGER NOT NULL,
+                        `remoteRevision` INTEGER,
+                        `title` TEXT NOT NULL,
+                        `snapshotJson` TEXT NOT NULL,
+                        PRIMARY KEY(`journalId`)
+                    )""".trimIndent()
+                )
+                database.execSQL(
+                    """CREATE INDEX IF NOT EXISTS `index_trashed_journals_expiresAt`
+                        ON `trashed_journals` (`expiresAt`)""".trimIndent()
+                )
+            }
+        }
+
+        /**
+         * Ana veritabanını açan HER yer bu listeyi kullanmalı (DI, hesap kopyası,
+         * hesap terfisi). Yeni migration yalnızca buraya eklenir.
+         */
+        val ALL_MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8,
+            MIGRATION_8_9,
+            MIGRATION_9_10
+        )
     }
 }
