@@ -99,7 +99,11 @@ class SyncDependencyCoverageRepository @Inject constructor(
             val backup = backupRepository.createBackupData()
             // Ana Room ilişkilerinde hata varsa eksik veriyle katalog üretmeyiz.
             backupValidator.parseAndValidate(gson.toJson(backup))
-            val moods = moodRepository.observeAll().first()
+            // Günlüğü silinmiş (yetim) ruh hali kayıtları katalogda anlamsızdır ve
+            // fromLocal'ın ilişki kontrolünü kalıcı olarak başarısız yapardı.
+            // Var olan bir anının ruh hali ise asla atlanmaz.
+            val journalIds = backup.journals.map { it.id }.toSet()
+            val moods = moodRepository.observeAll().first().filter { it.journalId in journalIds }
             val catalog = SyncDependencyCatalog.fromLocal(uid, backup, moods)
             catalog.validatedIndex(uid)
             val raw = gson.toJson(catalog)

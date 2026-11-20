@@ -6,6 +6,7 @@ import androidx.work.WorkerParameters
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.loc.benimdunyam.data.sync.remote.ManualJournalEventUploader
 import com.loc.benimdunyam.data.sync.remote.SafeJournalMergeRepository
+import com.loc.benimdunyam.data.sync.remote.SyncDependencyCoverageRepository
 import com.loc.benimdunyam.data.sync.security.SyncAutoAuthorizationRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -20,6 +21,14 @@ import kotlinx.coroutines.sync.withLock
  * Silme olayı GÖNDERİLEBİLİR; uzak silme ASLA yerel Room'a uygulanmaz.
  * Sürüm çakışmalarında kayıt ezilmez; kullanıcıya manuel inceleme kalır.
  * Tek çalışmada en çok 5 gönderim ve 5 yeni anı içe alma yapılır.
+ *
+ * Faz A:
+ * - Olay gönderildikten sonra şifreli ilişki kataloğu otomatik yenilenir;
+ *   aksi halde diğer cihaz yeni olayları "katalogdan yeni" sayıp hiç almaz.
+ * - İçe alma OLAY BAZINDA yapılır: güvenli yeni anılar alınır, silme /
+ *   eksik ilişki / katalogdan yeni olaylar yalnızca atlanır. Önceden tek bir
+ *   uzak silme bile otomatik içe almayı kalıcı olarak durduruyordu.
+ * - Yarım kalan ruh hali aktarımları otomatik tamamlanmaya çalışılır.
  */
 class AutomaticJournalSyncWorker(
     context: Context,
@@ -48,6 +57,20 @@ class AutomaticJournalSyncWorker(
                 }
                 ensureAllowed(uid, scheduler, permission)
 
+                // Faz A: Bu cihazın gönderdiği olaylar diğer cihazda içe alınabilsin
+                // diye ilişki kataloğu yenilenir. Yalnızca yeni olay yazıldıysa
+                // (veya önceki yenileme başarısız olduysa) çalışır; Spark kotası korunur.
+                val freshness = entry.catalogFreshness()
+                if (freshness.isStale(uid)) {
+                    val versionAtStart = freshness.changeVersion(uid)
+                    permission.withApprovedPassphrase(uid) { secret ->
+                        ensureAllowed(uid, scheduler, permission)
+                        entry.catalog().uploadCatalog(uid, secret)
+                    }
+                    freshness.markPublished(uid, versionAtStart)
+                }
+                ensureAllowed(uid, scheduler, permission)
+
                 // Faz 2I.1: Her 15 dakikada bir TÜM bulutu taramak Firestore
                 // okuma kotasını tüketebilir. Gönderim ayrı akıştır ve yukarıda
                 // eskisi gibi yapılır. Yalnızca tam sunucu taraması seyreltilir.
@@ -61,14 +84,23 @@ class AutomaticJournalSyncWorker(
                     // amacıyla gevşetilmez.
                     permission.withApprovedPassphrase(uid) { secret ->
                         ensureAllowed(uid, scheduler, permission)
-                        val preview = entry.merger().preview(uid, secret)
-                        if (preview.eligible > 0 && preview.remoteDeletes == 0 &&
-                            preview.remoteDeleteConflicts == 0 &&
-                            preview.staleCatalog == 0 &&
-                            preview.missingOrConflictingRelations == 0 &&
-                            preview.pendingMoodFinishes == 0) {
+                        val merger = entry.merger()
+
+                        // Önceki çalışmadan yarım kalan ruh halleri varsa önce onları
+                        // tamamla. İşlem tekrarlanabilir ve mevcut ruh halini ezmez.
+                        if (AutomaticJournalSyncPolicy.shouldResumePendingMoods(
+                                merger.pendingMoodCount(uid))) {
+                            merger.resumePendingMoods(uid)
                             ensureAllowed(uid, scheduler, permission)
-                            val imported = entry.merger().importMissing(
+                        }
+
+                        val preview = merger.preview(uid, secret)
+                        if (AutomaticJournalSyncPolicy.canImport(
+                                preview.eligible, preview.pendingMoodFinishes)) {
+                            ensureAllowed(uid, scheduler, permission)
+                            // importMissing yalnızca güvenlik kontrollerinden geçen
+                            // "eligible" olayları ekler; diğerleri atlanır.
+                            val imported = merger.importMissing(
                                 uid = uid,
                                 password = secret,
                                 expectedFingerprint = preview.fingerprint,
@@ -76,8 +108,14 @@ class AutomaticJournalSyncWorker(
                             )
                             // İçe alma sınırı 5 anı. Kalan yeni anıları bir
                             // sonraki periyodik çalışmada tekrar kontrol ederiz.
-                            allImportableHandled = imported.insertedJournals >= preview.eligible &&
-                                    imported.pendingMoodFinishes == 0
+                            allImportableHandled = AutomaticJournalSyncPolicy.scanCompleted(
+                                eligibleBefore = preview.eligible,
+                                inserted = imported.insertedJournals,
+                                pendingMoodFinishesAfter = imported.pendingMoodFinishes
+                            )
+                        } else if (preview.pendingMoodFinishes > 0) {
+                            // Ruh hali aktarımı hâlâ yarım: taramayı tamamlandı sayma.
+                            allImportableHandled = false
                         }
                     }
                     ensureAllowed(uid, scheduler, permission)
@@ -129,4 +167,6 @@ interface AutomaticJournalSyncEntryPoint {
     fun scanBudget(): SparkFirestoreScanBudget
     fun uploader(): ManualJournalEventUploader
     fun merger(): SafeJournalMergeRepository
+    fun catalog(): SyncDependencyCoverageRepository
+    fun catalogFreshness(): SyncCatalogFreshness
 }

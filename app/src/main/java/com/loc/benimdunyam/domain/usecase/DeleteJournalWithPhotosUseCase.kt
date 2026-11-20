@@ -4,6 +4,7 @@ import android.util.Log
 import com.loc.benimdunyam.data.backup.BackupWriteCoordinator
 import com.loc.benimdunyam.data.local.draft.JournalDraftStore
 import com.loc.benimdunyam.data.local.media.JournalPhotoStore
+import com.loc.benimdunyam.data.local.mood.JournalMoodRepository
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 
@@ -18,6 +19,7 @@ class DeleteJournalWithPhotosUseCase @Inject constructor(
     private val deleteJournalUseCase: DeleteJournalUseCase,
     private val photoStore: JournalPhotoStore,
     private val draftStore: JournalDraftStore,
+    private val moodRepository: JournalMoodRepository,
     private val writeCoordinator: BackupWriteCoordinator
 ) {
     suspend operator fun invoke(journalId: String): JournalDeleteWithPhotosResult =
@@ -44,6 +46,8 @@ class DeleteJournalWithPhotosUseCase @Inject constructor(
             val draftKey = JournalDraftStore.keyFor(journalId)
             tryCleanup("Düzenleme fotoğrafları") { photoStore.discardDraftPhotos(draftKey) }
             tryCleanup("Düzenleme taslağı") { draftStore.delete(draftKey) }
+            // Ruh hali ayrı Room'dadır; silinmezse yetim kalır.
+            tryCleanup("Ruh hali") { moodRepository.deleteForJournal(journalId) }
 
             JournalDeleteWithPhotosResult(
                 cleanupWarning = if (problems.isEmpty()) null else

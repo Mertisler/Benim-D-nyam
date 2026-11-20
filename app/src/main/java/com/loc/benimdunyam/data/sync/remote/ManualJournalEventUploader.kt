@@ -1,5 +1,6 @@
 package com.loc.benimdunyam.data.sync.remote
 
+import com.loc.benimdunyam.data.sync.work.SyncCatalogFreshness
 import android.util.Base64
 import androidx.room.withTransaction
 import com.google.firebase.auth.FirebaseAuth
@@ -56,7 +57,8 @@ class ManualJournalEventUploader @Inject constructor(
     private val database: AppDatabase,
     private val eventDao: JournalSyncEventDao,
     private val journalDao: JournalDao,
-    private val mentionDao: JournalPersonMentionDao
+    private val mentionDao: JournalPersonMentionDao,
+    private val catalogFreshness: SyncCatalogFreshness
 ) {
     private val mutex = Mutex()
 
@@ -153,6 +155,9 @@ class ManualJournalEventUploader @Inject constructor(
                         val updated = eventDao.markSyncedIfUnchanged(
                             event.journalId, uid, event.changeVersion, event.changeType
                         )
+                        // Buluta yazılan her olay, diğer cihazın içe alabilmesi için
+                        // yeni bir ilişki kataloğu gerektirir (Faz A).
+                        catalogFreshness.markStale(uid)
                         if (updated == 1) confirmed++ else stale++
                     } catch (cancelled: CancellationException) {
                         throw cancelled
