@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.loc.benimdunyam.data.sync.remote.JournalConflictReport
 import com.loc.benimdunyam.data.sync.remote.JournalConflictRepository
+import com.loc.benimdunyam.data.sync.remote.JournalConflictResolution
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -96,6 +97,68 @@ class JournalConflictViewModel @Inject constructor(
                             "Bu çakışmanın koruma kopyası zaten bulunuyor. Üzerine yazılmadı."
                         else "Metin, Günlükler ekranına ayrı bir anı olarak kaydedildi. " +
                                 "Orijinal anı ve silme geçmişi değiştirilmedi."
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                onError(uid, error)
+            } finally {
+                secret.fill('\u0000')
+            }
+        }
+    }
+
+    /**
+     * Faz C: çakışmayı kapatır. Açık onay ve yeniden girilen şifre zorunludur.
+     * Başarıdan sonra kart listeden kaldırılır; güncel durum için yeniden denetlenmelidir.
+     */
+    fun resolve(
+        uid: String,
+        password: String,
+        remoteDocumentId: String,
+        resolution: JournalConflictResolution,
+        confirmed: Boolean
+    ) {
+        val current = mutable.value
+        if (current.loading || current.accountUid != uid || !confirmed) return
+        val card = current.report?.cards?.firstOrNull { it.remoteDocumentId == remoteDocumentId }
+            ?: return
+        val allowed = when (resolution) {
+            JournalConflictResolution.KEEP_LOCAL -> card.canKeepLocal
+            JournalConflictResolution.ACCEPT_REMOTE -> card.canAcceptRemote
+        }
+        if (!allowed) return
+        val secret = password.toCharArray()
+        mutable.value = current.copy(loading = true, error = null, message = null)
+        viewModelScope.launch {
+            try {
+                repository.resolve(
+                    uid = uid,
+                    password = secret,
+                    documentId = card.remoteDocumentId,
+                    expectedConfirmationKey = card.confirmationKey,
+                    remoteHeadCount = card.simultaneousRemoteHeads,
+                    resolution = resolution,
+                    confirmed = true
+                )
+                if (mutable.value.accountUid == uid) {
+                    val previous = mutable.value
+                    mutable.value = previous.copy(
+                        loading = false,
+                        report = previous.report?.let { report ->
+                            report.copy(
+                                cards = report.cards.filterNot { it.journalId == card.journalId },
+                                totalConflicts = (report.totalConflicts - 1).coerceAtLeast(0)
+                            )
+                        },
+                        message = when (resolution) {
+                            JournalConflictResolution.KEEP_LOCAL ->
+                                "Cihazdaki metin korunacak. Bir sonraki eşitlemede buluta yeni sürüm " +
+                                        "olarak gönderilir; diğer cihaz bunu düzenleme olarak alır."
+                            JournalConflictResolution.ACCEPT_REMOTE ->
+                                "Buluttaki metin bu cihaza uygulandı. Ruh hali ve fotoğraflar değişmedi."
+                        }
                     )
                 }
             } catch (cancelled: CancellationException) {

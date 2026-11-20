@@ -10,6 +10,9 @@ object JournalSyncChangePolicy {
     const val UPSERT = "UPSERT"
     const val DELETE = "DELETE"
     const val PENDING = "PENDING"
+    const val SYNCED = "SYNCED"
+    /** Faz C: diğer cihaz aynı tabandan düzenlemiş; kullanıcı kararı bekler, gönderilmez. */
+    const val CONFLICT = "CONFLICT"
 
     fun requireChangeType(type: String): String {
         require(type == UPSERT || type == DELETE) { "Bilinmeyen anı işlemi: $type" }

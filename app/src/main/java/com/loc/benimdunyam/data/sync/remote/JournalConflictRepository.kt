@@ -1,5 +1,10 @@
 package com.loc.benimdunyam.data.sync.remote
 
+import com.loc.benimdunyam.domain.sync.RemoteEditPolicy
+import com.loc.benimdunyam.data.local.dao.PersonSpecialMemoryDao
+import com.loc.benimdunyam.data.local.dao.LifeEpisodeDao
+import com.loc.benimdunyam.data.local.dao.LifeSeasonDao
+import com.loc.benimdunyam.data.local.dao.PersonDao
 import android.util.Base64
 import androidx.room.withTransaction
 import com.google.firebase.auth.FirebaseAuth
@@ -56,7 +61,11 @@ data class JournalConflictCard(
     val canPreserveCopy: Boolean,
     val savedAsSeparateCopy: Boolean,
     val confirmationKey: String,
-    val simultaneousRemoteHeads: Int
+    val simultaneousRemoteHeads: Int,
+    /** Faz C: cihazdaki metin bulutun yerine geçirilebilir mi. */
+    val canKeepLocal: Boolean = false,
+    /** Faz C: buluttaki metin cihaza uygulanabilir mi (tek ve UPSERT baş). */
+    val canAcceptRemote: Boolean = false
 )
 
 data class JournalConflictReport(
@@ -67,6 +76,9 @@ data class JournalConflictReport(
 )
 
 data class PreservedJournalConflict(val copyJournalId: String, val alreadyPresent: Boolean)
+
+/** Faz C: kullanıcının çakışma kararı. */
+enum class JournalConflictResolution { KEEP_LOCAL, ACCEPT_REMOTE }
 
 private data class ConflictRemoteEvent(
     val documentId: String,
@@ -110,7 +122,11 @@ class JournalConflictRepository @Inject constructor(
     private val journalDao: JournalDao,
     private val syncDao: JournalSyncEventDao,
     private val mentionDao: JournalPersonMentionDao,
-    private val writeCoordinator: BackupWriteCoordinator
+    private val writeCoordinator: BackupWriteCoordinator,
+    private val personDao: PersonDao,
+    private val seasonDao: LifeSeasonDao,
+    private val episodeDao: LifeEpisodeDao,
+    private val specialDao: PersonSpecialMemoryDao
 ) {
     private val mutex = Mutex()
 
@@ -148,7 +164,11 @@ class JournalConflictRepository @Inject constructor(
                         localTitle = local.journal?.title,
                         remoteExcerpt = remote.journal?.content?.take(EXCERPT_SIZE),
                         localExcerpt = local.journal?.content?.take(EXCERPT_SIZE),
-                        localHasPendingChange = local.syncEvent?.state == JournalSyncChangePolicy.PENDING,
+                        localHasPendingChange = local.syncEvent?.state == JournalSyncChangePolicy.PENDING ||
+                                local.syncEvent?.state == JournalSyncChangePolicy.CONFLICT,
+                        canKeepLocal = local.journal != null,
+                        canAcceptRemote = remote.operation == JournalSyncChangePolicy.UPSERT &&
+                                heads.size == 1,
                         canPreserveCopy = remote.operation != JournalSyncChangePolicy.DELETE || local.journal != null,
                         savedAsSeparateCopy = journalDao.getJournalById(copyId) != null,
                         confirmationKey = confirmationKey(uid, remote, local, heads.size),
@@ -248,6 +268,112 @@ class JournalConflictRepository @Inject constructor(
                     ))
                     requireAccount(uid)
                     PreservedJournalConflict(copyId, alreadyPresent = false)
+                }
+            }
+        }
+    }
+
+    /**
+     * Faz C: çakışmayı kullanıcının seçimiyle KAPATIR.
+     *
+     * KEEP_LOCAL: cihazdaki metin, buluttaki TÜM sürümlerden yüksek bir sürümle
+     *   yeniden gönderilmek üzere kuyruğa alınır. Bulutta hiçbir şey silinmez;
+     *   eski sürümler geçmişte kalır ve diğer cihaz yeni sürümü düzenleme olarak alır.
+     * ACCEPT_REMOTE: buluttaki metin cihaza yazılır, kuyruk SYNCED olur. Etiketlenen
+     *   kişi ve dönemlerin cihazda bulunması gerekir (yoksa önce eşitleme yapılmalı).
+     *
+     * İkisi de önizleme onay anahtarına bağlıdır: arada bulut ya da yerel kayıt
+     * değiştiyse hiçbir şey yazılmaz. Ruh hali bu adımda değişmez.
+     */
+    suspend fun resolve(
+        uid: String,
+        password: CharArray,
+        documentId: String,
+        expectedConfirmationKey: String,
+        remoteHeadCount: Int,
+        resolution: JournalConflictResolution,
+        confirmed: Boolean
+    ): Unit = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            require(confirmed) { "Çakışmayı kapatmak için açık onay gerekiyor." }
+            requirePassword(password)
+            require(documentId.startsWith("e_") && documentId.length == 66) {
+                "Bulut belgesi kimliği geçersiz."
+            }
+            require(expectedConfirmationKey.matches(Regex("[a-f0-9]{64}"))) {
+                "Önizleme doğrulama anahtarı geçersiz."
+            }
+            require(remoteHeadCount in 1..2) { "Uzaktaki olay başı sayısı geçersiz." }
+            requireAccount(uid)
+            val doc = firestore.collection("users").document(uid)
+                .collection("journal_change_events").document(documentId)
+                .get(Source.SERVER).await()
+            check(doc.exists()) { "Bulut olayı değişti veya kaldırıldı. Yeniden incele." }
+            val remote = decodeEvent(uid, doc, password)
+            requireAccount(uid)
+            val history = readAllEvents(uid, password).filter { it.journalId == remote.journalId }
+            val top = history.maxOf { it.revision }
+            val heads = history.filter { it.revision == top }
+            check(heads.size == remoteHeadCount && heads.any { it.documentId == documentId }) {
+                "Bulut sürümleri değişmiş. Yeniden önizleme yap."
+            }
+
+            writeCoordinator.withExclusiveRestore {
+                requireAccount(uid)
+                database.withTransaction {
+                    requireAccount(uid)
+                    val local = readLocalInTransaction(remote.journalId)
+                    check(confirmationKey(uid, remote, local, remoteHeadCount) == expectedConfirmationKey &&
+                            conflictType(remote, local, remoteHeadCount) != null) {
+                        "Anı veya işlem kuyruğu değişti. Yeni önizleme gerekiyor."
+                    }
+                    when (resolution) {
+                        JournalConflictResolution.KEEP_LOCAL -> {
+                            checkNotNull(local.journal) { "Korunacak yerel anı bulunamadı." }
+                            val version = RemoteEditPolicy.versionToKeepLocal(
+                                highestRemoteRevision = top,
+                                localVersion = local.syncEvent?.changeVersion ?: 1L
+                            )
+                            syncDao.save(JournalSyncEventEntity(
+                                journalId = remote.journalId,
+                                ownerUid = uid,
+                                changeType = JournalSyncChangePolicy.UPSERT,
+                                state = JournalSyncChangePolicy.PENDING,
+                                changeVersion = version,
+                                updatedAtMillis = System.currentTimeMillis()
+                            ))
+                        }
+                        JournalConflictResolution.ACCEPT_REMOTE -> {
+                            check(remote.operation == JournalSyncChangePolicy.UPSERT && remoteHeadCount == 1) {
+                                "Yalnızca tek ve silme olmayan bulut sürümü alınabilir."
+                            }
+                            val journal = requireNotNull(remote.journal)
+                            check(journal.seasonId == null || seasonDao.getSeasonById(journal.seasonId) != null) {
+                                "Anının dönemi bu cihazda yok. Önce eşitlemeyi çalıştır."
+                            }
+                            check(journal.episodeId == null ||
+                                    episodeDao.getEpisodeById(journal.episodeId)?.seasonId == journal.seasonId) {
+                                "Anının bölümü bu cihazda yok. Önce eşitlemeyi çalıştır."
+                            }
+                            check(remote.mentions.all { personDao.getPersonById(it.personId) != null }) {
+                                "Etiketlenen kişilerden biri bu cihazda yok. Önce eşitlemeyi çalıştır."
+                            }
+                            if (local.journal == null) journalDao.insertJournal(journal)
+                            RemoteJournalEditWriter.apply(
+                                journalDao = journalDao,
+                                mentionDao = mentionDao,
+                                specialDao = specialDao,
+                                eventDao = syncDao,
+                                uid = uid,
+                                journal = journal,
+                                mentions = remote.mentions,
+                                specialMemories = emptyList(),
+                                remoteRevision = remote.revision,
+                                remoteChangedAt = System.currentTimeMillis()
+                            )
+                        }
+                    }
+                    requireAccount(uid)
                 }
             }
         }

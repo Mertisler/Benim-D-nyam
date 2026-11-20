@@ -1,5 +1,6 @@
 package com.loc.benimdunyam.feature.settings.cloudaccount
 
+import com.loc.benimdunyam.data.sync.remote.JournalConflictResolution
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -107,7 +108,11 @@ internal fun JournalConflictSection(
                             passwordReady = password.length in 12..128,
                             onSaveCopy = { viewModel.preserveCopy(
                                 uid, password, item.remoteDocumentId, true
-                            ); password = "" }
+                            ); password = "" },
+                            onResolve = { resolution ->
+                                viewModel.resolve(uid, password, item.remoteDocumentId, resolution, true)
+                                password = ""
+                            }
                         )
                     }
                 }
@@ -152,7 +157,8 @@ private fun ConflictReviewCard(
     item: JournalConflictCard,
     enabled: Boolean,
     passwordReady: Boolean,
-    onSaveCopy: () -> Unit
+    onSaveCopy: () -> Unit,
+    onResolve: (JournalConflictResolution) -> Unit
 ) {
     var approved by remember(item.remoteDocumentId, item.confirmationKey) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -182,6 +188,38 @@ private fun ConflictReviewCard(
         item.remoteTitle?.let { Text("Buluttaki başlık: $it") }
         item.remoteExcerpt?.let { Text("Buluttaki metin: $it…",
             style = MaterialTheme.typography.bodySmall) }
+        // Faz C: çakışmayı kapatan iki karar. Hiçbiri bulutta veri silmez.
+        if (item.canKeepLocal || item.canAcceptRemote) {
+            var resolveApproved by remember(item.remoteDocumentId, item.confirmationKey) {
+                mutableStateOf(false)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = resolveApproved, onCheckedChange = { resolveApproved = it },
+                    enabled = enabled)
+                Text(
+                    "Seçtiğim sürümün bu anı için geçerli olmasını onaylıyorum. " +
+                            "Diğer sürümün metni bu anıda kalmaz (istersen önce ayrı kopya al).",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                if (item.canKeepLocal) {
+                    OutlinedButton(
+                        onClick = { resolveApproved = false; onResolve(JournalConflictResolution.KEEP_LOCAL) },
+                        enabled = enabled && resolveApproved && passwordReady,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Benimkini koru") }
+                }
+                if (item.canAcceptRemote) {
+                    OutlinedButton(
+                        onClick = { resolveApproved = false; onResolve(JournalConflictResolution.ACCEPT_REMOTE) },
+                        enabled = enabled && resolveApproved && passwordReady,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Buluttakini al") }
+                }
+            }
+        }
         if (item.savedAsSeparateCopy) {
             Text("Bu sürümün ayrı koruma kopyası zaten var.",
                 style = MaterialTheme.typography.bodySmall)

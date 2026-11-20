@@ -45,6 +45,12 @@ object AutomaticJournalSyncPolicy {
     fun scanCompleted(
         eligibleBefore: Int,
         inserted: Int,
-        pendingMoodFinishesAfter: Int
-    ): Boolean = inserted >= eligibleBefore && pendingMoodFinishesAfter == 0
+        pendingMoodFinishesAfter: Int,
+        editsBefore: Int = 0,
+        editsApplied: Int = 0
+    ): Boolean = inserted >= eligibleBefore && pendingMoodFinishesAfter == 0 &&
+            editsApplied >= editsBefore
+
+    /** Faz C: uygulanabilecek uzak düzenleme var mı? */
+    fun canApplyEdits(remoteEdits: Int): Boolean = remoteEdits > 0
 }

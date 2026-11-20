@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.data.sync.remote
 
+import com.google.firebase.firestore.Source
+import com.loc.benimdunyam.domain.sync.RemoteEditPolicy
 import com.loc.benimdunyam.data.sync.work.SyncCatalogFreshness
 import android.util.Base64
 import androidx.room.withTransaction
@@ -30,7 +32,9 @@ import javax.inject.Singleton
 data class ManualJournalUploadResult(
     val confirmed: Int,
     val changedDuringUpload: Int,
-    val pending: Int
+    val pending: Int,
+    /** Faz C: diğer cihazın düzenlemesiyle çakıştığı için gönderilmeyen olaylar. */
+    val conflicts: Int = 0
 )
 
 /** Bir bölüm gönderilmiş olsa bile hata nedenini saklar. */
@@ -86,10 +90,31 @@ class ManualJournalEventUploader @Inject constructor(
                 val events = eventDao.pendingForAccount(uid, 5)
                 var confirmed = 0
                 var stale = 0
+                var conflicts = 0
 
                 for (event in events) {
                     try {
                         requireAccount(uid)
+                        // Faz C: diğer cihaz bu anıyı aynı veya daha yüksek sürümle
+                        // göndermişse üzerine yazmayız. Olay CONFLICT olur ve kuyruğun
+                        // geri kalanı devam eder (önceden tüm gönderim burada dururdu).
+                        val ownEventId = SyncEventIdentity.eventId(
+                            uid, event.journalId, event.changeVersion, event.changeType
+                        )
+                        val otherRevisions = firestore.collection("users").document(uid)
+                            .collection("journal_change_events")
+                            .whereEqualTo("journalHash", SyncEventIdentity.journalHash(uid, event.journalId))
+                            .get(Source.SERVER).await()
+                            .documents
+                            .filter { it.id != ownEventId }
+                            .mapNotNull { it.getLong("revision") }
+                        requireAccount(uid)
+                        if (RemoteEditPolicy.uploadWouldConflict(event.changeVersion, otherRevisions)) {
+                            conflicts += eventDao.markConflictIfUnchanged(
+                                event.journalId, uid, event.changeVersion, event.changeType
+                            )
+                            continue
+                        }
                         val json = readEventSnapshot(event)
                         if (json == null) {
                             stale++
@@ -168,7 +193,8 @@ class ManualJournalEventUploader @Inject constructor(
                 ManualJournalUploadResult(
                     confirmed = confirmed,
                     changedDuringUpload = stale,
-                    pending = eventDao.pendingUpserts(uid) + eventDao.pendingDeletes(uid)
+                    pending = eventDao.pendingUpserts(uid) + eventDao.pendingDeletes(uid),
+                    conflicts = conflicts
                 )
             }
         }

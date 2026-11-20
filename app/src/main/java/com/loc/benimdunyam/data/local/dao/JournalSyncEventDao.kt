@@ -54,4 +54,25 @@ interface JournalSyncEventDao {
         version: Long,
         operation: String
     ): Int
+
+    /**
+     * Faz C: gönderilecek sürüm buluttaki başka bir olayla çakışıyor. Olay kuyruktan
+     * çıkar (PENDING değil) ama silinmez; kullanıcı "benimkini koru" veya
+     * "buluttakini al" diyene kadar bekler. Arada yeni bir yerel sürüm yazıldıysa dokunulmaz.
+     */
+    @Query("""
+        UPDATE journal_sync_events SET state = 'CONFLICT'
+        WHERE journalId = :journalId AND ownerUid = :uid
+          AND changeVersion = :version AND changeType = :operation
+          AND state = 'PENDING'
+    """)
+    suspend fun markConflictIfUnchanged(
+        journalId: String,
+        uid: String,
+        version: Long,
+        operation: String
+    ): Int
+
+    @Query("SELECT COUNT(*) FROM journal_sync_events WHERE ownerUid = :uid AND state = 'CONFLICT'")
+    suspend fun conflictCount(uid: String): Int
 }

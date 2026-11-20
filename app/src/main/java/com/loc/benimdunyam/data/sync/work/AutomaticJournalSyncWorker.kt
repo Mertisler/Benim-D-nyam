@@ -95,6 +95,8 @@ class AutomaticJournalSyncWorker(
                         }
 
                         val preview = merger.preview(uid, secret)
+                        var inserted = 0
+                        var pendingAfter = preview.pendingMoodFinishes
                         if (AutomaticJournalSyncPolicy.canImport(
                                 preview.eligible, preview.pendingMoodFinishes)) {
                             ensureAllowed(uid, scheduler, permission)
@@ -106,17 +108,31 @@ class AutomaticJournalSyncWorker(
                                 expectedFingerprint = preview.fingerprint,
                                 userConfirmed = true
                             )
-                            // İçe alma sınırı 5 anı. Kalan yeni anıları bir
-                            // sonraki periyodik çalışmada tekrar kontrol ederiz.
-                            allImportableHandled = AutomaticJournalSyncPolicy.scanCompleted(
-                                eligibleBefore = preview.eligible,
-                                inserted = imported.insertedJournals,
-                                pendingMoodFinishesAfter = imported.pendingMoodFinishes
-                            )
-                        } else if (preview.pendingMoodFinishes > 0) {
-                            // Ruh hali aktarımı hâlâ yarım: taramayı tamamlandı sayma.
-                            allImportableHandled = false
+                            inserted = imported.insertedJournals
+                            pendingAfter = imported.pendingMoodFinishes
                         }
+
+                        // Faz C: yalnızca diğer cihazda düzenlenmiş anılar uygulanır.
+                        // Bu cihazda gönderilmemiş değişiklik olan anılar asla ezilmez.
+                        var editsApplied = 0
+                        if (AutomaticJournalSyncPolicy.canApplyEdits(preview.remoteEdits)) {
+                            ensureAllowed(uid, scheduler, permission)
+                            editsApplied = merger.applyRemoteEdits(
+                                uid = uid,
+                                password = secret,
+                                expectedFingerprint = preview.fingerprint,
+                                userConfirmed = true
+                            ).updatedJournals
+                        }
+
+                        // Tek çalışma sınırı 5 anı. Kalanlar için tarama ertelenmez.
+                        allImportableHandled = AutomaticJournalSyncPolicy.scanCompleted(
+                            eligibleBefore = preview.eligible,
+                            inserted = inserted,
+                            pendingMoodFinishesAfter = pendingAfter,
+                            editsBefore = preview.remoteEdits,
+                            editsApplied = editsApplied
+                        )
                     }
                     ensureAllowed(uid, scheduler, permission)
                     if (allImportableHandled) {

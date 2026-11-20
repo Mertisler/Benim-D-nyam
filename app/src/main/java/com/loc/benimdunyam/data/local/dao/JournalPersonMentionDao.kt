@@ -1,5 +1,6 @@
 package com.loc.benimdunyam.data.local.dao
 
+import androidx.room.Update
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -20,6 +21,10 @@ interface JournalPersonMentionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMention(mention: JournalPersonMentionEntity)
+
+    /** Faz C: REPLACE yerine güncelleme; bağlı unutulmaz anılar CASCADE ile silinmez. */
+    @Update
+    suspend fun updateMention(mention: JournalPersonMentionEntity)
 
     @Query("DELETE FROM journal_person_mentions WHERE journalId = :journalId AND personId = :personId")
     suspend fun deleteMention(journalId: String, personId: String)

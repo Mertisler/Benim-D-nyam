@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.data.sync.remote
 
+import com.loc.benimdunyam.domain.sync.RemoteEditPolicy
+import com.loc.benimdunyam.domain.sync.RemoteEditDecision
 import android.util.Base64
 import androidx.room.withTransaction
 import com.google.firebase.auth.FirebaseAuth
@@ -56,8 +58,17 @@ data class SafeMergePreview(
     val importableWithMood: Int,
     val pendingMoodFinishes: Int,
     val remoteDeleteConflicts: Int,
-    val batchLimit: Int = 5
+    val batchLimit: Int = 5,
+    /** Faz C: yalnızca diğer cihazda düzenlenmiş, güvenle uygulanabilecek anılar. */
+    val remoteEdits: Int = 0,
+    /** Faz C: iki tarafta da değişmiş, kullanıcı kararı bekleyen anılar. */
+    val editConflicts: Int = 0,
+    /** Aynı sürümde birden fazla farklı bulut olayı olan anılar (atlanır). */
+    val inconsistentHeads: Int = 0
 )
+
+/** Faz C: uygulanan uzak düzenleme sayısı. */
+data class RemoteEditResult(val updatedJournals: Int)
 
 /** Tek onayda en fazla beş anı ve bunların ana Room ilişkileri eklenir. */
 data class SafeMergeResult(
@@ -83,7 +94,14 @@ private data class MergeRemoteEvent(
 private data class MergePlan(
     val summary: SafeMergePreview,
     val catalog: SyncDependencyCatalog,
-    val eligible: List<MergeRemoteEvent>
+    val eligible: List<MergeRemoteEvent>,
+    val updates: List<MergeRemoteEvent> = emptyList()
+)
+
+private data class RemoteEventSet(
+    val latest: List<MergeRemoteEvent>,
+    val token: String,
+    val inconsistentJournals: Int
 )
 
 /**
@@ -352,8 +370,11 @@ class SafeJournalMergeRepository @Inject constructor(
     }
 
     /** Değiştirilemeyen olay belgelerini 50'şer okuyarak TAM koleksiyonu inceler. */
-    private suspend fun readEvents(uid: String, password: CharArray): Pair<List<MergeRemoteEvent>, String> {
+    private suspend fun readEvents(uid: String, password: CharArray): RemoteEventSet {
         val latest = linkedMapOf<String, MergeRemoteEvent>()
+        // Faz C: aynı sürümde çelişen olaylar yalnızca O anıyı atlatır;
+        // önceden tüm birleştirmeyi kalıcı olarak durduruyordu.
+        val inconsistent = mutableSetOf<String>()
         val digest = MessageDigest.getInstance("SHA-256")
         var cursor: DocumentSnapshot? = null
         var processed = 0
@@ -382,18 +403,23 @@ class SafeJournalMergeRepository @Inject constructor(
                 val event = decodeEvent(uid, doc, JSONObject(raw))
                 val old = latest[event.journalId]
                 when {
-                    old == null || event.revision > old.revision -> latest[event.journalId] = event
+                    old == null || event.revision > old.revision -> {
+                        latest[event.journalId] = event
+                        inconsistent.remove(event.journalId)
+                    }
                     event.revision == old.revision && event != old ->
-                        error("Aynı sürüm için çakışan bulut olayları var.")
+                        inconsistent += event.journalId
                 }
             }
             cursor = page.documents.last()
             if (page.size() < 50) break
         }
         requireAccount(uid)
-        return latest.values.toList() to digest.digest().joinToString("") {
-            "%02x".format(it.toInt() and 255)
-        }
+        return RemoteEventSet(
+            latest = latest.values.filter { it.journalId !in inconsistent },
+            token = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) },
+            inconsistentJournals = inconsistent.size
+        )
     }
 
     /** JSON alanları ve belge kimliği, Faz 2F.3 gönderici sözleşmesiyle eşleşmelidir. */
@@ -459,6 +485,124 @@ class SafeJournalMergeRepository @Inject constructor(
      * PREVIEW ile TRANSACTION içinde aynı denetim yürütülür.
      * Bir çakışma fark edilirse mevcut kişiyi/dönemi sessizce değiştirmeyiz.
      */
+    /**
+     * Faz C: yalnızca diğer cihazda düzenlenmiş bir anının uygulanabilirliği.
+     *
+     * Yeni anı kurallarından farkı: yerelde zaten var olan kişi / dönem / bölüm
+     * için katalogla birebir eşitlik ARANMAZ, çünkü bunlar değiştirilmez; yalnızca
+     * anı satırı ve etiketleri güncellenir. Yerelde olmayan bağımlılıklar katalogdan
+     * yeni anı kurallarıyla (aynı adlı farklı kişi yok vb.) eklenir.
+     */
+    private suspend fun isSafeRemoteEdit(
+        remote: MergeRemoteEvent, catalog: SyncDependencyCatalog
+    ): Boolean {
+        val journal = remote.journal ?: return false
+        if (remote.operation != JournalSyncChangePolicy.UPSERT ||
+            remote.changeRecordedAt > catalog.capturedAtMillis ||
+            journal.id !in catalog.journalIds) return false
+        // Yarım kalmış ruh hali aktarımı sürüme bağlıdır; önce o tamamlanmalı.
+        if (pendingMoodDao.find(journal.id) != null) return false
+        // Etiketler katalogla birebir aynı olmalı (diğer cihaz arada yine değiştirmediyse).
+        val catalogMentions = catalog.mentions.filter { it.journalId == journal.id }
+        if (catalogMentions.toSet() != remote.mentions.toSet()) return false
+        if (journal.seasonId != null && seasonDao.getSeasonById(journal.seasonId) == null &&
+            catalog.seasons.none { it.id == journal.seasonId }) return false
+        if (journal.episodeId != null) {
+            val episode = episodeDao.getEpisodeById(journal.episodeId)
+                ?: catalog.episodes.firstOrNull { it.id == journal.episodeId }
+                ?: return false
+            if (episode.seasonId != journal.seasonId) return false
+        }
+        for (mention in remote.mentions) {
+            if (personDao.getPersonById(mention.personId) != null) continue
+            val person = catalog.people.firstOrNull { it.id == mention.personId } ?: return false
+            val sameName = personDao.getPersonByName(person.name)
+            if (sameName != null && sameName.id != person.id) return false
+        }
+        return true
+    }
+
+    /**
+     * Faz C: önizlemede bulunan uzak düzenlemeleri uygular (en çok beş anı).
+     * Bulut değişmişse (parmak izi) veya yerel kayıt arada düzenlenmişse durur.
+     * Kullanıcının bu cihazdaki gönderilmemiş değişikliği ASLA ezilmez: sınıflama
+     * transaction içinde yeniden yapılır ve yalnızca SYNCED kayıtlar güncellenir.
+     */
+    suspend fun applyRemoteEdits(
+        uid: String,
+        password: CharArray,
+        expectedFingerprint: String,
+        userConfirmed: Boolean
+    ): RemoteEditResult = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            require(userConfirmed) { "Uzak düzenlemeleri uygulamak için açık onay gerekiyor." }
+            require(expectedFingerprint.matches(Regex("[a-f0-9]{64}"))) {
+                "Önizleme doğrulama anahtarı geçersiz."
+            }
+            requireAccount(uid)
+            val plan = prepare(uid, password)
+            check(plan.summary.fingerprint == expectedFingerprint) {
+                "Bulut olayları veya katalog değişmiş. Yeniden önizleme yap."
+            }
+            val batch = plan.updates.take(MAX_IMPORT_PER_CONFIRMATION)
+            if (batch.isEmpty()) return@withContext RemoteEditResult(0)
+
+            writeCoordinator.withExclusiveRestore {
+                requireAccount(uid)
+                database.withTransaction {
+                    requireAccount(uid)
+                    for (remote in batch) {
+                        val localEvent = eventDao.findByJournalId(remote.journalId)
+                        val decision = RemoteEditPolicy.classify(
+                            localJournalExists = journalDao.getJournalById(remote.journalId) != null,
+                            localState = localEvent?.state,
+                            localChangeType = localEvent?.changeType,
+                            localVersion = localEvent?.changeVersion,
+                            remoteRevision = remote.revision
+                        )
+                        check(decision == RemoteEditDecision.APPLY &&
+                                isSafeRemoteEdit(remote, plan.catalog)) {
+                            "Yerel kayıtlar değişti. Uzak düzenleme uygulanmadan işlem durduruldu."
+                        }
+                    }
+                    val catalog = plan.catalog
+                    for (remote in batch) {
+                        val journal = requireNotNull(remote.journal)
+                        catalog.seasons.firstOrNull { it.id == journal.seasonId }?.let { season ->
+                            if (seasonDao.getSeasonById(season.id) == null) seasonDao.insertSeason(season)
+                        }
+                        catalog.episodes.firstOrNull { it.id == journal.episodeId }?.let { episode ->
+                            if (episodeDao.getEpisodeById(episode.id) == null) episodeDao.insertEpisode(episode)
+                        }
+                        for (mention in remote.mentions) {
+                            if (personDao.getPersonById(mention.personId) != null) continue
+                            val person = catalog.people.first { it.id == mention.personId }
+                            val sameName = personDao.getPersonByName(person.name)
+                            check(sameName == null || sameName.id == person.id) {
+                                "Farklı kimlikli kişiler aynı ada sahip. Tüm işlem geri alındı."
+                            }
+                            personDao.insertPerson(person)
+                        }
+                        RemoteJournalEditWriter.apply(
+                            journalDao = journalDao,
+                            mentionDao = mentionDao,
+                            specialDao = specialDao,
+                            eventDao = eventDao,
+                            uid = uid,
+                            journal = journal,
+                            mentions = remote.mentions,
+                            specialMemories = catalog.specialMemories.filter { it.journalId == journal.id },
+                            remoteRevision = remote.revision,
+                            remoteChangedAt = remote.changeRecordedAt
+                        )
+                    }
+                    requireAccount(uid)
+                }
+                RemoteEditResult(batch.size)
+            }
+        }
+    }
+
     private suspend fun isSafeNewRecord(
         uid: String, remote: MergeRemoteEvent, catalog: SyncDependencyCatalog
     ): Boolean {
@@ -506,8 +650,12 @@ class SafeJournalMergeRepository @Inject constructor(
         require(password.size in 12..128) { "Aktarım şifresi 12–128 karakter olmalı." }
         requireAccount(uid)
         val (catalog, catalogToken) = readCatalog(uid, password)
-        val (latest, eventsToken) = readEvents(uid, password)
+        val remoteSet = readEvents(uid, password)
+        val latest = remoteSet.latest
+        val eventsToken = remoteSet.token
         val eligible = mutableListOf<MergeRemoteEvent>()
+        val updates = mutableListOf<MergeRemoteEvent>()
+        var editConflicts = 0
         var existing = 0
         var deletes = 0
         var stale = 0
@@ -524,8 +672,27 @@ class SafeJournalMergeRepository @Inject constructor(
                 continue // Faz 2F.8'e kadar otomatik DELETE yok.
             }
             if (remote.changeRecordedAt > catalog.capturedAtMillis) { stale++; continue }
-            if (journalDao.getJournalById(remote.journalId) != null ||
-                eventDao.findByJournalId(remote.journalId) != null) { existing++; continue }
+            val localJournal = journalDao.getJournalById(remote.journalId)
+            val localEvent = eventDao.findByJournalId(remote.journalId)
+            if (localJournal != null || localEvent != null) {
+                // Faz C: cihazda zaten olan anının buluttaki düzenlemesi.
+                when (RemoteEditPolicy.classify(
+                    localJournalExists = localJournal != null,
+                    localState = localEvent?.state,
+                    localChangeType = localEvent?.changeType,
+                    localVersion = localEvent?.changeVersion,
+                    remoteRevision = remote.revision
+                )) {
+                    RemoteEditDecision.APPLY ->
+                        if (isSafeRemoteEdit(remote, catalog)) updates += remote else missing++
+                    RemoteEditDecision.CONFLICT ->
+                        if (localJournal != null && localEvent != null &&
+                            remote.revision >= localEvent.changeVersion &&
+                            localJournal != remote.journal) editConflicts++ else existing++
+                    else -> existing++
+                }
+                continue
+            }
             if (!isSafeNewRecord(uid, remote, catalog)) { missing++; continue }
             eligible += remote
             if (catalog.moods.any { it.journalId == remote.journalId }) withMood++
@@ -536,8 +703,11 @@ class SafeJournalMergeRepository @Inject constructor(
             SafeMergePreview(fingerprint, latest.size, eligible.size, existing,
                 deletes, stale, missing, withMood,
                 pendingMoodDao.pendingCount(uid), deleteConflicts,
-                MAX_IMPORT_PER_CONFIRMATION),
-            catalog, eligible
+                MAX_IMPORT_PER_CONFIRMATION,
+                remoteEdits = updates.size,
+                editConflicts = editConflicts,
+                inconsistentHeads = remoteSet.inconsistentJournals),
+            catalog, eligible, updates
         )
     }
 
