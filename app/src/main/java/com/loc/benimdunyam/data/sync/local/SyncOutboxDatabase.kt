@@ -9,7 +9,7 @@ import androidx.room.RoomDatabase
  * Böylece ana AppDatabase'in version=7 şemasına migration eklemiyoruz.
  * Bu dosya yalnızca planlama/iş durumunu tutar; günlük verisi burada yoktur.
  */
-@Database(entities = [SyncTaskEntity::class], version = 1, exportSchema = false)
+@Database(entities = [SyncTaskEntity::class], version = 1, exportSchema = true)
 abstract class SyncOutboxDatabase : RoomDatabase() {
     abstract fun taskDao(): SyncTaskDao
 }

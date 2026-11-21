@@ -59,7 +59,7 @@ interface JournalMoodDao {
     suspend fun insertAll(records: List<JournalMoodRecord>)
 }
 
-@Database(entities = [JournalMoodRecord::class], version = 1, exportSchema = false)
+@Database(entities = [JournalMoodRecord::class], version = 1, exportSchema = true)
 abstract class JournalMoodDatabase : RoomDatabase() {
     abstract fun moodDao(): JournalMoodDao
 }

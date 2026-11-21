@@ -61,7 +61,7 @@ interface JournalDraftDao {
 @Database(
     entities = [JournalDraftEntity::class],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class JournalDraftDatabase : RoomDatabase() {
     abstract fun journalDraftDao(): JournalDraftDao

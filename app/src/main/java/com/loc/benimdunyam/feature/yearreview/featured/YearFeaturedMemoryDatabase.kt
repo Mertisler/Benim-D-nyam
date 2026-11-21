@@ -57,7 +57,7 @@ interface YearFeaturedMemoryDao {
 @Database(
     entities = [YearFeaturedMemoryEntity::class],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class YearFeaturedMemoryDatabase : RoomDatabase() {
     abstract fun dao(): YearFeaturedMemoryDao
