@@ -26,7 +26,9 @@ data class BackupPreview(
     val imageCount: Int,
     val encryptedSha256: String,
     /** null: eski yedek (arşiv sürüm 1) ruh hali içermiyor. */
-    val moodCount: Int? = null
+    val moodCount: Int? = null,
+    /** null: eski yedek (sürüm 1–2), anı fotoğrafları ayrı dosyada. */
+    val journalPhotoCount: Int? = null
 )
 
 @Singleton
@@ -57,7 +59,8 @@ class RestoreBackupUseCase @Inject constructor(
                     specialMemoryCount = verified.specialMemoryCount,
                     imageCount = verified.imageCount,
                     encryptedSha256 = verified.encryptedSha256,
-                    moodCount = verified.moodCount
+                    moodCount = verified.moodCount,
+                    journalPhotoCount = verified.journalPhotoCount
                 )
             }
         } finally {

@@ -37,7 +37,12 @@ class PreparedBackup internal constructor(
      * Doğrulanmış ruh halleri. null: arşiv sürüm 1 (ruh hali içermez);
      * bu durumda geri yükleme cihazdaki ruh hallerine dokunmaz.
      */
-    val moods: List<JournalMoodRecord>? = null
+    val moods: List<JournalMoodRecord>? = null,
+    /**
+     * Doğrulanmış (boyut + SHA-256) anı fotoğrafı arşivi; geçici klasörde.
+     * null: arşiv sürüm 1–2, fotoğraflar ayrı .bdmedia dosyasındadır.
+     */
+    val journalMediaZip: File? = null
 ) : Closeable {
 
     private val knownPaths =
@@ -167,11 +172,14 @@ class BackupArchiveReader @Inject constructor(
                 .toSet()
 
             val hasMoods = manifest.archiveVersion >=
-                    BackupArchiveManifest.CURRENT_ARCHIVE_VERSION
+                    BackupArchiveManifest.MOODS_ARCHIVE_VERSION
+            val hasJournalMedia = manifest.archiveVersion >=
+                    BackupArchiveManifest.JOURNAL_MEDIA_ARCHIVE_VERSION
 
             val expectedPaths = mediaPaths +
                     setOf(DATA_ENTRY, MANIFEST_ENTRY) +
-                    (if (hasMoods) setOf(BackupMoodCodec.ENTRY) else emptySet())
+                    (if (hasMoods) setOf(BackupMoodCodec.ENTRY) else emptySet()) +
+                    (if (hasJournalMedia) setOf(BackupArchiveManifest.JOURNAL_MEDIA_ENTRY) else emptySet())
 
             if (entries.keys != expectedPaths) {
                 throw IOException(
@@ -300,11 +308,31 @@ class BackupArchiveReader @Inject constructor(
                     totalBytes += copiedBytes
                 }
 
+                // Aşama 3: anı fotoğrafı arşivi akışla çıkarılır, boyut ve özeti doğrulanır.
+                // İçindeki her fotoğraf geri yüklemede ayrıca doğrulanır.
+                val journalMediaZip = if (hasJournalMedia) {
+                    val entry = entries[BackupArchiveManifest.JOURNAL_MEDIA_ENTRY]
+                        ?: throw IOException("Anı fotoğrafları yedekte bulunamadı.")
+                    val destination = File(stagingDirectory.canonicalFile, "journal-media.zip")
+                    extractVerifiedImage(
+                        zip = zip,
+                        entry = entry,
+                        destination = destination,
+                        media = BackupMediaFile(
+                            archivePath = BackupArchiveManifest.JOURNAL_MEDIA_ENTRY,
+                            sizeBytes = requireNotNull(manifest.journalMediaSizeBytes),
+                            sha256 = requireNotNull(manifest.journalMediaSha256)
+                        )
+                    )
+                    destination
+                } else null
+
                 val preparedBackup = PreparedBackup(
                     data = backupData,
                     manifest = manifest,
                     stagingDirectory = stagingDirectory,
-                    moods = moods
+                    moods = moods,
+                    journalMediaZip = journalMediaZip
                 )
 
                 completed = true
@@ -334,7 +362,7 @@ class BackupArchiveReader @Inject constructor(
             val entry = enumeration.nextElement()
             val name = entry.name
 
-            if (result.size >= MAX_MEDIA_COUNT + 3) {
+            if (result.size >= MAX_MEDIA_COUNT + 4) {
                 throw IOException(
                     "ZIP dosyasında çok fazla giriş var."
                 )
@@ -362,6 +390,7 @@ class BackupArchiveReader @Inject constructor(
         return name == MANIFEST_ENTRY ||
                 name == DATA_ENTRY ||
                 name == BackupMoodCodec.ENTRY ||
+                name == BackupArchiveManifest.JOURNAL_MEDIA_ENTRY ||
                 mediaPathRegex.matches(name)
     }
 
@@ -421,7 +450,7 @@ class BackupArchiveReader @Inject constructor(
         var moodsSize: Long? = null
         var moodsHash: String? = null
 
-        if (archiveVersion >= BackupArchiveManifest.CURRENT_ARCHIVE_VERSION) {
+        if (archiveVersion >= BackupArchiveManifest.MOODS_ARCHIVE_VERSION) {
             val size = readLong(root, "moodsSizeBytes")
             val hash = readString(root, "moodsSha256")
 
@@ -435,6 +464,28 @@ class BackupArchiveReader @Inject constructor(
             moodsSize = size
             moodsHash = hash
         } else if (root.has("moodsSizeBytes") || root.has("moodsSha256")) {
+            throw IOException(
+                "Manifest sürümü ile içeriği uyuşmuyor."
+            )
+        }
+
+        // Sürüm 3: anı fotoğrafı arşivi zorunlu ve özetle bağlı.
+        var journalMediaSize: Long? = null
+        var journalMediaHash: String? = null
+
+        if (archiveVersion >= BackupArchiveManifest.JOURNAL_MEDIA_ARCHIVE_VERSION) {
+            val size = readLong(root, "journalMediaSizeBytes")
+            val hash = readString(root, "journalMediaSha256")
+            if (size !in 1..BackupArchiveManifest.MAX_JOURNAL_MEDIA_BYTES ||
+                !shaRegex.matches(hash)
+            ) {
+                throw IOException(
+                    "Manifest fotoğraf bilgileri geçersiz."
+                )
+            }
+            journalMediaSize = size
+            journalMediaHash = hash
+        } else if (root.has("journalMediaSizeBytes") || root.has("journalMediaSha256")) {
             throw IOException(
                 "Manifest sürümü ile içeriği uyuşmuyor."
             )
@@ -529,7 +580,9 @@ class BackupArchiveReader @Inject constructor(
             dataSha256 = dataHash,
             mediaFiles = mediaFiles,
             moodsSizeBytes = moodsSize,
-            moodsSha256 = moodsHash
+            moodsSha256 = moodsHash,
+            journalMediaSizeBytes = journalMediaSize,
+            journalMediaSha256 = journalMediaHash
         )
     }
 

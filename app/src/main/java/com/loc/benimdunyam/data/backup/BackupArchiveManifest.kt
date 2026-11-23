@@ -9,6 +9,8 @@ package com.loc.benimdunyam.data.backup
  *   2: 1'e ek olarak data/moods.json (ruh halleri). Eski uygulamalar
  *      sürüm 2'yi "desteklenmeyen" diye reddeder; ruh halleri sessizce
  *      kaybolmaz.
+ *   3: 2'ye ek olarak media/journal-media.zip (anı fotoğrafları, sıralama ve
+ *      fotoğraf silme işaretleri). Tek dosya yedek: ayrı .bdmedia gerekmez.
  * dataVersion: BackupData modelinin sürümü.
  * moodsSizeBytes / moodsSha256: yalnızca sürüm 2'de; Gson null alanları yazmaz.
  */
@@ -21,11 +23,19 @@ data class BackupArchiveManifest(
     val dataSha256: String,
     val mediaFiles: List<BackupMediaFile>,
     val moodsSizeBytes: Long? = null,
-    val moodsSha256: String? = null
+    val moodsSha256: String? = null,
+    val journalMediaSizeBytes: Long? = null,
+    val journalMediaSha256: String? = null
 ) {
     companion object {
         const val LEGACY_ARCHIVE_VERSION = 1
-        const val CURRENT_ARCHIVE_VERSION = 2
+        /** Ruh halleri (data/moods.json) bu sürümden itibaren vardır. */
+        const val MOODS_ARCHIVE_VERSION = 2
+        /** Anı fotoğrafları (media/journal-media.zip) bu sürümden itibaren vardır. */
+        const val JOURNAL_MEDIA_ARCHIVE_VERSION = 3
+        const val CURRENT_ARCHIVE_VERSION = 3
+        const val JOURNAL_MEDIA_ENTRY = "media/journal-media.zip"
+        const val MAX_JOURNAL_MEDIA_BYTES = 300L * 1024L * 1024L
     }
 }
 

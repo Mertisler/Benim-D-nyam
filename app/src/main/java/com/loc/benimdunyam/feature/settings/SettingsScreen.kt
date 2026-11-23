@@ -1,5 +1,6 @@
 package com.loc.benimdunyam.feature.settings
 
+import com.loc.benimdunyam.feature.settings.cloudaccount.relativeTime
 import com.loc.benimdunyam.core.DeveloperTools
 import androidx.compose.ui.graphics.Color
 import android.net.Uri
@@ -41,7 +42,8 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     // Faz 2I.3: medya arşiv işi sürerken ana ekranın geri tuşunu da kilitle.
-    val mediaBackupViewModel: JournalMediaBackupViewModel = hiltViewModel()
+    val mediaBackupViewModel: JournalMediaBackupViewModel? =
+        if (DeveloperTools.ENABLED) hiltViewModel() else null
     // Faz 2I.4: iki SAF yedeğinin dosya bazında salt-okunur doğrulanması.
     // Yalnızca debug derlemesindeki geliştirici araçlarında kullanılır.
     val backupCoverageViewModel: BackupCoverageViewModel? =
@@ -51,7 +53,7 @@ fun SettingsScreen(
     val uiState = viewModel.uiState
     val isBusy = uiState.isLoading ||
             uiState.isBackupHealthLoading ||
-            uiState.isBackupSelfCheckLoading || mediaBackupViewModel.state.busy ||
+            uiState.isBackupSelfCheckLoading || mediaBackupViewModel?.state?.busy == true ||
             backupCoverageViewModel?.ui?.busy == true
 
     var showClearDialog by remember {
@@ -84,6 +86,8 @@ fun SettingsScreen(
 
     LaunchedEffect(Unit) {
         viewModel.loadBiometricPreference(context)
+        viewModel.loadBackupStatus()
+        // Arşiv sağlığı arka planda denetlenir; yalnızca sorun varsa tek satır uyarı çıkar.
         viewModel.checkBackupHealth()
     }
 
@@ -269,11 +273,28 @@ fun SettingsScreen(
                     }
 
                     Text(
-                        "Günlüklerini, kişilerini, dönemlerini ve ruh hallerini " +
-                                "parola korumalı bir dosyada sakla. Anı fotoğrafları " +
-                                "için aşağıdaki fotoğraf yedeğini kullan.",
+                        uiState.lastBackupAt?.let { "Son yedek: ${relativeTime(it)}" }
+                            ?: "Henüz yedek almadın.",
                         style = MaterialTheme.typography.bodyMedium
                     )
+
+                    if (uiState.backupReminder) {
+                        Text(
+                            "Anıların yalnızca bu telefonda. Telefon kaybolursa geri " +
+                                    "getirebilmek için yeni bir yedek almanı öneririz.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    uiState.backupHealthReport?.takeIf { it.hasDataProblems }?.let {
+                        Text(
+                            "Bazı anı kayıtlarında eksik fotoğraf veya bağlantı var. " +
+                                    "Yedek yine alınabilir; bu kayıtlar olduğu gibi yedeklenir.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
 
                     OutlinedButton(
                         onClick = {
@@ -315,18 +336,15 @@ fun SettingsScreen(
                     }
 
                     Text(
-                        "Yedek dosyası .bdbackup uzantısıyla " +
-                                "kaydedilir. Parolanı kaybedersen " +
-                                "şifreli yedeğini açamazsın.",
+                        "Günlüklerin, kişilerin, dönemlerin, ruh hallerin ve anı fotoğrafların " +
+                                "parola korumalı tek bir dosyaya kaydedilir. Dosyayı Google Drive gibi " +
+                                "telefon dışında bir yere kaydet. Parolanı unutursan yedek açılamaz.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            // Faz 2I.3: .bdbackup dosyasının kapsamadığı anı fotoğrafları için
-            // ayrı şifreli .bdmedia arşivi; mevcut yedek ekranı değişmez.
-            JournalMediaBackupSection(viewModel = mediaBackupViewModel)
 
             // Faz B: "Son silinenler" — yanlışlıkla silmeye karşı 30 günlük güvence.
             RecentlyDeletedSection(viewModel = recentlyDeletedViewModel)
@@ -341,6 +359,9 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // Eski ayrı fotoğraf yedeği (.bdmedia). Aşama 3'ten beri fotoğraflar
+                // tek .bdbackup dosyasında; bu bölüm eski dosyaları açmak içindir.
+                mediaBackupViewModel?.let { JournalMediaBackupSection(viewModel = it) }
                 // Faz 2I.4: doğrulanan gerçek yedek dosyalarının sağlık/kapasite özeti.
                 backupCoverageViewModel?.let { BackupCoverageSection(viewModel = it) }
                 ArchiveHealthCard(
@@ -654,7 +675,11 @@ fun SettingsScreen(
                         "Unutulmaz anılar: " +
                                 "${preview.specialMemoryCount}"
                     )
-                    Text("Fotoğraflar: ${preview.imageCount}")
+                    preview.moodCount?.let { Text("Ruh halleri: $it") }
+                    Text(
+                        "Fotoğraflar: " + (preview.journalPhotoCount?.let { "$it anı fotoğrafı, " } ?: "") +
+                                "${preview.imageCount} kişi/dönem fotoğrafı"
+                    )
 
                     HorizontalDivider()
 

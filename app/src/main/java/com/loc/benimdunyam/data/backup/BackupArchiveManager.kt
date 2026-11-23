@@ -24,7 +24,8 @@ class BackupArchiveManager @Inject constructor(
     private val workspace: ActiveWorkspaceSession,
     private val backupRepository: BackupRepository,
     private val backupValidator: BackupValidator,
-    private val moodRepository: JournalMoodRepository
+    private val moodRepository: JournalMoodRepository,
+    private val journalMediaManager: JournalMediaArchiveManager
 ) {
 
     private val gson = Gson()
@@ -148,7 +149,17 @@ class BackupArchiveManager @Inject constructor(
                 temporaryDirectory
             )
 
+            // Aşama 3: anı fotoğrafları tek dosyada. Mevcut .bdmedia biçimi aynen
+            // üretilir ve ZIP'e tek, özetle bağlı bir giriş olarak gömülür.
+            var journalMediaTemp: File? = null
+
             try {
+                val journalMedia = journalMediaManager.buildEmbeddedArchive()
+                journalMediaTemp = journalMedia
+                require(journalMedia.length() in 1..BackupArchiveManifest.MAX_JOURNAL_MEDIA_BYTES) {
+                    "Anı fotoğrafları yedek sınırını aşıyor."
+                }
+                val journalMediaSha = sha256File(journalMedia)
                 val mediaManifest =
                     mutableListOf<BackupMediaFile>()
 
@@ -174,6 +185,11 @@ class BackupArchiveManager @Inject constructor(
                         entryName = BackupMoodCodec.ENTRY,
                         bytes = moodBytes
                     )
+
+                    // Anı fotoğrafları (arşiv sürüm 3)
+                    zip.putNextEntry(ZipEntry(BackupArchiveManifest.JOURNAL_MEDIA_ENTRY))
+                    journalMedia.inputStream().buffered().use { it.copyTo(zip, DEFAULT_BUFFER_SIZE) }
+                    zip.closeEntry()
 
                     // Sezon ve kişi fotoğrafları
                     for ((archivePath, sourceFile) in images) {
@@ -202,7 +218,9 @@ class BackupArchiveManager @Inject constructor(
                         dataSha256 = sha256(jsonBytes),
                         mediaFiles = mediaManifest,
                         moodsSizeBytes = moodBytes.size.toLong(),
-                        moodsSha256 = sha256(moodBytes)
+                        moodsSha256 = sha256(moodBytes),
+                        journalMediaSizeBytes = journalMedia.length(),
+                        journalMediaSha256 = journalMediaSha
                     )
 
                     writeBytes(
@@ -225,6 +243,8 @@ class BackupArchiveManager @Inject constructor(
             } catch (exception: Exception) {
                 archiveFile.delete()
                 throw exception
+            } finally {
+                journalMediaTemp?.delete()
             }
         }
 
@@ -362,6 +382,19 @@ class BackupArchiveManager @Inject constructor(
         require(id.matches(Regex("[A-Za-z0-9_-]{1,128}"))) {
             "Güvensiz veya geçersiz kayıt kimliği bulundu."
         }
+    }
+
+    private fun sha256File(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().buffered().use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                digest.update(buffer, 0, n)
+            }
+        }
+        return toHex(digest.digest())
     }
 
     private fun sha256(bytes: ByteArray): String {

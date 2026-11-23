@@ -220,71 +220,123 @@ class JournalMediaArchiveManager @Inject constructor(
                         plan.toRestore.size == expected.restorePhotoCount) {
                     "Yerel anılar önizlemeden sonra değişmiş. Yeniden incele."
                 }
-                // İlk aşama: tamamını hazırla. Bozuk resim veya ZIP, hiçbir fotoğraf yazılmadan fark edilir.
-                val prepared = withContext(Dispatchers.IO) {
-                    ZipFile(requireNotNull(plain)).use { zip ->
-                        plan.toRestore.associateWith { photo ->
-                            val temp = temporary(".${photo.photoId.substringAfterLast('.')}")
-                            staged += temp
-                            val entry = zip.getEntry(photo.entryPath) ?: error("Medya eksik")
-                            zip.getInputStream(entry).use { input ->
-                                temp.outputStream().buffered().use { output ->
-                                    copyLimited(input, output, photo.size)
-                                }
-                            }
-                            check(temp.length() == photo.size && sha256OfFile(temp) == photo.sha256) {
-                                "Fotoğraf doğrulaması başarısız."
-                            }
-                            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                            BitmapFactory.decodeFile(temp.absolutePath, options)
-                            val pixels = options.outWidth.toLong() * options.outHeight.toLong()
-                            check(pixels in 1..MAX_PIXELS) { "Geçersiz fotoğraf çözünürlüğü." }
-                            temp
-                        }
-                    }
-                }
-                // Arşivdeki silme işaretlerini yalnızca birleştir; mevcut kayıtları azaltma.
-                ledger.mergeVerifiedArchive(archive.deletions)
-                var restored = 0
-                for ((photo, temp) in prepared) {
-                    currentCoroutineContext().ensureActive()
-                    if (journalPhotoStore.restoreMissingFromCloud(photo.journalId, photo.photoId, temp)) {
-                        restored++
-                    } else {
-                        // Kullanıcı silme işaretini güncellediyse fotoğrafı GERİ GETİRME.
-                        throw IOException("Fotoğraf eşitleme sırasında durum değişti. Kısmi içe alma olabilir; yeniden incele.")
-                    }
-                }
-                var layoutCount = 0
-                archive.photos.groupBy { it.journalId }.forEach { (journalId, photos) ->
-                    if (journalId in plan.previouslyEmptyJournals && photos.all { row ->
-                            plan.toRestore.any { it.journalId == journalId && it.photoId == row.photoId }
-                        }) {
-                        val local = journalPhotoStore.list(journalId)
-                        val desiredOrder = photos.sortedBy { it.orderIndex }.map { it.photoId }
-                        val cover = photos.firstOrNull { it.isCover }?.photoId
-                        if (local.map { it.id }.toSet() == desiredOrder.toSet() &&
-                            journalPhotoStore.applyApprovedCloudLayoutIfUnmodified(
-                                journalId = journalId,
-                                expectedLocalOrder = local.map { it.id },
-                                expectedLocalCover = local.firstOrNull { it.isCover }?.id,
-                                requestedOrder = desiredOrder,
-                                requestedCover = cover
-                            )) layoutCount++
-                    }
-                }
-                JournalMediaArchiveRestoreResult(
-                    restoredCount = restored,
-                    alreadyPresentCount = plan.alreadyPresent,
-                    deletedPhotoBlockedCount = plan.blocked,
-                    layoutRestoredCount = layoutCount
-                )
+                applyPlan(requireNotNull(plain), archive, plan, staged)
             }
         } finally {
             passphrase.fill('\u0000')
             withContext(Dispatchers.IO) { staged.forEach { it.delete() }; plain?.delete(); encrypted?.delete() }
         }
     }
+
+
+    /**
+     * Doğrulanmış plana göre fotoğrafları önce geçici klasörde hazırlar, sonra
+     * mevcutların üzerine yazmadan ekler. Çağıran yazma kilidini tutmalıdır.
+     */
+    private suspend fun applyPlan(
+        plain: File,
+        archive: MediaArchiveContent,
+        plan: MediaRestorePlan,
+        staged: MutableList<File>
+    ): JournalMediaArchiveRestoreResult {
+        // İlk aşama: tamamını hazırla. Bozuk resim veya ZIP, hiçbir fotoğraf yazılmadan fark edilir.
+        val prepared = withContext(Dispatchers.IO) {
+            ZipFile(plain).use { zip ->
+                plan.toRestore.associateWith { photo ->
+                    val temp = temporary(".${photo.photoId.substringAfterLast('.')}")
+                    staged += temp
+                    val entry = zip.getEntry(photo.entryPath) ?: error("Medya eksik")
+                    zip.getInputStream(entry).use { input ->
+                        temp.outputStream().buffered().use { output ->
+                            copyLimited(input, output, photo.size)
+                        }
+                    }
+                    check(temp.length() == photo.size && sha256OfFile(temp) == photo.sha256) {
+                        "Fotoğraf doğrulaması başarısız."
+                    }
+                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(temp.absolutePath, options)
+                    val pixels = options.outWidth.toLong() * options.outHeight.toLong()
+                    check(pixels in 1..MAX_PIXELS) { "Geçersiz fotoğraf çözünürlüğü." }
+                    temp
+                }
+            }
+        }
+        // Arşivdeki silme işaretlerini yalnızca birleştir; mevcut kayıtları azaltma.
+        ledger.mergeVerifiedArchive(archive.deletions)
+        var restored = 0
+        for ((photo, temp) in prepared) {
+            currentCoroutineContext().ensureActive()
+            if (journalPhotoStore.restoreMissingFromCloud(photo.journalId, photo.photoId, temp)) {
+                restored++
+            } else {
+                // Kullanıcı silme işaretini güncellediyse fotoğrafı GERİ GETİRME.
+                throw IOException("Fotoğraf eşitleme sırasında durum değişti. Kısmi içe alma olabilir; yeniden incele.")
+            }
+        }
+        var layoutCount = 0
+        archive.photos.groupBy { it.journalId }.forEach { (journalId, photos) ->
+            if (journalId in plan.previouslyEmptyJournals && photos.all { row ->
+                    plan.toRestore.any { it.journalId == journalId && it.photoId == row.photoId }
+                }) {
+                val local = journalPhotoStore.list(journalId)
+                val desiredOrder = photos.sortedBy { it.orderIndex }.map { it.photoId }
+                val cover = photos.firstOrNull { it.isCover }?.photoId
+                if (local.map { it.id }.toSet() == desiredOrder.toSet() &&
+                    journalPhotoStore.applyApprovedCloudLayoutIfUnmodified(
+                        journalId = journalId,
+                        expectedLocalOrder = local.map { it.id },
+                        expectedLocalCover = local.firstOrNull { it.isCover }?.id,
+                        requestedOrder = desiredOrder,
+                        requestedCover = cover
+                    )) layoutCount++
+            }
+        }
+        return JournalMediaArchiveRestoreResult(
+            restoredCount = restored,
+            alreadyPresentCount = plan.alreadyPresent,
+            deletedPhotoBlockedCount = plan.blocked,
+            layoutRestoredCount = layoutCount
+        )
+    }
+
+    /**
+     * Aşama 3 — tek yedek dosyası (.bdbackup arşiv sürüm 3) için şifresiz fotoğraf
+     * ZIP'i üretir. Çağıran (CreateBackupUseCase) ortak yazma kilidini tutar.
+     * Dönen geçici dosyanın silinmesi çağırana aittir.
+     */
+    internal suspend fun buildEmbeddedArchive(): File = withContext(Dispatchers.IO) {
+        requireWorkspace()
+        buildPlainArchive()
+    }
+
+    /** Gömülü fotoğraf arşivini doğrular ve fotoğraf sayısını döndürür. Hiçbir şey yazmaz. */
+    internal suspend fun inspectEmbedded(plainZip: File): Int = withContext(Dispatchers.IO) {
+        inspectPlainArchive(plainZip, requireSameOwner = false).photos.size
+    }
+
+    /**
+     * Tek yedek dosyasının geri yüklenmesinde, anılar Room'a yazıldıktan SONRA
+     * çağrılır. Hesap etiketi kontrol edilmez: kullanıcı bu dosyayı bilerek
+     * (ör. yeni telefona) geri yüklemektedir. Diğer tüm kontroller aynıdır:
+     * SHA-256, boyut, silme işaretleri, mevcut fotoğrafın üzerine yazmama.
+     */
+    internal suspend fun restoreEmbedded(plainZip: File): JournalMediaArchiveRestoreResult =
+        operationMutex.withLock {
+            val staged = mutableListOf<File>()
+            try {
+                requireWorkspace()
+                val archive = withContext(Dispatchers.IO) {
+                    inspectPlainArchive(plainZip, requireSameOwner = false)
+                }
+                writeCoordinator.withRegularWrite {
+                    val plan = buildRestorePlan(archive)
+                    applyPlan(plainZip, archive, plan, staged)
+                }
+            } finally {
+                withContext(Dispatchers.IO) { staged.forEach { it.delete() } }
+            }
+        }
 
     private suspend fun buildPlainArchive(): File {
         val journals = backupRepository.createBackupData().journals
@@ -361,7 +413,10 @@ class JournalMediaArchiveManager @Inject constructor(
         } })
     }
 
-    private suspend fun inspectPlainArchive(file: File): MediaArchiveContent {
+    private suspend fun inspectPlainArchive(
+        file: File,
+        requireSameOwner: Boolean = true
+    ): MediaArchiveContent {
         check(file.isFile && file.length() in 1..MAX_ENCRYPTED_BYTES) { "ZIP boyutu geçersiz." }
         return ZipFile(file).use { zip ->
             val entries = zip.entries().asSequence().toList()
@@ -383,7 +438,9 @@ class JournalMediaArchiveManager @Inject constructor(
                 "Bu dosya bir BD medya yedeği değil."
             }
             val owner = root.getString("owner")
-            check(owner == ownerTag()) { "Yedek başka hesap/çalışma alanına ait; aktarma durduruldu." }
+            check(!requireSameOwner || owner == ownerTag()) {
+                "Yedek başka hesap/çalışma alanına ait; aktarma durduruldu."
+            }
             val createdAt = root.getLong("createdAt")
             check(createdAt > 0 && createdAt <= System.currentTimeMillis() + 86_400_000L) {
                 "Yedek tarihi geçersiz."

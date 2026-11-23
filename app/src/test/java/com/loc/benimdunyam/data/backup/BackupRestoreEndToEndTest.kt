@@ -13,6 +13,9 @@ import com.loc.benimdunyam.data.local.entity.LifeSeasonEntity
 import com.loc.benimdunyam.data.local.entity.PersonEntity
 import com.loc.benimdunyam.data.local.entity.PersonSpecialMemoryEntity
 import com.loc.benimdunyam.data.local.isolation.ActiveWorkspaceSession
+import com.loc.benimdunyam.data.local.isolation.WorkspaceMode
+import com.loc.benimdunyam.data.local.media.JournalPhotoStore
+import com.loc.benimdunyam.data.local.media.PublishedPhotoDeletionLedger
 import com.loc.benimdunyam.data.local.mood.JournalMoodRecord
 import com.loc.benimdunyam.data.local.mood.JournalMoodRepository
 import com.loc.benimdunyam.data.repository.BackupRepositoryImpl
@@ -22,6 +25,9 @@ import io.mockk.every
 import io.mockk.mockk
 import java.io.File
 import java.io.IOException
+import java.io.ByteArrayOutputStream
+import java.security.MessageDigest
+import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -80,16 +86,34 @@ class BackupRestoreEndToEndTest {
             every { backupStagingRoot() } returns stagingRoot
             every { databaseNames() } returns
                     listOf("$name-main.db", "$name-moods.db", "$name-drafts.db", "$name-featured.db")
+            every { mode } returns WorkspaceMode.LEGACY
+            every { needsRestart() } returns false
         }
+        val coordinator = BackupWriteCoordinator()
+        val ledger = PublishedPhotoDeletionLedger(workspace)
+        val photoStore = JournalPhotoStore(context, coordinator, workspace, ledger)
         val db: AppDatabase = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         val repository = BackupRepositoryImpl(db, validator)
-        val moods = JournalMoodRepository(context, workspace, BackupWriteCoordinator())
+        val moods = JournalMoodRepository(context, workspace, coordinator)
         val crypto = BackupCryptoManager(context, workspace)
+        val journalMedia = JournalMediaArchiveManager(
+            context, workspace, repository, photoStore, ledger, crypto, coordinator
+        )
         val encryptedBackups = EncryptedBackupManager(
-            BackupArchiveManager(context, workspace, repository, validator, moods), crypto
+            BackupArchiveManager(context, workspace, repository, validator, moods, journalMedia), crypto
         )
         val reader = BackupArchiveReader(context, workspace, validator)
-        val restorer = BackupRestoreManager(context, workspace, repository, moods)
+        val restorer = BackupRestoreManager(context, workspace, repository, moods, journalMedia)
+
+        /** Anı fotoğrafını uygulamanın kendi klasör ve adlandırma düzeniyle yerleştirir. */
+        fun journalPhoto(journalId: String, bytes: ByteArray, at: Long): String {
+            val folder = MessageDigest.getInstance("SHA-256").digest(journalId.toByteArray())
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            val id = "${at.toString().padStart(13, '0')}_${UUID.randomUUID()}.png"
+            File(mediaRoot, "benim_dunyam_journal_photos/$folder").apply { mkdirs() }
+                .resolve(id).writeBytes(bytes)
+            return id
+        }
 
         fun snapshot(): BackupData = runBlocking { repository.createBackupData() }
 
@@ -114,6 +138,44 @@ class BackupRestoreEndToEndTest {
     // ------------------------------------------------------------------
     // Test verisi
     // ------------------------------------------------------------------
+
+    /** Geçerli bir PNG (8 bit RGB) üretir; Android test ortamında java.awt yoktur. */
+    private fun png(width: Int, height: Int, seed: Int): ByteArray {
+        val random = Random(seed)
+        val raw = ByteArrayOutputStream()
+        repeat(height) {
+            raw.write(0) // satır filtresi: yok
+            raw.write(random.nextBytes(width * 3))
+        }
+        val deflater = java.util.zip.Deflater()
+        deflater.setInput(raw.toByteArray())
+        deflater.finish()
+        val compressed = ByteArrayOutputStream()
+        val buffer = ByteArray(4096)
+        while (!deflater.finished()) compressed.write(buffer, 0, deflater.deflate(buffer))
+        deflater.end()
+
+        val out = ByteArrayOutputStream()
+        fun int(value: Int) = out.write(byteArrayOf((value ushr 24).toByte(), (value ushr 16).toByte(),
+            (value ushr 8).toByte(), value.toByte()))
+        fun chunk(type: String, data: ByteArray) {
+            int(data.size)
+            val typeBytes = type.toByteArray(Charsets.US_ASCII)
+            out.write(typeBytes); out.write(data)
+            val crc = java.util.zip.CRC32().apply { update(typeBytes); update(data) }
+            int(crc.value.toInt())
+        }
+        out.write(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A))
+        val header = ByteArrayOutputStream().apply {
+            write(byteArrayOf((width ushr 24).toByte(), (width ushr 16).toByte(), (width ushr 8).toByte(), width.toByte()))
+            write(byteArrayOf((height ushr 24).toByte(), (height ushr 16).toByte(), (height ushr 8).toByte(), height.toByte()))
+            write(byteArrayOf(8, 2, 0, 0, 0)) // 8 bit, RGB, sıkıştırma/filtre/geçişsiz
+        }.toByteArray()
+        chunk("IHDR", header)
+        chunk("IDAT", compressed.toByteArray())
+        chunk("IEND", ByteArray(0))
+        return out.toByteArray()
+    }
 
     private val seasonCover = Random(1).nextBytes(20_000)
     private val ayseProfile = Random(2).nextBytes(150_000)
@@ -248,7 +310,7 @@ class BackupRestoreEndToEndTest {
         assertTrue(restored.journals.none { it.id == "eski-ani" })
         assertTrue(restored.people.none { it.id == "eski-kisi" })
 
-        assertEquals(RestoreSummary(3, 2, 2, 1, 3, 1, 3, moodCount = 2), summary)
+        assertEquals(RestoreSummary(3, 2, 2, 1, 3, 1, 3, moodCount = 2, journalPhotoCount = 0), summary)
     }
 
     @Test
@@ -359,7 +421,7 @@ class BackupRestoreEndToEndTest {
         seedDeviceB()
         val summary = restoreOnB(createBackupOnA())
 
-        assertEquals(RestoreSummary(0, 0, 0, 0, 0, 0, 0, moodCount = 0), summary)
+        assertEquals(RestoreSummary(0, 0, 0, 0, 0, 0, 0, moodCount = 0, journalPhotoCount = 0), summary)
         val restored = deviceB.snapshot()
         assertTrue(restored.journals.isEmpty() && restored.people.isEmpty())
         assertTrue(deviceB.moodSnapshot().isEmpty())
@@ -383,14 +445,16 @@ class BackupRestoreEndToEndTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun yeniYedekArsivSurum2VeRuhHaliGirisiIcerir() {
+    fun yeniYedekArsivSurum3RuhHaliVeFotografGirisiIcerir() {
         seedDeviceA()
         rewriteArchive(createBackupOnA()) { entries ->
             assertTrue(BackupMoodCodec.ENTRY in entries)
+            assertTrue(BackupArchiveManifest.JOURNAL_MEDIA_ENTRY in entries)
             val manifest = JsonParser
                 .parseString(String(entries.getValue("manifest.json"), Charsets.UTF_8)).asJsonObject
-            assertEquals(2, manifest.get("archiveVersion").asInt)
+            assertEquals(3, manifest.get("archiveVersion").asInt)
             assertTrue(manifest.has("moodsSha256") && manifest.has("moodsSizeBytes"))
+            assertTrue(manifest.has("journalMediaSha256") && manifest.has("journalMediaSizeBytes"))
         }
     }
 
@@ -401,13 +465,7 @@ class BackupRestoreEndToEndTest {
 
         // Sürüm 1 arşivi: ruh hali girişi ve manifest alanları yok.
         val legacyZip = rewriteArchive(createBackupOnA()) { entries ->
-            entries.remove(BackupMoodCodec.ENTRY)
-            val manifest = JsonParser
-                .parseString(String(entries.getValue("manifest.json"), Charsets.UTF_8)).asJsonObject
-            manifest.addProperty("archiveVersion", 1)
-            manifest.remove("moodsSizeBytes")
-            manifest.remove("moodsSha256")
-            entries["manifest.json"] = manifest.toString().toByteArray(Charsets.UTF_8)
+            downgrade(entries, toVersion = 1)
         }
 
         val summary = runBlocking {
@@ -452,7 +510,7 @@ class BackupRestoreEndToEndTest {
             // Temizlik adımı mevcut kayıtları okur: B'nin gerçek veritabanına yönlendir.
             coEvery { createBackupData() } coAnswers { deviceB.repository.createBackupData() }
         }
-        val failingRestorer = BackupRestoreManager(context, deviceB.workspace, failingRepository, deviceB.moods)
+        val failingRestorer = BackupRestoreManager(context, deviceB.workspace, failingRepository, deviceB.moods, deviceB.journalMedia)
 
         val zip = runBlocking { deviceB.crypto.decryptArchive(createBackupOnA(), password.toCharArray()) }
         assertFailsWith<IllegalStateException> {
@@ -463,5 +521,101 @@ class BackupRestoreEndToEndTest {
         assertEquals(bOldMoods, deviceB.moodSnapshot())
         // Yarım kalan geri yüklemenin fotoğrafları da temizlendi.
         assertTrue(deviceB.mediaRoot.walkTopDown().none { it.isFile })
+    }
+
+    // ------------------------------------------------------------------
+    // Aşama 3: tek yedek dosyası (anı fotoğrafları dahil)
+    // ------------------------------------------------------------------
+
+    /** Yeni arşivi eski bir sürümün biçimine indirir (eski dosyaları taklit etmek için). */
+    private fun downgrade(entries: MutableMap<String, ByteArray>, toVersion: Int) {
+        val manifest = JsonParser
+            .parseString(String(entries.getValue("manifest.json"), Charsets.UTF_8)).asJsonObject
+        manifest.addProperty("archiveVersion", toVersion)
+        entries.remove(BackupArchiveManifest.JOURNAL_MEDIA_ENTRY)
+        manifest.remove("journalMediaSizeBytes")
+        manifest.remove("journalMediaSha256")
+        if (toVersion < 2) {
+            entries.remove(BackupMoodCodec.ENTRY)
+            manifest.remove("moodsSizeBytes")
+            manifest.remove("moodsSha256")
+        }
+        entries["manifest.json"] = manifest.toString().toByteArray(Charsets.UTF_8)
+    }
+
+    @Test
+    fun aniFotograflariSiraVeKapakIleTekDosyadanGeriGelir() {
+        seedDeviceA()
+        val first = png(40, 30, seed = 1)
+        val second = png(20, 50, seed = 2)
+        val firstId = deviceA.journalPhoto("j1", first, at = 1_700_000_000_001)
+        val secondId = deviceA.journalPhoto("j1", second, at = 1_700_000_000_002)
+        val aOrder = runBlocking { deviceA.photoStore.list("j1") }
+        val backup = createBackupOnA()
+
+        // 1) Yedek dosyasında sıra ve kapak birebir kayıtlı.
+        rewriteArchive(backup) { entries ->
+            val media = entries.getValue(BackupArchiveManifest.JOURNAL_MEDIA_ENTRY)
+            val manifest = java.util.zip.ZipInputStream(media.inputStream()).use { zip ->
+                generateSequence { zip.nextEntry }.first { it.name == "manifest.json" }
+                String(zip.readBytes(), Charsets.UTF_8)
+            }
+            val photos = JsonParser.parseString(manifest).asJsonObject.getAsJsonArray("photos")
+                .map { it.asJsonObject }
+            assertEquals(aOrder.map { it.id },
+                photos.sortedBy { it.get("orderIndex").asInt }.map { it.get("photoId").asString })
+            assertEquals(aOrder.single { it.isCover }.id,
+                photos.single { it.get("isCover").asBoolean }.get("photoId").asString)
+        }
+
+        // 2) Geri yüklemede fotoğraflar eksiksiz ve bayt bayt geliyor.
+        // Not: Sıralama dosyası Android'in AtomicFile'ıyla yazılır; Windows'ta çalışan
+        // JVM testlerinde var olan dosyanın üzerine yeniden adlandırma yapılamadığı için
+        // ikinci düzen yazımı burada güvenilir biçimde sınanamaz (cihazda Linux'ta çalışır).
+        val summary = restoreOnB(backup)
+        assertEquals(2, summary.journalPhotoCount)
+        assertNull(summary.journalPhotoWarning)
+        val restored = runBlocking { deviceB.photoStore.list("j1") }
+        assertEquals(aOrder.map { it.id }.toSet(), restored.map { it.id }.toSet())
+        assertArrayEquals(first, File(restored.single { it.id == firstId }.absolutePath).readBytes())
+        assertArrayEquals(second, File(restored.single { it.id == secondId }.absolutePath).readBytes())
+        // Fotoğraflar B'nin kendi klasöründe.
+        assertTrue(restored.all { File(it.absolutePath).canonicalPath.startsWith(deviceB.mediaRoot.canonicalPath) })
+    }
+
+    @Test
+    fun eskiSurum2YedekAnilariVeRuhHalleriniGetirirFotograflaraDokunmaz() {
+        seedDeviceA()
+        deviceA.journalPhoto("j1", png(10, 10, seed = 3), at = 1_700_000_000_003)
+        val v2 = rewriteArchive(createBackupOnA()) { downgrade(it, toVersion = 2) }
+
+        val summary = runBlocking {
+            prepareOnB(v2).use { prepared ->
+                assertNull(prepared.journalMediaZip)
+                deviceB.restorer.restore(prepared)
+            }
+        }
+        assertEquals(3, summary.journalCount)
+        assertEquals(2, summary.moodCount)
+        assertNull(summary.journalPhotoCount)
+        assertTrue(runBlocking { deviceB.photoStore.list("j1") }.isEmpty())
+    }
+
+    @Test
+    fun fotografArsiviDegistirilmisseYedekReddedilir() {
+        seedDeviceA()
+        deviceA.journalPhoto("j1", png(10, 10, seed = 4), at = 1_700_000_000_004)
+        val zip = rewriteArchive(createBackupOnA()) { entries ->
+            val media = entries.getValue(BackupArchiveManifest.JOURNAL_MEDIA_ENTRY)
+            media[media.size / 2] = (media[media.size / 2].toInt() xor 0x01).toByte()
+        }
+        assertFailsWith<IOException> { prepareOnB(zip) }
+    }
+
+    @Test
+    fun surum3YedektenFotografGirisiSilinmisseReddedilir() {
+        seedDeviceA()
+        val zip = rewriteArchive(createBackupOnA()) { it.remove(BackupArchiveManifest.JOURNAL_MEDIA_ENTRY) }
+        assertFailsWith<IOException> { prepareOnB(zip) }
     }
 }

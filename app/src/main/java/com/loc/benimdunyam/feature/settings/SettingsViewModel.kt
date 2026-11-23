@@ -1,5 +1,7 @@
 package com.loc.benimdunyam.feature.settings
 
+import com.loc.benimdunyam.domain.model.BackupReminderPolicy
+import com.loc.benimdunyam.data.backup.BackupVerificationReceiptStore
 import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -38,7 +40,11 @@ data class SettingsUiState(
     val isBackupHealthLoading: Boolean = false,
     val isBackupSelfCheckLoading: Boolean = false,
     val backupSelfCheckReport: BackupSelfCheckReport? = null,
-    val isDraftCleanupPending: Boolean = false
+    val isDraftCleanupPending: Boolean = false,
+    /** Bu çalışma alanında doğrulanmış son yedeğin tarihi (yalnızca bu cihazda tutulur). */
+    val lastBackupAt: Long? = null,
+    /** Anı var ve son yedek 14 günden eski ya da hiç yok. */
+    val backupReminder: Boolean = false
 )
 
 @HiltViewModel
@@ -50,7 +56,8 @@ class SettingsViewModel @Inject constructor(
     private val databaseIntegrityVerifier: BackupDatabaseIntegrityVerifier,
     private val writeCoordinator: BackupWriteCoordinator,
     private val backupSelfCheckManager: BackupSelfCheckManager,
-    private val journalDraftStore: JournalDraftStore
+    private val journalDraftStore: JournalDraftStore,
+    private val receiptStore: BackupVerificationReceiptStore
 ) : ViewModel() {
 
     var uiState by mutableStateOf(SettingsUiState())
@@ -63,6 +70,18 @@ class SettingsViewModel @Inject constructor(
     // ----------------------------------------
     // BIOMETRIC PREFERENCE
     // ----------------------------------------
+
+    /** Aşama 3: "Son yedek" bilgisi ve hatırlatma. Ağ veya dosya erişimi yoktur. */
+    fun loadBackupStatus() {
+        viewModelScope.launch {
+            val last = runCatching { receiptStore.load().normalCreatedAt }.getOrNull()
+            val journals = runCatching { appDatabase.journalDao().countAllForBootstrap() }.getOrDefault(0)
+            uiState = uiState.copy(
+                lastBackupAt = last,
+                backupReminder = BackupReminderPolicy.shouldRemind(last, journals, System.currentTimeMillis())
+            )
+        }
+    }
 
     fun loadBiometricPreference(context: Context) {
         val prefs = context.getSharedPreferences(
@@ -115,15 +134,21 @@ class SettingsViewModel @Inject constructor(
             )
 
             try {
-                createBackupUseCase(
+                val verified = createBackupUseCase(
                     destinationUri = destinationUri,
                     passphrase = password.toCharArray()
                 )
+                // Dosya kaydedilip yeniden açılarak doğrulandıktan sonra tarih saklanır.
+                runCatching { receiptStore.saveNormal(verified.createdAt, System.currentTimeMillis()) }
 
                 uiState = uiState.copy(
-                    successMessage =
-                        "Şifreli yedek oluşturuldu ve doğrulandı."
+                    successMessage = buildString {
+                        append("Yedek oluşturuldu ve doğrulandı: ${verified.journalCount} anı")
+                        verified.journalPhotoCount?.let { append(", $it anı fotoğrafı") }
+                        append(".")
+                    }
                 )
+                loadBackupStatus()
 
             } catch (e: CancellationException) {
                 throw e
@@ -258,11 +283,13 @@ class SettingsViewModel @Inject constructor(
                         "Geri yükleme BAŞARILI, ancak eski taslaklar temizlenemedi: " +
                                 "$reason. Aşağıdaki 'Taslak Temizliğini Tekrar Dene' düğmesini kullan."
                     },
-                    successMessage =
-                        "Geri yükleme tamamlandı. " +
-                                "${summary.journalCount} anı, " +
-                                "${summary.personCount} kişi ve " +
-                                "${summary.imageCount} fotoğraf aktarıldı."
+                    successMessage = buildString {
+                        append("Geri yükleme tamamlandı: ${summary.journalCount} anı, ")
+                        append("${summary.personCount} kişi")
+                        summary.journalPhotoCount?.let { append(", $it anı fotoğrafı") }
+                        append(".")
+                        summary.journalPhotoWarning?.let { append(" ").append(it) }
+                    }
                 )
 
                 // Eski taslakların yeni arşive karışma ihtimali kalmadıysa

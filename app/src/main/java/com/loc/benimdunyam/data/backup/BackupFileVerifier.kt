@@ -17,7 +17,9 @@ data class BackupVerificationResult(
     val imageCount: Int,
     val encryptedSha256: String,
     /** null: arşiv sürüm 1, ruh hali içermiyor. */
-    val moodCount: Int? = null
+    val moodCount: Int? = null,
+    /** null: arşiv sürüm 1–2, anı fotoğrafları ayrı .bdmedia dosyasında. */
+    val journalPhotoCount: Int? = null
 )
 
 /**
@@ -38,7 +40,8 @@ class BackupFileVerifier @Inject constructor(
     private val documentStore: BackupDocumentStore,
     private val cryptoManager: BackupCryptoManager,
     private val archiveReader: BackupArchiveReader,
-    private val dryRunVerifier: BackupDryRunVerifier
+    private val dryRunVerifier: BackupDryRunVerifier,
+    private val journalMediaManager: JournalMediaArchiveManager
 ) {
 
     suspend fun verify(
@@ -85,7 +88,11 @@ class BackupFileVerifier @Inject constructor(
                         imageCount =
                             prepared.manifest.mediaFiles.size,
                         encryptedSha256 = staged.sha256,
-                        moodCount = prepared.moods?.size
+                        moodCount = prepared.moods?.size,
+                        // Gömülü fotoğraf arşivinin içindeki her fotoğraf da doğrulanır.
+                        journalPhotoCount = prepared.journalMediaZip?.let {
+                            journalMediaManager.inspectEmbedded(it)
+                        }
                     )
                 }
 

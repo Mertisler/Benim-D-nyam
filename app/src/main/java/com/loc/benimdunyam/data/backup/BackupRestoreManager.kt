@@ -38,7 +38,11 @@ data class RestoreSummary(
     val specialMemoryCount: Int,
     val imageCount: Int,
     /** null: yedek ruh hali içermiyordu (arşiv sürüm 1); cihazdakiler korundu. */
-    val moodCount: Int? = null
+    val moodCount: Int? = null,
+    /** Geri yüklenen anı fotoğrafı sayısı. null: yedekte anı fotoğrafı yoktu (sürüm 1–2). */
+    val journalPhotoCount: Int? = null,
+    /** Anılar geri yüklendi ama fotoğrafların bir kısmı yüklenemediyse açıklama. */
+    val journalPhotoWarning: String? = null
 )
 
 /**
@@ -56,7 +60,8 @@ class BackupRestoreManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val workspace: ActiveWorkspaceSession,
     private val backupRepository: BackupRepository,
-    private val moodRepository: JournalMoodRepository
+    private val moodRepository: JournalMoodRepository,
+    private val journalMediaManager: JournalMediaArchiveManager
 ) {
 
     private val restoreMutex = Mutex()
@@ -189,7 +194,24 @@ class BackupRestoreManager @Inject constructor(
                     throw exception
                 }
 
-                // 5. Sonuç oluştur.
+                // 5. Aşama 3: anı fotoğrafları (anılar artık Room'da olduğu için).
+                // Bu adım başarısız olursa anılar geri ALINMAZ; kullanıcıya bildirilir.
+                var journalPhotos: Int? = null
+                var journalPhotoWarning: String? = null
+                preparedBackup.journalMediaZip?.let { zip ->
+                    try {
+                        val result = journalMediaManager.restoreEmbedded(zip)
+                        journalPhotos = result.restoredCount + result.alreadyPresentCount
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        journalPhotos = 0
+                        journalPhotoWarning = "Anıların geri yüklendi ancak anı fotoğrafları " +
+                                "yüklenemedi: ${error.message ?: "bilinmeyen hata"}"
+                    }
+                }
+
+                // 6. Sonuç oluştur.
                 RestoreSummary(
                     journalCount = restoredData.journals.size,
                     personCount = restoredData.people.size,
@@ -199,7 +221,9 @@ class BackupRestoreManager @Inject constructor(
                     specialMemoryCount =
                         restoredData.specialMemories.size,
                     imageCount = installedFiles.size,
-                    moodCount = preparedBackup.moods?.size
+                    moodCount = preparedBackup.moods?.size,
+                    journalPhotoCount = journalPhotos,
+                    journalPhotoWarning = journalPhotoWarning
                 )
 
             } catch (exception: Exception) {
