@@ -127,6 +127,8 @@ class JournalConflictViewModel @Inject constructor(
         val allowed = when (resolution) {
             JournalConflictResolution.KEEP_LOCAL -> card.canKeepLocal
             JournalConflictResolution.ACCEPT_REMOTE -> card.canAcceptRemote
+            JournalConflictResolution.MOVE_LOCAL_TO_TRASH ->
+                com.loc.benimdunyam.domain.sync.ConflictChoice.MOVE_TO_TRASH in card.choices
         }
         if (!allowed) return
         val secret = password.toCharArray()
@@ -158,6 +160,8 @@ class JournalConflictViewModel @Inject constructor(
                                         "olarak gönderilir; diğer cihaz bunu düzenleme olarak alır."
                             JournalConflictResolution.ACCEPT_REMOTE ->
                                 "Buluttaki metin bu cihaza uygulandı. Ruh hali ve fotoğraflar değişmedi."
+                            JournalConflictResolution.MOVE_LOCAL_TO_TRASH ->
+                                "Anı Son silinenler'e taşındı; 30 gün içinde geri getirilebilir."
                         }
                     )
                 }

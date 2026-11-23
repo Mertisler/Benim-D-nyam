@@ -1,5 +1,10 @@
 package com.loc.benimdunyam.data.sync.remote
 
+import com.loc.benimdunyam.data.trash.JournalTrashWriter
+import com.loc.benimdunyam.data.local.entity.TrashReason
+import com.loc.benimdunyam.data.local.mood.JournalMoodRepository
+import com.loc.benimdunyam.domain.sync.ConflictChoicePolicy
+import com.loc.benimdunyam.domain.sync.ConflictChoice
 import com.loc.benimdunyam.domain.sync.RemoteEditPolicy
 import com.loc.benimdunyam.data.local.dao.PersonSpecialMemoryDao
 import com.loc.benimdunyam.data.local.dao.LifeEpisodeDao
@@ -65,7 +70,13 @@ data class JournalConflictCard(
     /** Faz C: cihazdaki metin bulutun yerine geçirilebilir mi. */
     val canKeepLocal: Boolean = false,
     /** Faz C: buluttaki metin cihaza uygulanabilir mi (tek ve UPSERT baş). */
-    val canAcceptRemote: Boolean = false
+    val canAcceptRemote: Boolean = false,
+    /** Aşama 2: sade ekranın göstereceği seçenekler (ConflictChoicePolicy). */
+    val choices: List<ConflictChoice> = emptyList(),
+    val localUpdatedAt: Long? = null,
+    val remoteUpdatedAt: Long? = null,
+    /** Bu telefonda silinmiş (ve silmesi bekleyen/gönderilmiş) mi. */
+    val localDeleted: Boolean = false
 )
 
 data class JournalConflictReport(
@@ -77,8 +88,13 @@ data class JournalConflictReport(
 
 data class PreservedJournalConflict(val copyJournalId: String, val alreadyPresent: Boolean)
 
-/** Faz C: kullanıcının çakışma kararı. */
-enum class JournalConflictResolution { KEEP_LOCAL, ACCEPT_REMOTE }
+/**
+ * Kullanıcının çakışma kararı.
+ * KEEP_LOCAL: bu telefondaki sürüm (metin ya da silinmiş olması) kazanır.
+ * ACCEPT_REMOTE: diğer cihazdaki metin bu telefona yazılır.
+ * MOVE_LOCAL_TO_TRASH: diğer cihazdaki silme kabul edilir; anı 30 gün "Son silinenler"de.
+ */
+enum class JournalConflictResolution { KEEP_LOCAL, ACCEPT_REMOTE, MOVE_LOCAL_TO_TRASH }
 
 private data class ConflictRemoteEvent(
     val documentId: String,
@@ -126,8 +142,11 @@ class JournalConflictRepository @Inject constructor(
     private val personDao: PersonDao,
     private val seasonDao: LifeSeasonDao,
     private val episodeDao: LifeEpisodeDao,
-    private val specialDao: PersonSpecialMemoryDao
+    private val specialDao: PersonSpecialMemoryDao,
+    private val moodRepository: JournalMoodRepository
 ) {
+    private fun isLocallyDeleted(local: LocalConflictState): Boolean =
+        local.journal == null && local.syncEvent?.changeType == JournalSyncChangePolicy.DELETE
     private val mutex = Mutex()
 
     private fun requireAccount(uid: String) {
@@ -166,9 +185,18 @@ class JournalConflictRepository @Inject constructor(
                         localExcerpt = local.journal?.content?.take(EXCERPT_SIZE),
                         localHasPendingChange = local.syncEvent?.state == JournalSyncChangePolicy.PENDING ||
                                 local.syncEvent?.state == JournalSyncChangePolicy.CONFLICT,
-                        canKeepLocal = local.journal != null,
+                        canKeepLocal = local.journal != null || isLocallyDeleted(local),
                         canAcceptRemote = remote.operation == JournalSyncChangePolicy.UPSERT &&
                                 heads.size == 1,
+                        choices = ConflictChoicePolicy.choices(
+                            localExists = local.journal != null,
+                            localDeleted = isLocallyDeleted(local),
+                            remoteIsDelete = remote.operation == JournalSyncChangePolicy.DELETE,
+                            singleRemoteHead = heads.size == 1
+                        ),
+                        localUpdatedAt = local.journal?.updatedAt ?: local.syncEvent?.updatedAtMillis,
+                        remoteUpdatedAt = remote.journal?.updatedAt,
+                        localDeleted = isLocallyDeleted(local),
                         canPreserveCopy = remote.operation != JournalSyncChangePolicy.DELETE || local.journal != null,
                         savedAsSeparateCopy = journalDao.getJournalById(copyId) != null,
                         confirmationKey = confirmationKey(uid, remote, local, heads.size),
@@ -320,6 +348,9 @@ class JournalConflictRepository @Inject constructor(
 
             writeCoordinator.withExclusiveRestore {
                 requireAccount(uid)
+                // Ruh hali ayrı veritabanındadır; çöpe taşımadan önce görüntüsü alınır.
+                val trashMood = if (resolution == JournalConflictResolution.MOVE_LOCAL_TO_TRASH)
+                    moodRepository.recordFor(remote.journalId) else null
                 database.withTransaction {
                     requireAccount(uid)
                     val local = readLocalInTransaction(remote.journalId)
@@ -329,19 +360,42 @@ class JournalConflictRepository @Inject constructor(
                     }
                     when (resolution) {
                         JournalConflictResolution.KEEP_LOCAL -> {
-                            checkNotNull(local.journal) { "Korunacak yerel anı bulunamadı." }
+                            val keepDeleted = isLocallyDeleted(local)
+                            check(local.journal != null || keepDeleted) {
+                                "Korunacak yerel anı bulunamadı."
+                            }
                             val version = RemoteEditPolicy.versionToKeepLocal(
                                 highestRemoteRevision = top,
                                 localVersion = local.syncEvent?.changeVersion ?: 1L
                             )
+                            // Metin varsa metin, bu telefonda silinmişse silme yeniden gönderilir.
                             syncDao.save(JournalSyncEventEntity(
                                 journalId = remote.journalId,
                                 ownerUid = uid,
-                                changeType = JournalSyncChangePolicy.UPSERT,
+                                changeType = if (keepDeleted) JournalSyncChangePolicy.DELETE
+                                else JournalSyncChangePolicy.UPSERT,
                                 state = JournalSyncChangePolicy.PENDING,
                                 changeVersion = version,
                                 updatedAtMillis = System.currentTimeMillis()
                             ))
+                        }
+                        JournalConflictResolution.MOVE_LOCAL_TO_TRASH -> {
+                            check(remote.operation == JournalSyncChangePolicy.DELETE && local.journal != null) {
+                                "Yalnızca diğer cihazda silinen ve bu telefonda duran anı taşınabilir."
+                            }
+                            JournalTrashWriter.moveToTrash(
+                                journalDao = journalDao,
+                                mentionDao = mentionDao,
+                                specialDao = specialDao,
+                                eventDao = syncDao,
+                                trashDao = database.trashedJournalDao(),
+                                uid = uid,
+                                journalId = remote.journalId,
+                                reason = TrashReason.REMOTE_DELETE,
+                                remoteRevision = top,
+                                mood = trashMood,
+                                now = System.currentTimeMillis()
+                            )
                         }
                         JournalConflictResolution.ACCEPT_REMOTE -> {
                             check(remote.operation == JournalSyncChangePolicy.UPSERT && remoteHeadCount == 1) {
@@ -374,6 +428,10 @@ class JournalConflictRepository @Inject constructor(
                         }
                     }
                     requireAccount(uid)
+                }
+                if (resolution == JournalConflictResolution.MOVE_LOCAL_TO_TRASH) {
+                    // Görüntüsü çöp kaydında; silinemezse yalnızca yetim kayıt kalır.
+                    runCatching { moodRepository.deleteForJournal(remote.journalId) }
                 }
             }
         }

@@ -125,6 +125,10 @@ class AutomaticJournalSyncWorker(
                         }
 
                         val preview = merger.preview(uid, secret)
+                        // Aşama 2: sade karttaki "N anı iki cihazda farklı" uyarısı için.
+                        entry.runStatus().recordConflicts(
+                            uid, preview.editConflicts + preview.remoteDeleteConflicts
+                        )
                         var inserted = 0
                         var pendingAfter = preview.pendingMoodFinishes
                         if (AutomaticJournalSyncPolicy.canImport(

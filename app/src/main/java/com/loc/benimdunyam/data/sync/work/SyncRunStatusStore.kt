@@ -51,6 +51,16 @@ class SyncRunStatusStore @Inject constructor(
             .apply()
     }
 
+    /**
+     * Aşama 2: son taramada bulunan, kullanıcı kararı bekleyen çakışma sayısı
+     * (iki cihazda düzenlenen + başka cihazda silinip burada değişen anılar).
+     */
+    fun recordConflicts(uid: String, count: Int) {
+        preferences.edit().putInt("conflicts_${hash(uid)}", count.coerceAtLeast(0)).apply()
+    }
+
+    fun conflicts(uid: String): Int = preferences.getInt("conflicts_${hash(uid)}", 0)
+
     fun status(uid: String): Status = Status(
         lastSuccessAtMillis = preferences.getLong("ok_${hash(uid)}", 0L),
         lastFailureAtMillis = preferences.getLong("fail_${hash(uid)}", 0L),
@@ -59,7 +69,8 @@ class SyncRunStatusStore @Inject constructor(
 
     fun clear(uid: String) {
         val key = hash(uid)
-        preferences.edit().remove("ok_$key").remove("fail_$key").remove("fail_msg_$key").apply()
+        preferences.edit().remove("ok_$key").remove("fail_$key").remove("fail_msg_$key")
+            .remove("conflicts_$key").apply()
     }
 }
 

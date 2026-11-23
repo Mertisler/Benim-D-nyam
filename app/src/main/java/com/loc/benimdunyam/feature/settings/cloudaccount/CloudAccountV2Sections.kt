@@ -150,6 +150,8 @@ internal fun CloudAccountV2Content(
             CloudHubDestination(Icons.Default.Storage, "Buluttaki Anıları İncele", "Şifreli kayıtları karşılaştır ve güvenle birleştir", onClick = { navigate(CloudHubPage.SYNC_RECEIVE) })
             CloudHubDestination(Icons.Default.Refresh, "Otomatik Eşitleme", "Cihaz anahtarı, izin ve eşitleme planı", onClick = { navigate(CloudHubPage.SYNC_AUTO) })
             CloudHubDestination(Icons.Default.Info, "Anı Çakışmaları", "Farklı cihazlardaki sürümleri koruyarak incele", onClick = { navigate(CloudHubPage.SYNC_CONFLICTS) })
+            // Eski, şifreli ve ayrıntılı çakışma denetimi (sorun giderme için).
+            JournalConflictSection(uid = account.uid)
         }
 
         CloudHubPage.SYNC_SEND -> if (DeveloperTools.ENABLED) {
@@ -173,8 +175,9 @@ internal fun CloudAccountV2Content(
         }
 
         CloudHubPage.SYNC_CONFLICTS -> {
-            CloudHubIntro("Çakışma yönetimi", "Anıların farklı sürümlerini incele. Hiçbir kayıt sırf bu ekran açıldı diye silinmez veya değiştirilmez.")
-            JournalConflictSection(uid = account.uid)
+            CloudHubIntro("Farklı sürümler", "Bu anılar iki cihazda farklı değişti. Hangisinin kalacağını seç; istersen ikisini de saklayabilirsin.")
+            // Aşama 2: şifresiz, iki sütunlu çakışma ekranı.
+            ConflictCenterSection(uid = account.uid)
         }
 
         CloudHubPage.BACKUP -> if (DeveloperTools.ENABLED) {

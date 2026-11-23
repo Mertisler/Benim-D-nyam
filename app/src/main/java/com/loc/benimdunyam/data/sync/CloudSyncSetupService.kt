@@ -80,7 +80,9 @@ class CloudSyncSetupService @Inject constructor(
             lastFailureMessage = status.lastFailureMessage,
             waitingToUpload = eventDao.pendingUpserts(uid) + eventDao.pendingDeletes(uid) +
                     journalDao.countUntrackedForBootstrap(),
-            conflicts = eventDao.conflictCount(uid),
+            // Yükleme sırasında işaretlenen yerel çakışmalar ile son taramada bulunan
+            // uzak çakışmalar aynı anıyı sayabilir; çift saymamak için büyük olanı al.
+            conflicts = maxOf(eventDao.conflictCount(uid), runStatus.conflicts(uid)),
             recentlyDeleted = trashDao.count()
         )
     }
