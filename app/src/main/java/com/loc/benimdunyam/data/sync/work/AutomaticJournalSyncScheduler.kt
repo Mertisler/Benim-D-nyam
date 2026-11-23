@@ -45,6 +45,10 @@ class AutomaticJournalSyncScheduler @Inject constructor(
     private fun periodic(uid: String) = "bd_periodic_sync_${key(uid)}"
     private fun immediate(uid: String) = "bd_immediate_sync_${key(uid)}"
 
+    /** Sade ekranın "Eşitleniyor…" durumunu izlemesi için. */
+    fun periodicWorkName(uid: String): String = periodic(uid)
+    fun immediateWorkName(uid: String): String = immediate(uid)
+
     /** Bu tercih yalnızca yerel planlama iznidir; tek başına ağ yetkisi değildir. */
     fun isStarted(uid: String): Boolean = preferences.getBoolean("started_${key(uid)}", false)
 

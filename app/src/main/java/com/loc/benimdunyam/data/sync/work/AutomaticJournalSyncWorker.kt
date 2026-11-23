@@ -50,12 +50,39 @@ class AutomaticJournalSyncWorker(
                 }
                 if (!permission.status(uid).enabled) return@withLock Result.success()
 
-                // Mevcut şifreli göndericinin sunucuda tekrar/kimlik kontrolünü tekrar kullanırız.
-                permission.withApprovedPassphrase(uid) { secret ->
+                // Sade kurulum: hesaba bağlanmadan önce yazılmış eski anılar artık
+                // kullanıcıya 5'er 5'er onaylatılmaz; işçi onları güvenle sıraya alır.
+                // Sunucuda aynı kimlikte kayıt varsa hazırlık durur ve çakışma ekranına kalır;
+                // bu durum diğer eşitleme adımlarını engellemez.
+                val bootstrap = entry.bootstrap()
+                for (batch in 0 until MAX_BOOTSTRAP_BATCHES) {
                     ensureAllowed(uid, scheduler, permission)
-                    entry.uploader().uploadPending(uid, secret)
+                    val remaining = try {
+                        if (bootstrap.overview(uid).untrackedJournalCount == 0) 0
+                        else bootstrap.prepareNext(uid, confirmed = true).let {
+                            if (it.prepared == 0) 0 else it.remainingUntracked
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: IllegalStateException) {
+                        // Sunucuda aynı kimlikte kayıt veya başka hesaba ait kuyruk:
+                        // ilk aktarım bekler, eşitlemenin geri kalanı sürer.
+                        0
+                    }
+                    if (remaining == 0) break
                 }
                 ensureAllowed(uid, scheduler, permission)
+
+                // Mevcut şifreli göndericinin sunucuda tekrar/kimlik kontrolünü tekrar kullanırız.
+                // Kuyruk boşalana kadar (en çok MAX_UPLOAD_BATCHES parti) gönderilir.
+                for (batch in 0 until MAX_UPLOAD_BATCHES) {
+                    val sent = permission.withApprovedPassphrase(uid) { secret ->
+                        ensureAllowed(uid, scheduler, permission)
+                        entry.uploader().uploadPending(uid, secret)
+                    }
+                    ensureAllowed(uid, scheduler, permission)
+                    if (sent.pending == 0 || sent.confirmed + sent.conflicts == 0) break
+                }
 
                 // Faz A: Bu cihazın gönderdiği olaylar diğer cihazda içe alınabilsin
                 // diye ilişki kataloğu yenilenir. Yalnızca yeni olay yazıldıysa
@@ -157,17 +184,20 @@ class AutomaticJournalSyncWorker(
                         scanBudget.markSuccessfulScan(uid, manualVersion)
                     }
                 }
+                entry.runStatus().recordSuccess(uid)
                 Result.success()
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: FirebaseFirestoreException) {
+            entry.runStatus().recordFailure(uid, error)
             // Ağ kaynaklı sorunlar yeniden denenebilir; izin ve çakışma sorunları denenmez.
             if (error.code == FirebaseFirestoreException.Code.UNAVAILABLE ||
                 error.code == FirebaseFirestoreException.Code.DEADLINE_EXCEEDED) {
                 if (runAttemptCount < 3) Result.retry() else Result.failure()
             } else Result.failure()
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            entry.runStatus().recordFailure(uid, error)
             // Yanlış şifre, eski katalog, çakışma vb. için sonsuz otomatik tekrar yok.
             // Yerel kayıtlar ve PENDING olaylar korunur; manuel inceleme gerekir.
             Result.failure()
@@ -187,6 +217,10 @@ class AutomaticJournalSyncWorker(
         const val UID = "sync_owner_uid"
         // Aynı süreçte periyodik ve anlık işlerin aynı anda veri yazmasını engeller.
         private val SINGLE_RUN = Mutex()
+        /** Tek çalışmada sıraya alınacak eski anı partisi (5'er). */
+        private const val MAX_BOOTSTRAP_BATCHES = 4
+        /** Tek çalışmada gönderilecek olay partisi (5'er). */
+        private const val MAX_UPLOAD_BATCHES = 10
     }
 }
 
@@ -202,4 +236,6 @@ interface AutomaticJournalSyncEntryPoint {
     fun catalog(): SyncDependencyCoverageRepository
     fun catalogFreshness(): SyncCatalogFreshness
     fun trash(): com.loc.benimdunyam.data.trash.JournalTrashRepository
+    fun bootstrap(): com.loc.benimdunyam.data.sync.remote.InitialJournalBootstrapRepository
+    fun runStatus(): SyncRunStatusStore
 }

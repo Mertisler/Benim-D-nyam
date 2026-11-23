@@ -126,7 +126,7 @@ internal fun InitialJournalBootstrapSection(
                     "Katalogla birlikte kuyruktaki en fazla 5 işlemin " +
                             "(silme olayları dahil) AES-GCM ile şifrelenerek " +
                             "Firebase hesabıma gönderilmesini onaylıyorum. " +
-                            "Otomatik eşitleme başlamayacak.",
+                            "Otomatik eşitleme açıksa bu adım arka planda kendiliğinden yapılır.",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f)
                 )

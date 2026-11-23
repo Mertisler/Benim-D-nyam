@@ -1,5 +1,6 @@
 package com.loc.benimdunyam.feature.settings.cloudaccount
 
+import com.loc.benimdunyam.core.DeveloperTools
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,7 +51,7 @@ import java.util.Date
  */
 internal enum class CloudHubPage(val title: String) {
     HOME("Bulut Hesabım"),
-    SYNC("Anılarımı Eşitle"),
+    SYNC("Eşitleme Ayrıntıları"),
     SYNC_SEND("Anılarımı Gönder"),
     SYNC_RECEIVE("Buluttaki Anılar"),
     SYNC_AUTO("Otomatik Eşitleme"),
@@ -58,16 +59,29 @@ internal enum class CloudHubPage(val title: String) {
     BACKUP("Şifreli Bulut Arşivi"),
     MEDIA("Fotoğraflarım"),
     SECURITY("Hesap ve Güvenlik"),
-    ADVANCED("Gelişmiş İşlemler");
+    ADVANCED("Geliştirici araçları");
 
-    /** Alt menüde Geri, önce eşitleme merkezine döner. */
+    /**
+     * Sade yapı: ana sayfada yalnızca eşitleme kartı, hesap ve Gelişmiş.
+     * Teknik eşitleme adımları, bulut arşivi ve fotoğraflar Gelişmiş altındadır.
+     */
     fun parent(): CloudHubPage = when (this) {
-        SYNC_SEND, SYNC_RECEIVE, SYNC_AUTO, SYNC_CONFLICTS -> SYNC
+        SYNC_SEND, SYNC_RECEIVE, SYNC_AUTO -> SYNC
+        SYNC, BACKUP, MEDIA -> ADVANCED
         else -> HOME
     }
 
+    /** Yalnızca debug derlemesinde açılan teknik sayfalar. */
+    val developerOnly: Boolean
+        get() = this == SYNC || this == SYNC_SEND || this == SYNC_RECEIVE ||
+                this == SYNC_AUTO || this == BACKUP || this == MEDIA || this == ADVANCED
+
     companion object {
-        fun fromName(name: String): CloudHubPage = entries.firstOrNull { it.name == name } ?: HOME
+        fun fromName(name: String): CloudHubPage {
+            val page = entries.firstOrNull { it.name == name } ?: HOME
+            // Release'te teknik sayfaya hiçbir yoldan (kayıtlı durum dahil) gidilemez.
+            return if (page.developerOnly && !DeveloperTools.ENABLED) HOME else page
+        }
     }
 }
 
@@ -112,40 +126,47 @@ internal fun CloudAccountV2Content(
                     )
                 }
             }
-            CloudHubIntro(
-                title = "Anıların, senin kontrolünde",
-                message = "Günlüklerin ve fotoğrafların öncelikle cihazında saklanır. Metin anılarını istersen şifreli eşitleyebilirsin; fotoğraflar şu an buluta yüklenmez."
+            // Sade bulut: kullanıcı yalnızca açık/kapalı, son eşitleme ve dikkat
+            // gerektiren durumları görür. Tüm teknik adımlar Gelişmiş altında.
+            CloudSyncHomeCard(
+                uid = account.uid,
+                onOpenConflicts = { navigate(CloudHubPage.SYNC_CONFLICTS) }
             )
-            CloudHubDestination(Icons.Default.Cloud, "Anılarımı Eşitle", "Gönderim, indirme, otomatik eşitleme ve çakışmalar", onClick = { navigate(CloudHubPage.SYNC) })
-            CloudHubDestination(Icons.Default.Storage, "Şifreli Bulut Arşivi", "Şifreli kopya, kontrol ve geri yükleme", onClick = { navigate(CloudHubPage.BACKUP) })
-            CloudHubDestination(Icons.Default.CloudOff, "Fotoğraflarım", "Ücretsiz cihaz modunda yerel fotoğraflar", onClick = { navigate(CloudHubPage.MEDIA) })
+            Text(
+                "Fotoğrafların şu an yalnızca bu cihazda saklanır ve eşitlenmez.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             CloudHubDestination(Icons.Default.Security, "Hesap ve Güvenlik", "Profil, e-posta doğrulaması ve oturum", onClick = { navigate(CloudHubPage.SECURITY) })
-            CloudHubDestination(Icons.Default.Settings, "Gelişmiş İşlemler", "Bağlantı testi, veri taşıma ve tanılama", onClick = { navigate(CloudHubPage.ADVANCED) })
+            if (DeveloperTools.ENABLED) {
+                // Yalnızca debug derlemesi. Release APK'da bu satır ve hedefleri yoktur.
+                CloudHubDestination(Icons.Default.Settings, "Geliştirici araçları", "Yalnızca debug sürümünde · eşitleme ayrıntıları, arşiv, tanılama", onClick = { navigate(CloudHubPage.ADVANCED) })
+            }
         }
 
-        CloudHubPage.SYNC -> {
-            CloudHubIntro("Anı eşitleme", "Bulut eşitleme isteğe bağlıdır. Her ilk izin ve hassas işlem için mevcut onay ekranları kullanılmaya devam eder.")
+        CloudHubPage.SYNC -> if (DeveloperTools.ENABLED) {
+            CloudHubIntro("Eşitleme ayrıntıları", "Otomatik eşitleme bu adımları kendisi yapar. Buradaki ekranlar sorun giderme ve elle kontrol içindir.")
             CloudHubDestination(Icons.Default.Cloud, "Anılarımı Gönder", "Bekleyen anılar ve ilk bulut aktarımı", onClick = { navigate(CloudHubPage.SYNC_SEND) })
             CloudHubDestination(Icons.Default.Storage, "Buluttaki Anıları İncele", "Şifreli kayıtları karşılaştır ve güvenle birleştir", onClick = { navigate(CloudHubPage.SYNC_RECEIVE) })
             CloudHubDestination(Icons.Default.Refresh, "Otomatik Eşitleme", "Cihaz anahtarı, izin ve eşitleme planı", onClick = { navigate(CloudHubPage.SYNC_AUTO) })
             CloudHubDestination(Icons.Default.Info, "Anı Çakışmaları", "Farklı cihazlardaki sürümleri koruyarak incele", onClick = { navigate(CloudHubPage.SYNC_CONFLICTS) })
         }
 
-        CloudHubPage.SYNC_SEND -> {
+        CloudHubPage.SYNC_SEND -> if (DeveloperTools.ENABLED) {
             CloudHubIntro("Anılarımı gönder", "Önce gönderilecek anıları gözden geçir. Şifreli gönderim yalnızca ilgili kullanıcı onayıyla çalışır.")
             // Önceki güvenli ilk aktarım ve manuel gönderim bileşenleri değişmedi.
             InitialJournalBootstrapSection(uid = account.uid)
             ManualJournalUploadSection(uid = account.uid)
         }
 
-        CloudHubPage.SYNC_RECEIVE -> {
+        CloudHubPage.SYNC_RECEIVE -> if (DeveloperTools.ENABLED) {
             CloudHubIntro("Buluttaki anılar", "Önce kayıtları doğrula; yerel anıları değiştiren birleştirme işlemi ayrıca onay ister.")
             VerifiedJournalDownloadSection(uid = account.uid)
             FullSyncReadinessSection(uid = account.uid)
             SafeJournalMergeSection(uid = account.uid)
         }
 
-        CloudHubPage.SYNC_AUTO -> {
+        CloudHubPage.SYNC_AUTO -> if (DeveloperTools.ENABLED) {
             CloudHubIntro("Otomatik eşitleme", "Şifreli metin eşitlemesinin yetkilerini ve zamanlamasını buradan yönetebilirsin. Fotoğrafların buluta gönderilmez.")
             AutoSyncAuthorizationSection(uid = account.uid)
             AutomaticJournalSyncSection(uid = account.uid)
@@ -156,7 +177,7 @@ internal fun CloudAccountV2Content(
             JournalConflictSection(uid = account.uid)
         }
 
-        CloudHubPage.BACKUP -> {
+        CloudHubPage.BACKUP -> if (DeveloperTools.ENABLED) {
             CloudHubIntro("Şifreli bulut kopyası", "Bu işlem günlük metinlerini ve desteklenen ilişkileri korur; fotoğraflar dahil değildir. Yerel .bdbackup ve .bdmedia yedeklerini de saklamalısın.")
             Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -209,7 +230,7 @@ internal fun CloudAccountV2Content(
             state.archiveMessage?.let { CloudHubMessage(it, false, viewModel::dismissArchiveMessage) }
         }
 
-        CloudHubPage.MEDIA -> {
+        CloudHubPage.MEDIA -> if (DeveloperTools.ENABLED) {
             CloudHubIntro("Fotoğraflarım", "Ücretsiz Spark modunda fotoğrafların cihazında kalır. Bulut fotoğraf eşitleme ve fiziksel bulut temizliği kapalıdır.")
             // Spark koruması repository ve WorkManager katmanlarında da uygulanmıştı.
             SparkLocalMediaSection(uid = account.uid)
@@ -239,8 +260,12 @@ internal fun CloudAccountV2Content(
             }
         }
 
-        CloudHubPage.ADVANCED -> {
-            CloudHubIntro("Gelişmiş işlemler", "Bu bölüm teknik kontroller içindir. Anıların silinmesi veya hesap değiştirme gibi işlemler otomatik yapılmaz.")
+        CloudHubPage.ADVANCED -> if (DeveloperTools.ENABLED) {
+            CloudHubIntro("Geliştirici araçları", "Yalnızca debug sürümünde görünür. Kullanıcının uygulamasında bu bölüm yoktur.")
+            CloudHubDestination(Icons.Default.Cloud, "Eşitleme ayrıntıları", "Elle gönderim, buluttaki kayıtlar, izin ve plan", onClick = { navigate(CloudHubPage.SYNC) })
+            CloudHubDestination(Icons.Default.Info, "Anı çakışmaları", "Farklı cihazlardaki sürümleri incele", onClick = { navigate(CloudHubPage.SYNC_CONFLICTS) })
+            CloudHubDestination(Icons.Default.Storage, "Şifreli bulut arşivi", "Tek seferlik şifreli kopya ve geri yükleme", onClick = { navigate(CloudHubPage.BACKUP) })
+            CloudHubDestination(Icons.Default.CloudOff, "Fotoğraflarım", "Cihazdaki fotoğraflar", onClick = { navigate(CloudHubPage.MEDIA) })
             // Önceki Faz 2F.1: yalnızca tanılama, günlük içerik aktarımı yok.
             SyncFoundationSection(uid = account.uid)
             Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {

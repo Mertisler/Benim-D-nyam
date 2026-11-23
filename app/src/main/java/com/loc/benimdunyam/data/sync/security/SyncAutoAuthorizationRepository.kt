@@ -36,7 +36,8 @@ class SyncAutoAuthorizationRepository @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
     private val session: ActiveWorkspaceSession,
-    private val vault: SyncDeviceCredentialVault
+    private val vault: SyncDeviceCredentialVault,
+    private val catalog: com.loc.benimdunyam.data.sync.remote.SyncDependencyCoverageRepository
 ) {
     private val mutex = Mutex()
 
@@ -56,7 +57,7 @@ class SyncAutoAuthorizationRepository @Inject constructor(
             grantedAtMillis = local?.grantedAtMillis,
             remoteSampleVerified = local?.remoteVerified ?: false,
             note = if (local == null) "Bu cihazda izin kapalı." else
-                "İzin bu cihazda saklı; otomatik eşitleme işleri henüz etkin değil."
+                "İzin bu cihazda saklı."
         )
     }
 
@@ -78,7 +79,7 @@ class SyncAutoAuthorizationRepository @Inject constructor(
                 grantedAtMillis = saved.grantedAtMillis,
                 remoteSampleVerified = verified,
                 note = if (verified)
-                    "Buluttaki örnek şifre doğrulandı. Arka plan aktarımı henüz başlamaz."
+                    "Şifre buluttaki kayıtla doğrulandı."
                 else
                     "Bulutta henüz olay/katalog yok; şifre yalnızca bu cihaza kaydedildi."
             )
@@ -160,11 +161,9 @@ class SyncAutoAuthorizationRepository @Inject constructor(
             .get(Source.SERVER).await().documents.firstOrNull()
         requireAccount(uid)
         if (snapshot != null) {
-            // Katalog mevcutsa yalnızca örnek manifest yeterli DEĞİLDİR.
-            // Bütün katalog parçalarını çözme Faz 2F.11'e kalacağından burada
-            // kullanıcıya önce bir manuel olay gönderimi yaptırıyoruz.
-            error("Bulutta ilişki kataloğu var ama anı olayı yok. " +
-                    "Önce aynı şifreyle bir test anısı olayını manuel gönder, ardından izni aç.")
+            // Katalog mevcutsa TÜM parçaları indirilip bu şifreyle çözülür ve
+            // ilişkileri doğrulanır. Şifre yanlışsa hata fırlar ve izin kaydedilmez.
+            return catalog.canOpenLatestCatalog(uid, password.copyOf())
         }
         return false // Boş bulut hesabı: kullanıcı yeni bir şifre tanımlayabilir.
     }

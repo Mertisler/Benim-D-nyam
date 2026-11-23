@@ -205,6 +205,21 @@ class SyncDependencyCoverageRepository @Inject constructor(
         }
     }
 
+    /**
+     * Sade kurulum: en son şifreli katalog bu şifreyle açılabiliyor mu?
+     * Katalog yoksa false döner; varsa ama şifre yanlışsa hata fırlatır.
+     * Hiçbir belge veya Room kaydı değişmez.
+     */
+    suspend fun canOpenLatestCatalog(uid: String, password: CharArray): Boolean = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            requireAccount(uid)
+            val exists = !catalogCollection(uid).limit(1).get(Source.SERVER).await().isEmpty
+            if (!exists) return@withContext false
+            downloadCatalog(uid, password)
+            true
+        }
+    }
+
     private suspend fun downloadCatalog(uid: String, password: CharArray): SyncDependencyCatalog {
         val doc = catalogCollection(uid)
             .orderBy("createdAt", Query.Direction.DESCENDING)

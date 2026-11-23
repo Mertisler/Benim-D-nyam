@@ -64,7 +64,7 @@ internal fun ManualJournalUploadSection(
             Text(
                 "Gönderilen belgeler AES-GCM ile şifrelenir. Sunucuda işlem türü, sürüm ve " +
                         "hesap kimliği gibi sınırlı metadata görülebilir. " +
-                        "Buluttan otomatik geri indirme hâlâ kapalıdır.",
+                        "Otomatik eşitleme açıksa bu işlemi elle yapman gerekmez.",
                 style = MaterialTheme.typography.bodySmall
             )
             OutlinedTextField(
@@ -84,7 +84,7 @@ internal fun ManualJournalUploadSection(
                 )
                 Text(
                     "En fazla 5 bekleyen anı olayının şifreli olarak Firebase hesabıma " +
-                            "gönderilmesine onay veriyorum. Otomatik eşitleme başlamayacak.",
+                            "gönderilmesine onay veriyorum.",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f)
                 )

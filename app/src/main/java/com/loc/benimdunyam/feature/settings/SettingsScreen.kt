@@ -1,5 +1,6 @@
 package com.loc.benimdunyam.feature.settings
 
+import com.loc.benimdunyam.core.DeveloperTools
 import androidx.compose.ui.graphics.Color
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -42,14 +43,16 @@ fun SettingsScreen(
     // Faz 2I.3: medya arşiv işi sürerken ana ekranın geri tuşunu da kilitle.
     val mediaBackupViewModel: JournalMediaBackupViewModel = hiltViewModel()
     // Faz 2I.4: iki SAF yedeğinin dosya bazında salt-okunur doğrulanması.
-    val backupCoverageViewModel: BackupCoverageViewModel = hiltViewModel()
+    // Yalnızca debug derlemesindeki geliştirici araçlarında kullanılır.
+    val backupCoverageViewModel: BackupCoverageViewModel? =
+        if (DeveloperTools.ENABLED) hiltViewModel() else null
     // Faz B: başka cihazda silinen anılar için 30 günlük "Son silinenler".
     val recentlyDeletedViewModel: RecentlyDeletedViewModel = hiltViewModel()
     val uiState = viewModel.uiState
     val isBusy = uiState.isLoading ||
             uiState.isBackupHealthLoading ||
             uiState.isBackupSelfCheckLoading || mediaBackupViewModel.state.busy ||
-            backupCoverageViewModel.ui.busy
+            backupCoverageViewModel?.ui?.busy == true
 
     var showClearDialog by remember {
         mutableStateOf(false)
@@ -192,49 +195,13 @@ fun SettingsScreen(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Bulut Hesabım", style = MaterialTheme.typography.titleMedium)
+                        Text("Bulut eşitleme", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "İsteğe bağlı Firebase hesabı, giriş ve güvenli bağlantı kontrolü",
+                            "Hesabın ve anılarının cihazlar arasında şifreli eşitlenmesi",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
                     Icon(Icons.Default.ChevronRight, contentDescription = null)
-                }
-            }
-
-            // GİZLİLİK
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-
-                        Text(
-                            "Yerel Anı Arşivi",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-
-                    Text(
-                        "Günlüklerin, kişilerin, dönemlerin ve fotoğrafların " +
-                                "şimdilik cihazında saklanır. Bulut hesabı yalnızca " +
-                                "kimlik doğrulama ve Firestore bağlantı testi yapar; " +
-                                "anılar kendiliğinden yüklenmez. Dosya yedeğini " +
-                                "bir bulut sağlayıcısına kaydetmeyi ayrıca seçebilirsin.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
                 }
             }
 
@@ -256,12 +223,12 @@ fun SettingsScreen(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "Biyometrik Uygulama Kilidi",
+                            "Uygulama kilidi",
                             style = MaterialTheme.typography.titleMedium
                         )
 
                         Text(
-                            "Uygulama kilidi tercihi",
+                            "Açılışta parmak izi veya yüz tanıma iste",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
@@ -296,15 +263,15 @@ fun SettingsScreen(
                         )
 
                         Text(
-                            "Anılarımın Güvenliği",
+                            "Yedekleme",
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
 
                     Text(
-                        "Günlüklerini, yaşam dönemlerini, " +
-                                "kişilerini ve fotoğraflarını " +
-                                "parola korumalı bir dosyada sakla.",
+                        "Günlüklerini, kişilerini, dönemlerini ve ruh hallerini " +
+                                "parola korumalı bir dosyada sakla. Anı fotoğrafları " +
+                                "için aşağıdaki fotoğraf yedeğini kullan.",
                         style = MaterialTheme.typography.bodyMedium
                     )
 
@@ -324,7 +291,7 @@ fun SettingsScreen(
 
                         Spacer(Modifier.width(8.dp))
 
-                        Text("Şifreli Yedek Oluştur")
+                        Text("Yedek al")
                     }
 
                     OutlinedButton(
@@ -344,7 +311,7 @@ fun SettingsScreen(
 
                         Spacer(Modifier.width(8.dp))
 
-                        Text("Yedekten Geri Yükle")
+                        Text("Yedekten geri yükle")
                     }
 
                     Text(
@@ -361,30 +328,33 @@ fun SettingsScreen(
             // ayrı şifreli .bdmedia arşivi; mevcut yedek ekranı değişmez.
             JournalMediaBackupSection(viewModel = mediaBackupViewModel)
 
-            // Faz 2I.4: doğrulanan gerçek yedek dosyalarının sağlık/kapasite özeti.
-            BackupCoverageSection(viewModel = backupCoverageViewModel)
-
             // Faz B: "Son silinenler" — yanlışlıkla silmeye karşı 30 günlük güvence.
             RecentlyDeletedSection(viewModel = recentlyDeletedViewModel)
 
             // ----------------------------------------
-            // ARŞİV SAĞLIĞI
+            // GELİŞTİRİCİ ARAÇLARI (yalnızca debug derlemesi)
+            // Release APK'da bu blok ve kartları yoktur.
             // ----------------------------------------
-            ArchiveHealthCard(
-                uiState = uiState,
-                isBusy = isBusy,
-                onCheckHealth = viewModel::checkBackupHealth,
-                onCleanLeftovers = viewModel::cleanBackupLeftovers
-            )
-
-            // ----------------------------------------
-            // ŞİFRELİ YEDEKLEME PROVASI
-            // ----------------------------------------
-            BackupSelfCheckCard(
-                uiState = uiState,
-                isBusy = isBusy,
-                onRunSelfCheck = viewModel::runBackupSelfCheck
-            )
+            if (DeveloperTools.ENABLED) {
+                Text(
+                    "Geliştirici araçları · yalnızca debug sürümünde",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                // Faz 2I.4: doğrulanan gerçek yedek dosyalarının sağlık/kapasite özeti.
+                backupCoverageViewModel?.let { BackupCoverageSection(viewModel = it) }
+                ArchiveHealthCard(
+                    uiState = uiState,
+                    isBusy = isBusy,
+                    onCheckHealth = viewModel::checkBackupHealth,
+                    onCleanLeftovers = viewModel::cleanBackupLeftovers
+                )
+                BackupSelfCheckCard(
+                    uiState = uiState,
+                    isBusy = isBusy,
+                    onRunSelfCheck = viewModel::runBackupSelfCheck
+                )
+            }
 
             // Geri yükleme / sıfırlama başarılı; ama ayrı taslak DB'sinin
             // temizlenmesi başarısız olduysa kullanıcı buradan tekrar dener.
