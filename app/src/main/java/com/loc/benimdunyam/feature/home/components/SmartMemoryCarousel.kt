@@ -78,7 +78,9 @@ fun SmartMemoryCarousel(
     memories: List<SmartMemoryItem>,
     insights: List<LifeStoryInsight> = emptyList(),
     onJournalClick: (String) -> Unit,
-    onSeasonClick: () -> Unit
+    onSeasonClick: () -> Unit,
+    /** Verilirse "Analiz" düğmesi tam sayfa "Hikâyem"i açar; yoksa eski alt pencere. */
+    onOpenAnalytics: (() -> Unit)? = null
 ) {
     val cards = remember(memories, insights) {
         buildList<TunnelCard> {
@@ -127,7 +129,7 @@ fun SmartMemoryCarousel(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Kullanıcı açmadıkça ekranı doldurmayan, tamamen yerel analiz girişi.
                 TextButton(
-                    onClick = { showAnalytics = true },
+                    onClick = { onOpenAnalytics?.invoke() ?: run { showAnalytics = true } },
                     contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp)
                 ) {
                     Text("Analiz", style = MaterialTheme.typography.labelMedium, color = TunnelPine)

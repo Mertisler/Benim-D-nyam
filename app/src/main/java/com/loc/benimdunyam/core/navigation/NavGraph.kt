@@ -225,6 +225,24 @@ private fun BenimDunyamContentNavGraph(startDestination: String) {
                         onNavigateToEpisodes = { seasonId ->
                             navController.navigate(Screen.LifeEpisodes.createRoute(seasonId))
                         },
+                        onNavigateToMyStory = {
+                            navController.navigate(Screen.MyStory.route)
+                        },
+                    )
+                }
+
+                // Hikâyem: genel analiz sayfası (ana sayfadan açılır)
+                composable(route = Screen.MyStory.route) {
+                    com.loc.benimdunyam.feature.mystory.MyStoryScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onOpenJournal = { journalId ->
+                            navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                        },
+                        onOpenPerson = { personId ->
+                            navController.navigate(Screen.PersonDetail.createRoute(personId))
+                        },
+                        onOpenYearReview = { navController.navigate("year_review") },
+                        onOpenSeasons = { navController.navigate(Screen.LifeSeasons.route) }
                     )
                 }
 
@@ -317,7 +335,22 @@ private fun BenimDunyamContentNavGraph(startDestination: String) {
                         },
                         onNavigateToPersonDetail = { otherPersonId ->
                             navController.navigate(Screen.PersonDetail.createRoute(otherPersonId))
+                        },
+                        onNavigateToAnalytics = { personId ->
+                            navController.navigate(Screen.PersonAnalytics.createRoute(personId))
                         }
+                    )
+                }
+
+                // 7b. Kişi Analizi (yıllara/aylara göre grafikler ve süzgeçler)
+                composable(
+                    route = Screen.PersonAnalytics.route,
+                    arguments = listOf(
+                        navArgument("personId") { type = NavType.StringType }
+                    )
+                ) {
+                    com.loc.benimdunyam.feature.people.detail.analytics.PersonAnalyticsScreen(
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
 

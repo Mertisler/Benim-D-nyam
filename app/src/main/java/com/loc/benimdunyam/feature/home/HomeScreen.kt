@@ -44,6 +44,7 @@ fun HomeScreen(
     onNavigateToSeasons: () -> Unit,
     onNavigateToTimeline: () -> Unit,
     onNavigateToEpisodes: (String) -> Unit,
+    onNavigateToMyStory: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -102,8 +103,14 @@ fun HomeScreen(
                         memories = uiState.smartMemories,
                         insights = visibleInsights,
                         onJournalClick = onNavigateToJournalDetail,
-                        onSeasonClick = onNavigateToSeasons
+                        onSeasonClick = onNavigateToSeasons,
+                        onOpenAnalytics = onNavigateToMyStory
                     )
+                }
+
+                // Hikâyem: anılarının genel görünümü (tam sayfa analiz).
+                item(key = "home-my-story") {
+                    com.loc.benimdunyam.feature.mystory.MyStoryHomeCard(onClick = onNavigateToMyStory)
                 }
 
                 // Yalnızca eski yılların bugünün tarihine denk düşen anıları varsa görünür.

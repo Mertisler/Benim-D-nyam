@@ -1,5 +1,16 @@
 package com.loc.benimdunyam.feature.people.detail
 
+import com.loc.benimdunyam.feature.people.detail.analytics.components.PersonAnalyticsPreviewCard
+import com.loc.benimdunyam.feature.people.detail.insights.PersonStoryInsightsFeature
+import com.loc.benimdunyam.feature.people.detail.relationship.UntaggedMentionsCard
+import com.loc.benimdunyam.feature.people.detail.relationship.TogetherPhotosSection
+import com.loc.benimdunyam.feature.people.detail.relationship.RelationshipHabitsCard
+import com.loc.benimdunyam.feature.people.detail.relationship.MoodComparisonLine
+import com.loc.benimdunyam.feature.people.detail.relationship.RelationshipTimelineCard
+import com.loc.benimdunyam.feature.people.detail.relationship.RelationshipStoryCard
+import com.loc.benimdunyam.feature.people.detail.relationship.RelationshipMemory
+import com.loc.benimdunyam.feature.people.detail.relationship.PersonRelationshipInsightsCalculator
+import com.loc.benimdunyam.feature.people.detail.relationship.PersonRelationshipViewModel
 import androidx.compose.material3.TopAppBarDefaults
 import com.loc.benimdunyam.core.designsystem.themedColor
 
@@ -101,10 +112,16 @@ fun PersonDetailScreen(
     viewModel: PersonDetailViewModel = hiltViewModel(),
     onNavigateToPersonDetail: ((String) -> Unit)? = null,
     onNavigateToAnalytics: ((String) -> Unit)? = null,
-    moodViewModel: PersonMoodViewModel = hiltViewModel()
+    moodViewModel: PersonMoodViewModel = hiltViewModel(),
+    relationshipViewModel: PersonRelationshipViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val moodState by moodViewModel.uiState.collectAsStateWithLifecycle()
+    val togetherPhotos by relationshipViewModel.photos.collectAsStateWithLifecycle()
+    val untaggedMentions by relationshipViewModel.untaggedMentions.collectAsStateWithLifecycle()
+    LaunchedEffect(uiState.person?.name) {
+        uiState.person?.name?.let(relationshipViewModel::bindName)
+    }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var moreMenuExpanded by remember { mutableStateOf(false) }
@@ -169,6 +186,24 @@ fun PersonDetailScreen(
         PersonMoodInsightsCalculator.calculate(
             journalIds = uiState.associatedJournals.map { it.id },
             moodByJournalId = moodState.moodsByJournalId
+        )
+    }
+
+    // Kişi detayı içgörüleri: hikâye özeti, zaman çizgisi, ruh hali karşılaştırması,
+    // alışkanlıklar. Saf hesaplayıcı; yalnızca kayıtlı anılara dayanır.
+    val relationship = remember(
+        uiState.person?.name, uiState.associatedJournals, moodState.moodsByJournalId,
+        uiState.profileStats.topSeason
+    ) {
+        PersonRelationshipInsightsCalculator.calculate(
+            personName = uiState.person?.name.orEmpty(),
+            memories = uiState.associatedJournals.map {
+                RelationshipMemory(it.id, it.title, it.content, it.entryDate)
+            },
+            moodByJournalId = moodState.moodsByJournalId,
+            topSeasonTitle = uiState.profileStats.topSeason
+                ?.takeIf { uiState.profileStats.seasonBreakdown.size > 1 }?.seasonTitle,
+            now = System.currentTimeMillis()
         )
     }
 
@@ -238,7 +273,8 @@ fun PersonDetailScreen(
                 val hasInsights = stats.seasonBreakdown.isNotEmpty() ||
                         stats.badges.isNotEmpty() || uiState.connections.isNotEmpty() ||
                         sharedPeopleFromJournals.isNotEmpty() ||
-                        personMoodSummary.taggedMemories > 0
+                        personMoodSummary.taggedMemories > 0 ||
+                        !relationship.isEmpty || untaggedMentions.isNotEmpty()
 
                 LazyColumn(
                     state = listState,
@@ -421,11 +457,62 @@ fun PersonDetailScreen(
                             }
                         }
 
+                        // 1) Hikâye kartı: tek paragraf özet + bugünün yıl dönümü.
+                        if (!relationship.isEmpty) {
+                            item(key = "insights-story") {
+                                RelationshipStoryCard(personName = person.name, insights = relationship)
+                            }
+                            // 2) Zaman çizgisi + yıllara göre ayrıntılı analiz.
+                            item(key = "insights-timeline") {
+                                RelationshipTimelineCard(insights = relationship)
+                            }
+                            if (onNavigateToAnalytics != null && relationship.memoryCount >= 2) {
+                                item(key = "insights-analytics-preview") {
+                                    PersonAnalyticsPreviewCard(
+                                        appearances = uiState.appearances,
+                                        onOpenAnalytics = { onNavigateToAnalytics(person.id) }
+                                    )
+                                }
+                            }
+                        }
+
+                        // 3) Ruh hali: dağılım ve genel ortalamayla karşılaştırma.
                         // Kişinin hisleri değil, kullanıcı tarafından anılara seçilen ruh halleri.
                         // Hiç kayıt yoksa boş bir grafik veya tekrar eden kart göstermeyiz.
                         if (personMoodSummary.taggedMemories > 0) {
                             item(key = "insights-person-moods") {
                                 PersonMoodInsightsSummary(summary = personMoodSummary)
+                            }
+                        }
+                        relationship.moodComparison?.let { comparison ->
+                            item(key = "insights-mood-comparison") {
+                                MoodComparisonLine(personName = person.name, comparison = comparison)
+                            }
+                        }
+
+                        // 4) Birlikte fotoğraflar.
+                        if (togetherPhotos.isNotEmpty()) {
+                            item(key = "insights-photos") {
+                                TogetherPhotosSection(photos = togetherPhotos, onOpenJournal = onNavigateToJournalDetail)
+                            }
+                        }
+
+                        // 5) Temalar, yoğun dönemler ve "tekrar oku" önerileri.
+                        if (relationship.memoryCount >= 2) {
+                            item(key = "insights-story-themes") {
+                                PersonStoryInsightsFeature(
+                                    personName = person.name,
+                                    appearances = uiState.appearances,
+                                    specialMemories = uiState.specialMemories,
+                                    onOpenJournal = onNavigateToJournalDetail
+                                )
+                            }
+                        }
+
+                        // 6) Birlikte zamanlarınız: hafta sonu, mevsim, yazılanlar.
+                        if (!relationship.isEmpty) {
+                            item(key = "insights-habits") {
+                                RelationshipHabitsCard(insights = relationship, onOpenJournal = onNavigateToJournalDetail)
                             }
                         }
 
@@ -534,6 +621,17 @@ fun PersonDetailScreen(
                             items(
                                 items = if (showAllBadges) stats.badges else stats.badges.take(2)
                             ) { badge -> CinematicBadgeCard(badge) }
+                        }
+
+                        // Adı geçen ama etiketlenmemiş anılar (yalnızca öneri; hiçbir veri değişmez).
+                        if (untaggedMentions.isNotEmpty()) {
+                            item(key = "insights-untagged") {
+                                UntaggedMentionsCard(
+                                    personName = person.name,
+                                    mentions = untaggedMentions,
+                                    onOpenJournal = onNavigateToJournalDetail
+                                )
+                            }
                         }
 
                         if (hasInsights) {

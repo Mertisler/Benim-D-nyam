@@ -60,6 +60,11 @@ sealed class Screen(val route: String) {
         fun createRoute(personId: String) = "person_detail/$personId"
     }
 
+    // Kişi detayı > İçgörüler > yıllara/aylara göre ayrıntılı analiz
+    object PersonAnalytics : Screen("person_analytics/{personId}") {
+        fun createRoute(personId: String) = "person_analytics/$personId"
+    }
+
     object PersonCreateEdit : Screen("person_create_edit?personId={personId}") {
         fun createRoute(personId: String? = null) =
             if (personId != null) "person_create_edit?personId=$personId"
@@ -67,6 +72,8 @@ sealed class Screen(val route: String) {
     }
 
     object Settings : Screen("settings")
+    // Ana sayfa > Hikâyem: anılarının genel görünümü
+    object MyStory : Screen("my_story")
     object CloudAccount : Screen("cloud_account")
     object LifeSeasons : Screen("life_seasons")
     object Timeline : Screen("timeline")
