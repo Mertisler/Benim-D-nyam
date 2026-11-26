@@ -437,6 +437,15 @@ fun JournalsScreen(
                     }
                 }
 
+                if (uiState.isPartialSearchMatch && uiState.journals.isNotEmpty()) {
+                    Text(
+                        "Tüm kelimeleri içeren anı bulunamadı; bazılarını içerenler gösteriliyor.",
+                        color = JournalMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
                 // -------------------------------------------------
                 // YÜKLENİYOR / BOŞ / GÜNLÜK LİSTESİ
                 // -------------------------------------------------
@@ -555,6 +564,8 @@ fun JournalsScreen(
                                         episodeTitle = journal.episodeId?.let(uiState.episodeTitles::get),
 
                                         coverPath = coverPaths[journal.id],
+
+                                        highlight = uiState.searchHighlights[journal.id],
 
                                         onClick = {
                                             onNavigateToJournalDetail(journal.id)

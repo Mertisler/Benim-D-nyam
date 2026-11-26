@@ -13,10 +13,12 @@ import com.loc.benimdunyam.domain.usecase.ObserveLifeSeasonsUseCase
 import com.loc.benimdunyam.domain.usecase.ObservePeopleUseCase
 import com.loc.benimdunyam.feature.journal.filter.JournalArchiveFilterEngine
 import com.loc.benimdunyam.feature.journal.filter.JournalArchiveFilters
+import com.loc.benimdunyam.feature.journal.filter.JournalSearchHighlight
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -32,6 +35,10 @@ import kotlinx.coroutines.launch
 
 data class JournalsUiState(
     val journals: List<JournalEntry> = emptyList(),
+    /** Arama varken her anı için vurgulanacak başlık parçaları ve metin alıntısı. */
+    val searchHighlights: Map<String, JournalSearchHighlight> = emptyMap(),
+    /** Tüm kelimeleri içeren anı yok; bazılarını içerenler gösteriliyor. */
+    val isPartialSearchMatch: Boolean = false,
     val totalJournals: Int = 0,
     val seasons: List<LifeSeason> = emptyList(),
     val episodes: List<LifeEpisode> = emptyList(),
@@ -123,8 +130,11 @@ class JournalsViewModel @Inject constructor(
             .distinctBy { it.id }
             .sortedBy { it.name.lowercase(turkishLocale) }
 
+        val result = JournalArchiveFilterEngine.search(data.journals, active)
         JournalsUiState(
-            journals = JournalArchiveFilterEngine.filter(data.journals, active),
+            journals = result.journals,
+            searchHighlights = result.highlights,
+            isPartialSearchMatch = result.isPartialMatch,
             totalJournals = data.journals.size,
             seasons = data.seasons,
             episodes = data.episodes.filter { it.seasonId == active.selectedSeasonId }
@@ -141,7 +151,7 @@ class JournalsViewModel @Inject constructor(
             isLoading = false,
             deleteErrorMessage = warning
         )
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = JournalsUiState()

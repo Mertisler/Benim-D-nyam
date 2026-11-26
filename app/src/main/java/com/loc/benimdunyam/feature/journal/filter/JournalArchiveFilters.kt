@@ -1,7 +1,6 @@
 package com.loc.benimdunyam.feature.journal.filter
 
 import com.loc.benimdunyam.domain.model.JournalEntry
-import java.util.Locale
 
 /**
  * The same filters are AND-ed together. Search tokens can match across fields.
@@ -21,36 +20,29 @@ data class JournalArchiveFilters(
 }
 
 object JournalArchiveFilterEngine {
-    private val turkishLocale = Locale.forLanguageTag("tr-TR")
-    private val spaces = Regex("\\s+")
 
     fun filter(
         journals: List<JournalEntry>,
         filters: JournalArchiveFilters
-    ): List<JournalEntry> {
-        val tokens = filters.searchQuery.trim().lowercase(turkishLocale)
-            .split(spaces).filter { it.isNotEmpty() }
+    ): List<JournalEntry> = search(journals, filters).journals
 
-        return journals.filter match@{ journal ->
+    /**
+     * Tarih, kişi, dönem ve bölüm filtreleri kesindir; metin araması [JournalTextSearch] ile
+     * Türkçe eklere ve harf farklarına duyarlı yapılır ve sonuçlar alakaya göre sıralanır.
+     * Arama kutusu boşsa anıların gelen sırası korunur.
+     */
+    fun search(
+        journals: List<JournalEntry>,
+        filters: JournalArchiveFilters
+    ): JournalSearchResult {
+        val faceted = journals.filter match@{ journal ->
             if (filters.startDate != null && journal.entryDate < filters.startDate) return@match false
             if (filters.endDate != null && journal.entryDate > filters.endDate) return@match false
             if (filters.selectedPersonId != null && journal.mentionedPeople.none { it.id == filters.selectedPersonId }) return@match false
             if (filters.selectedSeasonId != null && journal.seasonId != filters.selectedSeasonId) return@match false
             if (filters.selectedEpisodeId != null && journal.episodeId != filters.selectedEpisodeId) return@match false
-
-            if (tokens.isEmpty()) return@match true
-
-            val searchableText = buildString {
-                append(journal.title)
-                append(' ')
-                append(journal.content)
-                journal.mentionedPeople.forEach { person ->
-                    append(' ')
-                    append(person.name)
-                }
-            }.lowercase(turkishLocale)
-
-            tokens.all { token -> searchableText.contains(token) }
+            true
         }
+        return JournalTextSearch.search(faceted, filters.searchQuery)
     }
 }

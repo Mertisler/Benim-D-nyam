@@ -28,6 +28,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,6 +42,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.loc.benimdunyam.feature.journal.cover.JournalArchiveCoverViewModel
+import com.loc.benimdunyam.feature.journal.filter.JournalSearchHighlight
 import java.io.File
 import com.loc.benimdunyam.feature.journal.components.SwipeToDeleteJournalItem
 import com.loc.benimdunyam.feature.journal.components.JournalArchiveFiltersSheet
@@ -62,8 +66,25 @@ internal fun JournalArchiveCard(
     seasonTitle: String?,
     episodeTitle: String?,
     coverPath: String?,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    /** Arama sonucuysa: başlıkta ve alıntıda eşleşen kelimeler vurgulanır. */
+    highlight: JournalSearchHighlight? = null
 ) {
+    val highlightStyle = SpanStyle(
+        background = JournalGreen.copy(alpha = 0.18f),
+        color = JournalInk,
+        fontWeight = FontWeight.SemiBold
+    )
+    val shownTitle = title.ifBlank { "Başlıksız anı" }
+    val titleText = remember(shownTitle, highlight) {
+        highlighted(shownTitle, highlight?.titleRanges.takeIf { title.isNotBlank() }.orEmpty(), highlightStyle)
+    }
+    // Eşleşme metnin derinlerindeyse ilk iki satır yerine eşleşmenin geçtiği yer gösterilir.
+    val contentText = remember(content, highlight) {
+        val snippet = highlight?.snippet
+        if (snippet != null) highlighted(snippet, highlight?.snippetRanges.orEmpty(), highlightStyle)
+        else AnnotatedString(content)
+    }
 
     Surface(
 
@@ -209,9 +230,7 @@ internal fun JournalArchiveCard(
 
                 // ANI BAŞLIĞI
                 Text(
-                    text = title.ifBlank {
-                        "Başlıksız anı"
-                    },
+                    text = titleText,
 
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = FontFamily.Serif,
@@ -235,7 +254,7 @@ internal fun JournalArchiveCard(
                     )
 
                     Text(
-                        text = content,
+                        text = contentText,
 
                         style = MaterialTheme.typography.bodyMedium.copy(
                             lineHeight = 22.sp
@@ -561,3 +580,12 @@ internal fun JournalEmptyState(
         }
     }
 }
+
+
+/** Verilen aralıkları vurgulu gösterir; metin dışına taşan aralıklar yok sayılır. */
+private fun highlighted(text: String, ranges: List<IntRange>, style: SpanStyle): AnnotatedString =
+    buildAnnotatedString {
+        append(text)
+        ranges.filter { it.first >= 0 && it.last < text.length && it.first <= it.last }
+            .forEach { addStyle(style, it.first, it.last + 1) }
+    }
