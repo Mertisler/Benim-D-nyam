@@ -66,15 +66,17 @@ interface AiResultDao {
     entities = [
         AiResultEntity::class,
         com.loc.benimdunyam.data.ai.insight.MemoryInsightEntity::class,
-        com.loc.benimdunyam.data.ai.history.AskedQuestionEntity::class
+        com.loc.benimdunyam.data.ai.history.AskedQuestionEntity::class,
+        com.loc.benimdunyam.data.ai.narrative.StoredNarrativeEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AiCacheDatabase : RoomDatabase() {
     abstract fun dao(): AiResultDao
     abstract fun insightDao(): com.loc.benimdunyam.data.ai.insight.MemoryInsightDao
     abstract fun questionDao(): com.loc.benimdunyam.data.ai.history.AskedQuestionDao
+    abstract fun narrativeDao(): com.loc.benimdunyam.data.ai.narrative.StoredNarrativeDao
 }
 
 /** Her çalışma alanının (hesap) kendi yapay zekâ veritabanı olur; ana veritabanı adından türetilir. */
@@ -88,7 +90,10 @@ class AiCacheDatabaseProvider @Inject constructor(
             .digest(session.databaseNames()[0].toByteArray())
             .joinToString("") { "%02x".format(it) }.take(16)
         Room.databaseBuilder(context.applicationContext, AiCacheDatabase::class.java, "bd_ai_cache_v1_$scope.db")
-            .addMigrations(com.loc.benimdunyam.data.ai.history.AI_CACHE_MIGRATION_1_2)
+            .addMigrations(
+                com.loc.benimdunyam.data.ai.history.AI_CACHE_MIGRATION_1_2,
+                com.loc.benimdunyam.data.ai.narrative.AI_CACHE_MIGRATION_2_3
+            )
             // Yalnızca yeniden üretilebilir veri: bilinmeyen bir sürümde sıfırdan kurulur.
             .fallbackToDestructiveMigration()
             .build()
@@ -152,7 +157,8 @@ class RoomAiResultStore @Inject constructor(
         db.dao().clear()
         db.insightDao().clear()
         db.questionDao().clear()
+        db.narrativeDao().clear()
     }
 
-    override suspend fun count(): Int = withContext(Dispatchers.IO) { db.dao().count() + db.insightDao().count() }
+    override suspend fun count(): Int = withContext(Dispatchers.IO) { db.dao().count() + db.insightDao().count() + db.narrativeDao().count() }
 }

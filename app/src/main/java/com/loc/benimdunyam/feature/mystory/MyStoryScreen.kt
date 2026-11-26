@@ -115,6 +115,13 @@ fun MyStoryScreen(
                     }
                 }
                 item(key = "period") { PeriodSelector(state.period, viewModel::selectPeriod) }
+                // Faz 4: seçili dönemin yapay zekâyla yazılmış hikâyesi (izin kapalıysa görünmez).
+                item(key = "narrative-${state.period.name}") {
+                    com.loc.benimdunyam.feature.narrative.AiNarrativeCard(
+                        scope = com.loc.benimdunyam.data.ai.narrative.NarrativeScope.Period(state.period),
+                        onOpenJournal = onOpenJournal
+                    )
+                }
                 item(key = "summary") { SummaryCard(report) }
                 if (report.writingCalendar.activeDays > 0 || report.streak.longest > 0) {
                     item(key = "rhythm") { WritingRhythmCard(report) }

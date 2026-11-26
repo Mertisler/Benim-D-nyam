@@ -5,6 +5,8 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.loc.benimdunyam.data.ai.history.AI_CACHE_MIGRATION_1_2
+import com.loc.benimdunyam.data.ai.narrative.AI_CACHE_MIGRATION_2_3
+import com.loc.benimdunyam.data.ai.narrative.StoredNarrativeEntity
 import com.loc.benimdunyam.data.ai.history.AskedQuestionEntity
 import java.io.File
 import kotlinx.coroutines.runBlocking
@@ -16,15 +18,15 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Yapay zekâ veritabanı 1 → 2: dışa aktarılan 1. sürüm şemasıyla kurulan veritabanı,
- * soru geçmişi tablosu eklenerek açılır ve mevcut analizler korunur.
+ * Yapay zekâ veritabanı 1 → 2 → 3: dışa aktarılan 1. sürüm şemasıyla kurulan veritabanı,
+ * soru geçmişi ve hikâye yazıları tabloları eklenerek açılır ve mevcut analizler korunur.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class AiCacheMigrationTest {
 
     @Test
-    fun surum1den2yeGecisVeriyiKorur() = runBlocking {
+    fun surum1den3eGecisVeriyiKorur() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val name = "ai-cache-migration-test.db"
         context.deleteDatabase(name)
@@ -47,7 +49,7 @@ class AiCacheMigrationTest {
         }
 
         val room = Room.databaseBuilder(context, AiCacheDatabase::class.java, name)
-            .addMigrations(AI_CACHE_MIGRATION_1_2)
+            .addMigrations(AI_CACHE_MIGRATION_1_2, AI_CACHE_MIGRATION_2_3)
             .allowMainThreadQueries()
             .build()
         try {
@@ -55,6 +57,8 @@ class AiCacheMigrationTest {
             room.questionDao().insert(AskedQuestionEntity(question = "Ne?", answer = "Şu [1].", sourcesJson = "[\"j-1\"]",
                 notFound = false, askedAt = 5))
             assertEquals(1, room.questionDao().count())
+            room.narrativeDao().upsert(StoredNarrativeEntity("year:2025", "h", "Yazı [1].", "[\"j-1\"]", "v", 7))
+            assertEquals(1, room.narrativeDao().count())
         } finally {
             room.close()
             context.deleteDatabase(name)

@@ -38,6 +38,9 @@ abstract class AiModule {
     @Binds
     abstract fun bindAskSources(impl: com.loc.benimdunyam.feature.ask.DefaultAskSources): com.loc.benimdunyam.feature.ask.AskSources
 
+    @Binds
+    abstract fun bindNarrativeStore(impl: com.loc.benimdunyam.data.ai.narrative.RoomNarrativeStore): com.loc.benimdunyam.data.ai.narrative.NarrativeStore
+
     companion object {
         @Provides
         @Singleton

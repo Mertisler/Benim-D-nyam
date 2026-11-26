@@ -196,6 +196,14 @@ fun YearReviewScreen(
                         item(key = "poster-${report.year}") {
                             YearReviewPoster(report, Modifier.padding(horizontal = 18.dp))
                         }
+                        // Faz 4: yılın yapay zekâyla yazılmış hikâyesi (izin kapalıysa görünmez).
+                        item(key = "narrative-${report.year}") {
+                            com.loc.benimdunyam.feature.narrative.AiNarrativeCard(
+                                scope = com.loc.benimdunyam.data.ai.narrative.NarrativeScope.Year(report.year),
+                                onOpenJournal = onNavigateToJournalDetail,
+                                modifier = Modifier.padding(horizontal = 18.dp)
+                            )
+                        }
                         if (report.journalCount > 0) {
                             item(key = "year-movie-action") {
                                 Button(

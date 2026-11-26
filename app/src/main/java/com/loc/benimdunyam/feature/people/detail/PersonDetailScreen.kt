@@ -462,6 +462,13 @@ fun PersonDetailScreen(
                             item(key = "insights-story") {
                                 RelationshipStoryCard(personName = person.name, insights = relationship)
                             }
+                            // Faz 4: kişiyle ortak hikâye yazısı (izin kapalıysa görünmez).
+                            item(key = "insights-ai-story-${person.id}") {
+                                com.loc.benimdunyam.feature.narrative.AiNarrativeCard(
+                                    scope = com.loc.benimdunyam.data.ai.narrative.NarrativeScope.Person(person.id, person.name),
+                                    onOpenJournal = onNavigateToJournalDetail
+                                )
+                            }
                             // 2) Zaman çizgisi + yıllara göre ayrıntılı analiz.
                             item(key = "insights-timeline") {
                                 RelationshipTimelineCard(insights = relationship)
