@@ -4,7 +4,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const Anthropic = require("@anthropic-ai/sdk");
-const {kapiOlustur, KapiHatasi} = require("../ai/gateway");
+const {kapiOlustur, KapiHatasi, ozetle} = require("../ai/gateway");
 const {birlestir, modelSec, maliyetMikro, ayarOkuyucu} = require("../ai/ayarlar");
 const {GOREVLER} = require("../ai/gorevler");
 
@@ -176,4 +176,29 @@ test("her görevin talimatı veri/talimat ayrımını belirtir", () => {
     assert.ok(/veridir/.test(istek.system), `${ad} talimatı`);
     assert.ok(istek.maxTokens > 0);
   }
+});
+
+test("kullanım özeti: Claude çağrılmaz, izin istemez, bugün ve bu ay toplanır", async () => {
+  const claude = sahteClaude([]);
+  const k = kapiOlustur({
+    ayar: async () => birlestir({gunlukIstekLimiti: 50}),
+    bugunkuIstek: async () => 999,
+    kullanimYaz: async () => {},
+    kullanimOzeti: async (uid, gun) => ozetle({
+      "2026-11-25": {istek: 3, mikroUsd: 1000, gorevler: {ani_analizi: {istek: 3, mikroUsd: 1000}}},
+      "2026-11-26": {istek: 2, mikroUsd: 500, gorevler: {ani_analizi: {istek: 1, mikroUsd: 100}, soru_cevabi: {istek: 1, mikroUsd: 400}}},
+      "2026-10-31": {istek: 9, mikroUsd: 9000},
+    }, gun),
+    claude: () => claude,
+    simdi: () => new Date("2026-11-26T10:00:00Z"),
+  });
+  const r = await k({uid: UID, data: {gorev: "kullanim"}});
+  assert.equal(r.gunlukIstekLimiti, 50);
+  assert.deepEqual(r.bugun, {istek: 2, mikroUsd: 500});
+  assert.equal(r.ay.istek, 5);
+  assert.equal(r.ay.mikroUsd, 1500);
+  assert.deepEqual(r.ay.gorevler.ani_analizi, {istek: 4, mikroUsd: 1100});
+  assert.equal(claude.cagrilar.length, 0);
+  // Girişsiz olmaz.
+  assert.equal(await hataKodu(k({uid: undefined, data: {gorev: "kullanim"}})), "unauthenticated");
 });

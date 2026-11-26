@@ -36,7 +36,11 @@ data class AiSettingsUiState(
     val testResult: String? = null,
     val progress: AnalysisProgress? = null,
     val analysisRunning: Boolean = false,
-    val archiveRequested: Boolean = false
+    val archiveRequested: Boolean = false,
+    /** Sunucudaki kullanım sayacı (bugün / bu ay). */
+    val usage: com.loc.benimdunyam.data.ai.AiUsage? = null,
+    val usageLoading: Boolean = false,
+    val usageError: String? = null
 )
 
 private data class Local(
@@ -45,7 +49,10 @@ private data class Local(
     val message: String? = null,
     val testResult: String? = null,
     val progress: AnalysisProgress? = null,
-    val archiveRequested: Boolean = false
+    val archiveRequested: Boolean = false,
+    val usage: com.loc.benimdunyam.data.ai.AiUsage? = null,
+    val usageLoading: Boolean = false,
+    val usageError: String? = null
 )
 
 @HiltViewModel
@@ -65,6 +72,9 @@ class AiSettingsViewModel @Inject constructor(
             progress = l.progress,
             analysisRunning = running,
             archiveRequested = l.archiveRequested,
+            usage = l.usage,
+            usageLoading = l.usageLoading,
+            usageError = l.usageError,
             enabled = consent.isValid,
             hasAccount = auth.currentUser != null,
             cachedCount = l.cachedCount,
@@ -76,6 +86,7 @@ class AiSettingsViewModel @Inject constructor(
 
     init {
         refresh()
+        refreshUsage()
         // Analiz sürerken ilerleme sayıları güncellensin.
         viewModelScope.launch {
             scheduler.isRunning.collect { refresh() }
@@ -88,6 +99,24 @@ class AiSettingsViewModel @Inject constructor(
             local.update {
                 it.copy(cachedCount = repository.cachedCount(), progress = progress,
                     archiveRequested = scheduler.archiveRequested())
+            }
+        }
+    }
+
+    /** Sunucudan bugün/bu ay sayacını okur. Claude çağrılmaz; ücret çıkmaz. */
+    fun refreshUsage() {
+        if (!repository.consent.value.isValid || auth.currentUser == null) return
+        viewModelScope.launch {
+            local.update { it.copy(usageLoading = true, usageError = null) }
+            try {
+                val u = repository.usage()
+                local.update { it.copy(usage = u, usageLoading = false) }
+            } catch (c: CancellationException) {
+                throw c
+            } catch (e: AiException) {
+                local.update { it.copy(usageLoading = false, usageError = e.message) }
+            } catch (e: Exception) {
+                local.update { it.copy(usageLoading = false, usageError = "Kullanım bilgisi alınamadı.") }
             }
         }
     }
@@ -114,7 +143,7 @@ class AiSettingsViewModel @Inject constructor(
             local.update { it.copy(busy = true) }
             runCatching { scheduler.cancelAll() }
             runCatching { repository.disableAndClear() }
-            local.update { it.copy(busy = false, cachedCount = 0, testResult = null, progress = null, archiveRequested = false,
+            local.update { it.copy(busy = false, cachedCount = 0, testResult = null, progress = null, archiveRequested = false, usage = null,
                 message = "Yapay zekâ kapatıldı; bu cihazdaki yapay zekâ sonuçları silindi.") }
         }
     }
@@ -152,6 +181,7 @@ class AiSettingsViewModel @Inject constructor(
                 "✗ Beklenmeyen hata: ${e.javaClass.simpleName}"
             }
             local.update { it.copy(busy = false, testResult = text) }
+            refreshUsage()
         }
     }
 }

@@ -146,4 +146,21 @@ class AiRepositoryTest {
         assertEquals(setOf("id", "tarih", "baslik", "metin", "kisiler", "donem", "ruhHali"), wire.keys)
         assertFalse(AiMemoryInput("j-1", "2025-07-28", "Koy", "Metin").toWire().containsKey("donem"))
     }
+
+    @Test
+    fun kullanimYanitiOkunur() {
+        val u = FirebaseAiGateway.parseUsage(mapOf(
+            "gun" to "2026-11-26", "gunlukIstekLimiti" to 300,
+            "bugun" to mapOf("istek" to 12, "mikroUsd" to 8000),
+            "ay" to mapOf("istek" to 40, "mikroUsd" to 32000L,
+                "gorevler" to mapOf("ani_analizi" to mapOf("istek" to 30, "mikroUsd" to 9000)))
+        ))
+        assertEquals(300, u.dailyLimit)
+        assertEquals(AiUsageCounter(12, 8000), u.today)
+        assertEquals(AiUsageCounter(40, 32000), u.month)
+        assertEquals(AiUsageCounter(30, 9000), u.monthByTask["ani_analizi"])
+        assertEquals(288, u.remainingToday)
+        // Eksik alanlar sıfır sayılır.
+        assertEquals(AiUsageCounter(), FirebaseAiGateway.parseUsage(emptyMap<String, Any>()).today)
+    }
 }

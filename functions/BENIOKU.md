@@ -32,6 +32,12 @@
 
    İlk yüklemede Firebase, Cloud Build ve Artifact Registry API'lerini açmak için onay isteyebilir.
 
+   "User code failed to load … Timeout after 10000" hatası alırsan (yavaş disk/antivirüs), bekleme süresini uzat:
+
+   ```powershell
+   $env:FUNCTIONS_DISCOVERY_TIMEOUT=60; firebase deploy --only functions:bdAiGatewayV1
+   ```
+
 4. App Check: Fonksiyon App Check jetonu zorunlu tutar. Debug sürümünü denerken Firebase Console →
    App Check → Uygulamalar → **Hata ayıklama jetonlarını yönet** bölümüne, Logcat'te
    `DebugAppCheckProvider` satırında görünen jetonu ekle. Release sürümü Play Integrity kullanır.

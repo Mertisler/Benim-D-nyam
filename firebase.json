@@ -3,12 +3,29 @@
     {
       "source": "functions",
       "codebase": "default",
-      "ignore": ["node_modules", ".git", "test", "*.log", ".secret.local"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "test",
+        "*.log",
+        ".secret.local"
+      ]
     }
   ],
   "emulators": {
-    "functions": {"host": "127.0.0.1", "port": 5001},
-    "ui": {"enabled": false},
+    "functions": {
+      "host": "127.0.0.1",
+      "port": 5001
+    },
+    "ui": {
+      "enabled": false
+    },
     "singleProjectMode": true
+  },
+  "firestore": {
+    "rules": "firebase/security/firestore.rules"
+  },
+  "storage": {
+    "rules": "firebase/security/storage.rules"
   }
 }

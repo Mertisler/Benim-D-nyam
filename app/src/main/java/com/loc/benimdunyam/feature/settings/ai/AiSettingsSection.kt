@@ -67,6 +67,7 @@ fun AiSettingsSection(viewModel: AiSettingsViewModel) {
                 )
             }
             if (state.enabled) {
+                UsageBlock(state, viewModel)
                 ArchiveAnalysisBlock(state, viewModel)
             }
             if (state.cachedCount > 0) {
@@ -182,3 +183,65 @@ private fun ArchiveAnalysisBlock(state: AiSettingsUiState, viewModel: AiSettings
 
 private fun AiSettingsUiState.totalPending(p: com.loc.benimdunyam.data.ai.insight.AnalysisProgress) =
     p.pendingAutomatic + if (archiveRequested) p.pendingArchive else 0
+
+private val TASK_LABELS = mapOf(
+    "ani_analizi" to "Anı analizi",
+    "soru_filtresi" to "Soru (arama)",
+    "soru_cevabi" to "Soru (cevap)",
+    "donem_ozeti" to "Dönem / yıl hikâyesi",
+    "kisi_hikayesi" to "Kişi hikâyesi"
+)
+
+/** 1.000.000 mikro-dolar = 1 dolar = 100 sent. */
+private fun cents(microUsd: Long): String =
+    String.format(java.util.Locale.forLanguageTag("tr-TR"), "%.2f sent", microUsd / 10_000.0)
+
+@Composable
+private fun UsageBlock(state: AiSettingsUiState, viewModel: AiSettingsViewModel) {
+    if (!state.hasAccount) return
+    androidx.compose.material3.HorizontalDivider()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Kullanım", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+        TextButton(onClick = viewModel::refreshUsage, enabled = !state.usageLoading) {
+            Text(if (state.usageLoading) "Yükleniyor…" else "Yenile")
+        }
+    }
+    val u = state.usage
+    when {
+        u != null -> {
+            Text(
+                "Bugün ${u.today.requests} / ${u.dailyLimit} istek · bu ay ${u.month.requests} istek",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (u.dailyLimit > 0) {
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { (u.today.requests.toFloat() / u.dailyLimit).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            // Geliştirici: yaklaşık maliyet ve görev kırılımı (release'te yok).
+            if (DeveloperTools.ENABLED) {
+                Text(
+                    "Yaklaşık maliyet: bugün ${cents(u.today.microUsd)} · bu ay ${cents(u.month.microUsd)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                u.monthByTask.entries.sortedByDescending { it.value.microUsd }.forEach { (task, c) ->
+                    Text(
+                        "• ${TASK_LABELS[task] ?: task}: ${c.requests} istek · ${cents(c.microUsd)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    "Gerçek fatura Anthropic Console'dadır; bu sayaç sunucunun liste fiyatlarıyla yaptığı tahmindir.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        state.usageError != null -> Text(state.usageError, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error)
+        state.usageLoading -> Text("Kullanım bilgisi alınıyor…", style = MaterialTheme.typography.bodySmall)
+    }
+}

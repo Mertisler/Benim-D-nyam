@@ -51,6 +51,20 @@ data class AiResponse(
     val fromCache: Boolean = false
 )
 
+/** Sunucunun kullanım sayacı. Tutarlar mikro-dolar (1.000.000 = 1 USD). */
+data class AiUsageCounter(val requests: Int = 0, val microUsd: Long = 0)
+
+data class AiUsage(
+    val day: String,
+    val dailyLimit: Int,
+    val today: AiUsageCounter,
+    val month: AiUsageCounter,
+    /** Görev adı (sunucudaki) → bu ayki sayaç */
+    val monthByTask: Map<String, AiUsageCounter> = emptyMap()
+) {
+    val remainingToday: Int get() = (dailyLimit - today.requests).coerceAtLeast(0)
+}
+
 /** Kullanıcıya gösterilebilir, Türkçe hata. */
 sealed class AiException(message: String) : Exception(message) {
     class NotEnabled : AiException("Yapay zekâ özellikleri kapalı. Ayarlar'dan açabilirsin.")

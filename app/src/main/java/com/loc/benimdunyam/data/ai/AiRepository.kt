@@ -45,6 +45,9 @@ class AiRepository @Inject constructor(
 
     fun enable(now: Long = System.currentTimeMillis()) = consentSource.accept(now)
 
+    /** Sunucudaki kullanım sayacı; izin gerektirmez ama bulut hesabı gerekir. */
+    suspend fun usage(): AiUsage = gateway.usage()
+
     suspend fun cachedCount(): Int = runCatching { store.count() }.getOrDefault(0)
 }
 

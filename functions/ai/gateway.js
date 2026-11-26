@@ -21,11 +21,37 @@ class KapiHatasi extends Error {
 
 const UID = /^[A-Za-z0-9_-]{6,128}$/;
 
+function bosOzet() {
+  return {bugun: {istek: 0, mikroUsd: 0}, ay: {istek: 0, mikroUsd: 0, gorevler: {}}};
+}
+
+/** Gün belgelerinden (YYYY-AA-GG → sayaçlar) bugün ve bu ay özetini çıkarır. */
+function ozetle(gunler, gun) {
+  const ozet = bosOzet();
+  const ay = gun.slice(0, 7);
+  for (const [id, b] of Object.entries(gunler || {})) {
+    if (!id.startsWith(ay) || !b || typeof b !== "object") continue;
+    const istek = Number(b.istek) || 0;
+    const mikro = Number(b.mikroUsd) || 0;
+    ozet.ay.istek += istek;
+    ozet.ay.mikroUsd += mikro;
+    if (id === gun) ozet.bugun = {istek, mikroUsd: mikro};
+    for (const [g, v] of Object.entries(b.gorevler || {})) {
+      const t = ozet.ay.gorevler[g] || {istek: 0, mikroUsd: 0};
+      t.istek += Number(v && v.istek) || 0;
+      t.mikroUsd += Number(v && v.mikroUsd) || 0;
+      ozet.ay.gorevler[g] = t;
+    }
+  }
+  return ozet;
+}
+
 /**
  * @param {object} bag
  * @param {() => Promise<object>} bag.ayar birleştirilmiş sunucu ayarı
  * @param {(uid: string, gun: string) => Promise<number>} bag.bugunkuIstek
  * @param {(uid: string, gun: string, kayit: object) => Promise<void>} bag.kullanimYaz
+ * @param {(uid: string, gun: string) => Promise<object>} [bag.kullanimOzeti] bugün ve bu ayın sayaçları
  * @param {() => object} bag.claude Anthropic istemcisi
  * @param {() => Date} [bag.simdi]
  */
@@ -37,6 +63,14 @@ function kapiOlustur(bag) {
       throw new KapiHatasi("unauthenticated", "Yapay zekâ için bulut hesabıyla giriş yapılmalı.");
     }
     const d = data && typeof data === "object" ? data : {};
+
+    // Kullanım özeti: Claude çağrılmaz, ücret ve günlük sınır sayılmaz; içerik yoktur.
+    if (d.gorev === "kullanim") {
+      const ayar = await bag.ayar();
+      const gun = simdi().toISOString().slice(0, 10);
+      const ozet = bag.kullanimOzeti ? await bag.kullanimOzeti(uid, gun) : bosOzet();
+      return {gorev: "kullanim", gun, gunlukIstekLimiti: ayar.gunlukIstekLimiti, ...ozet};
+    }
     // İzin cihazda verilir; sunucu yine de açık beyan ister.
     if (d.izin !== true) {
       throw new KapiHatasi("failed-precondition", "Yapay zekâ özellikleri Ayarlar'dan açılmamış.");
@@ -113,4 +147,4 @@ function kapiOlustur(bag) {
   };
 }
 
-module.exports = {kapiOlustur, KapiHatasi};
+module.exports = {kapiOlustur, KapiHatasi, ozetle};

@@ -12,9 +12,9 @@
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {defineSecret} = require("firebase-functions/params");
 const {initializeApp, getApps} = require("firebase-admin/app");
-const {getFirestore, FieldValue} = require("firebase-admin/firestore");
+const {getFirestore, FieldValue, FieldPath} = require("firebase-admin/firestore");
 const Anthropic = require("@anthropic-ai/sdk");
-const {kapiOlustur, KapiHatasi} = require("./gateway");
+const {kapiOlustur, KapiHatasi, ozetle} = require("./gateway");
 const {ayarOkuyucu} = require("./ayarlar");
 
 if (!getApps().length) initializeApp();
@@ -37,6 +37,14 @@ const calistir = kapiOlustur({
     modeller: {[k.model]: FieldValue.increment(1)},
     guncellendi: FieldValue.serverTimestamp(),
   }, {merge: true}),
+  kullanimOzeti: async (uid, gun) => {
+    const ay = gun.slice(0, 7);
+    const snap = await db.collection("_server_ai_usage").doc(uid).collection("gunler")
+      .where(FieldPath.documentId(), ">=", `${ay}-01`)
+      .where(FieldPath.documentId(), "<=", `${ay}-31`)
+      .get();
+    return ozetle(Object.fromEntries(snap.docs.map((doc) => [doc.id, doc.data()])), gun);
+  },
   claude: () => {
     if (!istemci) istemci = new Anthropic({apiKey: ANTHROPIC_API_KEY.value(), maxRetries: 2, timeout: 90_000});
     return istemci;

@@ -11,6 +11,9 @@ import kotlinx.coroutines.tasks.await
 /** Yapay zekâ sunucusu. Testlerde sahte uygulamayla değiştirilir. */
 interface AiGateway {
     suspend fun run(task: AiTask, input: Map<String, Any?>): AiResponse
+
+    /** Bugün ve bu ayın kullanım sayacı (Claude çağrılmaz, ücret çıkmaz). */
+    suspend fun usage(): AiUsage = throw AiException.Unknown("Kullanım bilgisi alınamadı.")
 }
 
 /**
@@ -40,8 +43,47 @@ class FirebaseAiGateway(
         return parse(task, data as? Map<*, *> ?: throw AiException.Unknown("Yapay zekâ yanıtı okunamadı."))
     }
 
+    override suspend fun usage(): AiUsage {
+        if (FirebaseAuth.getInstance().currentUser == null) throw AiException.NoAccount()
+        val data = try {
+            functions.getHttpsCallable(FUNCTION_NAME)
+                .apply { setTimeout(30, TimeUnit.SECONDS) }
+                .call(mapOf("gorev" to "kullanim"))
+                .await()
+                .getData()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: FirebaseFunctionsException) {
+            throw mapError(e)
+        } catch (e: java.io.IOException) {
+            throw AiException.Offline()
+        }
+        return parseUsage(data as? Map<*, *> ?: throw AiException.Unknown("Kullanım bilgisi okunamadı."))
+    }
+
     companion object {
         const val FUNCTION_NAME = "bdAiGatewayV1"
+
+        private fun counter(value: Any?): AiUsageCounter {
+            val m = value as? Map<*, *> ?: return AiUsageCounter()
+            return AiUsageCounter(
+                requests = (m["istek"] as? Number)?.toInt() ?: 0,
+                microUsd = (m["mikroUsd"] as? Number)?.toLong() ?: 0L
+            )
+        }
+
+        /** Sunucudaki "kullanim" yanıtını okur. */
+        fun parseUsage(data: Map<*, *>): AiUsage {
+            val month = data["ay"] as? Map<*, *>
+            return AiUsage(
+                day = data["gun"] as? String ?: "",
+                dailyLimit = (data["gunlukIstekLimiti"] as? Number)?.toInt() ?: 0,
+                today = counter(data["bugun"]),
+                month = counter(month),
+                monthByTask = (month?.get("gorevler") as? Map<*, *>).orEmpty()
+                    .mapNotNull { (k, v) -> (k as? String)?.let { it to counter(v) } }.toMap()
+            )
+        }
 
         fun mapError(e: FirebaseFunctionsException): AiException {
             val message = e.message?.takeIf { it.isNotBlank() }
