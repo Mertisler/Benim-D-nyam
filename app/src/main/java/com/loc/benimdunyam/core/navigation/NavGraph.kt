@@ -228,12 +228,27 @@ private fun BenimDunyamContentNavGraph(startDestination: String) {
                         onNavigateToMyStory = {
                             navController.navigate(Screen.MyStory.route)
                         },
+                        onNavigateToAskMemories = {
+                            navController.navigate(Screen.AskMemories.route)
+                        },
                     )
                 }
 
                 // Hikâyem: genel analiz sayfası (ana sayfadan açılır)
+                // Anılarına sor: kaynaklı yapay zekâ cevapları
+                composable(route = Screen.AskMemories.route) {
+                    com.loc.benimdunyam.feature.ask.AskMemoriesScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onOpenJournal = { journalId ->
+                            navController.navigate(Screen.JournalDetail.createRoute(journalId))
+                        },
+                        onOpenSettings = { navController.navigate(Screen.Settings.route) }
+                    )
+                }
+
                 composable(route = Screen.MyStory.route) {
                     com.loc.benimdunyam.feature.mystory.MyStoryScreen(
+                        onOpenAskMemories = { navController.navigate(Screen.AskMemories.route) },
                         onNavigateBack = { navController.popBackStack() },
                         onOpenJournal = { journalId ->
                             navController.navigate(Screen.JournalDetail.createRoute(journalId))

@@ -63,13 +63,18 @@ interface AiResultDao {
 }
 
 @Database(
-    entities = [AiResultEntity::class, com.loc.benimdunyam.data.ai.insight.MemoryInsightEntity::class],
-    version = 1,
+    entities = [
+        AiResultEntity::class,
+        com.loc.benimdunyam.data.ai.insight.MemoryInsightEntity::class,
+        com.loc.benimdunyam.data.ai.history.AskedQuestionEntity::class
+    ],
+    version = 2,
     exportSchema = true
 )
 abstract class AiCacheDatabase : RoomDatabase() {
     abstract fun dao(): AiResultDao
     abstract fun insightDao(): com.loc.benimdunyam.data.ai.insight.MemoryInsightDao
+    abstract fun questionDao(): com.loc.benimdunyam.data.ai.history.AskedQuestionDao
 }
 
 /** Her çalışma alanının (hesap) kendi yapay zekâ veritabanı olur; ana veritabanı adından türetilir. */
@@ -83,6 +88,8 @@ class AiCacheDatabaseProvider @Inject constructor(
             .digest(session.databaseNames()[0].toByteArray())
             .joinToString("") { "%02x".format(it) }.take(16)
         Room.databaseBuilder(context.applicationContext, AiCacheDatabase::class.java, "bd_ai_cache_v1_$scope.db")
+            .addMigrations(com.loc.benimdunyam.data.ai.history.AI_CACHE_MIGRATION_1_2)
+            // Yalnızca yeniden üretilebilir veri: bilinmeyen bir sürümde sıfırdan kurulur.
             .fallbackToDestructiveMigration()
             .build()
     }
@@ -144,6 +151,7 @@ class RoomAiResultStore @Inject constructor(
     override suspend fun clear() = withContext(Dispatchers.IO) {
         db.dao().clear()
         db.insightDao().clear()
+        db.questionDao().clear()
     }
 
     override suspend fun count(): Int = withContext(Dispatchers.IO) { db.dao().count() + db.insightDao().count() }

@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 
 /** Ana sayfadaki "Hikâyem" girişi. */
 @Composable
-fun MyStoryHomeCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun MyStoryHomeCard(onClick: () -> Unit, modifier: Modifier = Modifier, onAsk: (() -> Unit)? = null) {
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
@@ -38,6 +38,12 @@ fun MyStoryHomeCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
                 )
             }
             Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        }
+        if (onAsk != null) {
+            androidx.compose.material3.HorizontalDivider()
+            androidx.compose.material3.TextButton(onClick = onAsk, modifier = Modifier.padding(horizontal = 8.dp)) {
+                Text("💬 Anılarına sor")
+            }
         }
     }
 }

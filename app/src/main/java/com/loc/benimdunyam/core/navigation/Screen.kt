@@ -74,6 +74,8 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     // Ana sayfa > Hikâyem: anılarının genel görünümü
     object MyStory : Screen("my_story")
+    // Hikâyem / Ana sayfa > Anılarına sor (yapay zekâ)
+    object AskMemories : Screen("ask_memories")
     object CloudAccount : Screen("cloud_account")
     object LifeSeasons : Screen("life_seasons")
     object Timeline : Screen("timeline")

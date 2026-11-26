@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -72,6 +73,7 @@ fun MyStoryScreen(
     onOpenPerson: (String) -> Unit,
     onOpenYearReview: () -> Unit,
     onOpenSeasons: () -> Unit,
+    onOpenAskMemories: () -> Unit = {},
     viewModel: MyStoryViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -107,6 +109,11 @@ fun MyStoryScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                item(key = "ask") {
+                    OutlinedButton(onClick = onOpenAskMemories, modifier = Modifier.fillMaxWidth()) {
+                        Text("💬 Anılarına sor")
+                    }
+                }
                 item(key = "period") { PeriodSelector(state.period, viewModel::selectPeriod) }
                 item(key = "summary") { SummaryCard(report) }
                 if (report.writingCalendar.activeDays > 0 || report.streak.longest > 0) {

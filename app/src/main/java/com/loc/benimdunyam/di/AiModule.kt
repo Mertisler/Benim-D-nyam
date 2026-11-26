@@ -32,6 +32,12 @@ abstract class AiModule {
     @Binds
     abstract fun bindAnalysisSources(impl: com.loc.benimdunyam.data.ai.insight.DefaultMemoryAnalysisSources): com.loc.benimdunyam.data.ai.insight.MemoryAnalysisSources
 
+    @Binds
+    abstract fun bindAskHistory(impl: com.loc.benimdunyam.data.ai.history.RoomAskHistoryStore): com.loc.benimdunyam.data.ai.history.AskHistoryStore
+
+    @Binds
+    abstract fun bindAskSources(impl: com.loc.benimdunyam.feature.ask.DefaultAskSources): com.loc.benimdunyam.feature.ask.AskSources
+
     companion object {
         @Provides
         @Singleton
