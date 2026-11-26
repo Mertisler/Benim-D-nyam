@@ -68,3 +68,6 @@
 -keep class * extends androidx.work.ListenableWorker {
     public <init>(android.content.Context, androidx.work.WorkerParameters);
 }
+
+# Yapay zekâ önbelleği (Gson ile JSON olarak saklanır).
+-keep class com.loc.benimdunyam.data.ai.StoredAiPayload { <fields>; <init>(...); }

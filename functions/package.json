@@ -1,11 +1,19 @@
 {
-  "name": "benimdunyam-media-cleanup-functions",
+  "name": "benimdunyam-functions",
   "private": true,
-  "engines": {"node": "22"},
+  "engines": {
+    "node": "22"
+  },
   "main": "index.js",
   "dependencies": {
-    "@google-cloud/storage": "^7.18.0",
+    "@anthropic-ai/sdk": "^1.14.0",
+    "@google-cloud/storage": "^7.22.0",
     "firebase-admin": "^14.5.1",
     "firebase-functions": "^7.4.0"
+  },
+  "scripts": {
+    "test": "node --test test/ai.test.js",
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions"
   }
 }

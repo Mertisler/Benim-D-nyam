@@ -16,6 +16,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import com.loc.benimdunyam.data.ai.AiConsentSource
+import com.loc.benimdunyam.data.ai.insight.MemoryInsightStore
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -36,9 +41,17 @@ data class MyStoryUiState(
 class MyStoryViewModel @Inject constructor(
     observeJournalsUseCase: ObserveJournalsUseCase,
     observeLifeSeasonsUseCase: ObserveLifeSeasonsUseCase,
-    moodRepository: JournalMoodRepository,
-    private val photoStore: JournalPhotoStore
+    private val moodRepository: JournalMoodRepository,
+    private val photoStore: JournalPhotoStore,
+    private val insightStore: MemoryInsightStore,
+    consent: AiConsentSource
 ) : ViewModel() {
+
+    /** Yapay zekâ kapalıysa analizler gösterilmez (izin kapatılınca silinirler de). */
+    private val insights = consent.consent.flatMapLatest { c ->
+        if (!c.isValid) flowOf(emptyList())
+        else insightStore.observeAll().catch { emit(emptyList()) }
+    }.onStart { emit(emptyList()) }
 
     private val period = MutableStateFlow(LocalAnalyticsPeriod.LAST_12_MONTHS)
 
@@ -57,9 +70,10 @@ class MyStoryViewModel @Inject constructor(
         journals,
         observeLifeSeasonsUseCase(),
         moodRepository.observeAll(),
-        photoCounts,
+        combine(photoCounts, insights) { photos, list -> photos to list },
         period
-    ) { journalList, seasons, moods, photos, selected ->
+    ) { journalList, seasons, moods, (photos, insightList), selected ->
+        val visible = insightList.filter { it.isVisible }
         MyStoryUiState(
             loading = false,
             period = selected,
@@ -69,7 +83,11 @@ class MyStoryViewModel @Inject constructor(
                 moodNamesByJournalId = moods.associate { it.journalId to it.moodName },
                 photoCountByJournalId = photos,
                 period = selected,
-                now = System.currentTimeMillis()
+                now = System.currentTimeMillis(),
+                topicsByJournalId = visible.associate { it.journalId to it.topics },
+                moodSuggestionsByJournalId = visible
+                    .filter { !it.moodDismissed && it.moodSuggestion != null }
+                    .associate { it.journalId to it.moodSuggestion!! }
             )
         )
     }.flowOn(Dispatchers.Default)
@@ -78,5 +96,15 @@ class MyStoryViewModel @Inject constructor(
 
     fun selectPeriod(value: LocalAnalyticsPeriod) {
         period.value = value
+    }
+
+    fun applyMoodSuggestion(suggestion: MoodSuggestion) {
+        viewModelScope.launch { runCatching { moodRepository.saveMood(suggestion.journalId, suggestion.mood) } }
+    }
+
+    fun dismissMoodSuggestion(journalId: String) {
+        viewModelScope.launch {
+            runCatching { insightStore.get(journalId)?.let { insightStore.upsert(it.copy(moodDismissed = true)) } }
+        }
     }
 }

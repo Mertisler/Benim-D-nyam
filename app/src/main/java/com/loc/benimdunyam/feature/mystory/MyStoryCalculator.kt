@@ -1,6 +1,7 @@
 package com.loc.benimdunyam.feature.mystory
 
 import com.loc.benimdunyam.domain.model.JournalEntry
+import com.loc.benimdunyam.domain.model.JournalMood
 import com.loc.benimdunyam.domain.model.LifeSeason
 import com.loc.benimdunyam.feature.home.analytics.LocalAnalyticsPeriod
 import com.loc.benimdunyam.feature.home.analytics.LocalStoryAnalyticsCalculator
@@ -19,6 +20,12 @@ data class QuietPerson(
     val lastMemoryAt: Long,
     val monthsAgo: Int
 )
+
+/** Yapay zekâ analizinden: dönemde en çok yazılan konu. */
+data class MyStoryTopic(val name: String, val count: Int)
+
+/** Ruh hali seçilmemiş anı için yapay zekâ önerisi. */
+data class MoodSuggestion(val journalId: String, val title: String, val dateMillis: Long, val mood: com.loc.benimdunyam.domain.model.JournalMood)
 
 data class MyStoryMilestone(
     val emoji: String,
@@ -52,7 +59,13 @@ data class MyStoryReport(
     /** Seçilen dönemde hangi gün ve saatlerde yazıldığı. */
     val habits: WritingHabits = WritingHabits(),
     /** Son 12 ayın baskın ruh halleri (30 günlük dönemde boş). */
-    val moodTrend: List<MoodMonth> = emptyList()
+    val moodTrend: List<MoodMonth> = emptyList(),
+    /** Dönemde en sık konular (yapay zekâ analizi; en az 3 analizli anı gerekir). */
+    val topics: List<MyStoryTopic> = emptyList(),
+    /** Dönemdeki anılardan kaçının analizi var. */
+    val analyzedInPeriod: Int = 0,
+    /** Ruh hali seçilmemiş anılar için öneriler (dönemden bağımsız, yeniden eskiye). */
+    val moodSuggestions: List<MoodSuggestion> = emptyList()
 ) {
     val isEmpty: Boolean get() = allTimeJournalCount == 0
 }
@@ -73,6 +86,9 @@ object MyStoryCalculator {
     private const val QUIET_MIN_MEMORIES = 2
     private const val QUIET_LIMIT = 6
     private const val NEW_PEOPLE_LIMIT = 8
+    private const val TOPIC_LIMIT = 8
+    private const val TOPIC_MIN_ANALYZED = 3
+    private const val MOOD_SUGGESTION_LIMIT = 20
 
     fun calculate(
         journals: List<JournalEntry>,
@@ -81,7 +97,11 @@ object MyStoryCalculator {
         photoCountByJournalId: Map<String, Int>,
         period: LocalAnalyticsPeriod,
         now: Long,
-        timeZone: TimeZone = TimeZone.getDefault()
+        timeZone: TimeZone = TimeZone.getDefault(),
+        /** anı kimliği → yapay zekâ konuları (yalnızca görünür analizler) */
+        topicsByJournalId: Map<String, List<String>> = emptyMap(),
+        /** anı kimliği → önerilen ruh hali (reddedilmemiş öneriler) */
+        moodSuggestionsByJournalId: Map<String, com.loc.benimdunyam.domain.model.JournalMood> = emptyMap()
     ): MyStoryReport {
         val all = journals.distinctBy { it.id }.filter { it.entryDate in 1..now }
         if (all.isEmpty()) return MyStoryReport(base = LocalStoryAnalyticsReport(period = period))
@@ -112,11 +132,29 @@ object MyStoryCalculator {
             writingCalendar = MyStoryHabitsCalculator.calendar(all, now, timeZone),
             streak = MyStoryHabitsCalculator.streak(all, now, timeZone),
             habits = MyStoryHabitsCalculator.habits(all, start, now, timeZone),
-            moodTrend = MyStoryHabitsCalculator.moodTrend(all, moodNamesByJournalId, period, now, timeZone)
+            moodTrend = MyStoryHabitsCalculator.moodTrend(all, moodNamesByJournalId, period, now, timeZone),
+            topics = topics(inPeriod, topicsByJournalId),
+            analyzedInPeriod = inPeriod.count { topicsByJournalId.containsKey(it.id) },
+            moodSuggestions = all
+                .filter { j -> moodNamesByJournalId[j.id]?.let { n -> JournalMood.entries.any { it.name == n } } != true }
+                .mapNotNull { j -> moodSuggestionsByJournalId[j.id]?.let { MoodSuggestion(j.id, j.title.ifBlank { "Başlıksız anı" }, j.entryDate, it) } }
+                .sortedByDescending { it.dateMillis }
+                .take(MOOD_SUGGESTION_LIMIT)
         )
     }
 
     // -----------------------------------------------------------------------
+
+    private fun topics(inPeriod: List<JournalEntry>, topicsByJournalId: Map<String, List<String>>): List<MyStoryTopic> {
+        val analyzed = inPeriod.mapNotNull { topicsByJournalId[it.id] }
+        if (analyzed.size < TOPIC_MIN_ANALYZED) return emptyList()
+        val tr = java.util.Locale.forLanguageTag("tr-TR")
+        return analyzed.flatMap { list -> list.map { it.trim().lowercase(tr) }.filter(String::isNotEmpty).distinct() }
+            .groupingBy { it }.eachCount()
+            .map { (name, count) -> MyStoryTopic(name, count) }
+            .sortedWith(compareByDescending<MyStoryTopic> { it.count }.thenBy { it.name })
+            .take(TOPIC_LIMIT)
+    }
 
     internal fun wordCount(text: String): Int =
         text.split(Regex("\\s+")).count { word -> word.any { it.isLetterOrDigit() } }

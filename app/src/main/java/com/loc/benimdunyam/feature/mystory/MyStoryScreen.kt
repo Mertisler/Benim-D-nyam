@@ -31,10 +31,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -115,6 +119,9 @@ fun MyStoryScreen(
                 if (report.base.moods.isNotEmpty()) {
                     item(key = "moods") { MoodsCard(report) }
                 }
+                if (report.topics.isNotEmpty()) {
+                    item(key = "topics") { TopicsCard(report) }
+                }
                 if (report.moodTrend.isNotEmpty()) {
                     item(key = "mood-trend") { MoodTrendCard(report) }
                 }
@@ -137,7 +144,14 @@ fun MyStoryScreen(
                     item(key = "milestones") { MilestonesCard(report, onOpenJournal) }
                 }
                 if (report.withoutMood > 0 || report.withoutSeason > 0) {
-                    item(key = "complete") { CompleteArchiveCard(report) }
+                    item(key = "complete") {
+                        CompleteArchiveCard(
+                            report = report,
+                            onApplySuggestion = viewModel::applyMoodSuggestion,
+                            onDismissSuggestion = viewModel::dismissMoodSuggestion,
+                            onOpenJournal = onOpenJournal
+                        )
+                    }
                 }
                 item(key = "note") {
                     Text(
@@ -383,11 +397,57 @@ private fun MilestonesCard(report: MyStoryReport, onOpenJournal: (String) -> Uni
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CompleteArchiveCard(report: MyStoryReport) {
+private fun TopicsCard(report: MyStoryReport) {
+    StoryCard(
+        "🏷 En çok yazdığın konular",
+        "Bu dönemdeki ${report.base.journalCount} anının ${report.analyzedInPeriod} tanesi yapay zekâyla analiz edildi."
+    ) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            report.topics.forEach { topic ->
+                Text(
+                    "${topic.name.replaceFirstChar { it.titlecase(TR) }} · ${topic.count}",
+                    modifier = Modifier.clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompleteArchiveCard(
+    report: MyStoryReport,
+    onApplySuggestion: (MoodSuggestion) -> Unit,
+    onDismissSuggestion: (String) -> Unit,
+    onOpenJournal: (String) -> Unit
+) {
+    var showSuggestions by remember { mutableStateOf(false) }
     StoryCard("🧩 Arşivini tamamla", "Bu bilgileri eklersen hikâyen daha doğru görünür.") {
         if (report.withoutMood > 0) {
             Text("${report.withoutMood} anında ruh hali seçilmemiş.", style = MaterialTheme.typography.bodyMedium)
+            if (report.moodSuggestions.isNotEmpty()) {
+                TextButton(onClick = { showSuggestions = !showSuggestions }) {
+                    Text(if (showSuggestions) "Önerileri gizle" else "✨ ${report.moodSuggestions.size} anı için ruh hali önerisi var")
+                }
+                if (showSuggestions) {
+                    report.moodSuggestions.forEach { s ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.weight(1f).clickable { onOpenJournal(s.journalId) }) {
+                                Text(s.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("${s.mood.emoji} ${s.mood.label}", style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            TextButton(onClick = { onApplySuggestion(s) }) { Text("Uygula") }
+                            TextButton(onClick = { onDismissSuggestion(s.journalId) }) { Text("✕") }
+                        }
+                    }
+                }
+            }
         }
         if (report.withoutSeason > 0) {
             Text("${report.withoutSeason} anı bir yaşam dönemine bağlı değil.", style = MaterialTheme.typography.bodyMedium)

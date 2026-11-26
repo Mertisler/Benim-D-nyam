@@ -50,6 +50,7 @@ fun SettingsScreen(
         if (DeveloperTools.ENABLED) hiltViewModel() else null
     // Faz B: başka cihazda silinen anılar için 30 günlük "Son silinenler".
     val recentlyDeletedViewModel: RecentlyDeletedViewModel = hiltViewModel()
+    val aiSettingsViewModel: com.loc.benimdunyam.feature.settings.ai.AiSettingsViewModel = hiltViewModel()
     val uiState = viewModel.uiState
     val isBusy = uiState.isLoading ||
             uiState.isBackupHealthLoading ||
@@ -348,6 +349,9 @@ fun SettingsScreen(
 
             // Faz B: "Son silinenler" — yanlışlıkla silmeye karşı 30 günlük güvence.
             RecentlyDeletedSection(viewModel = recentlyDeletedViewModel)
+
+            // Faz 1: yapay zekâ izni (varsayılan kapalı).
+            com.loc.benimdunyam.feature.settings.ai.AiSettingsSection(viewModel = aiSettingsViewModel)
 
             // ----------------------------------------
             // GELİŞTİRİCİ ARAÇLARI (yalnızca debug derlemesi)

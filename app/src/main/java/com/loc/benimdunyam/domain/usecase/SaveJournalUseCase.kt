@@ -4,11 +4,14 @@ package com.loc.benimdunyam.domain.usecase
 import com.loc.benimdunyam.data.backup.BackupWriteCoordinator
 import com.loc.benimdunyam.domain.model.JournalEntry
 import com.loc.benimdunyam.domain.repository.JournalRepository
+import com.loc.benimdunyam.data.ai.insight.MemoryAnalysisScheduler
 import javax.inject.Inject
 
 class SaveJournalUseCase @Inject constructor(
     private val repository: JournalRepository,
-    private val writeCoordinator: BackupWriteCoordinator
+    private val writeCoordinator: BackupWriteCoordinator,
+    // Yapay zekâ izni açıksa kaydedilen anı arka planda analiz edilir; kapalıysa işçi hemen biter.
+    private val analysisScheduler: MemoryAnalysisScheduler
 ) {
 
     suspend operator fun invoke(
@@ -32,5 +35,6 @@ class SaveJournalUseCase @Inject constructor(
                 )
             }
         }
+        runCatching { analysisScheduler.requestSoon() }
     }
 }

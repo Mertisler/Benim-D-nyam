@@ -1,5 +1,0 @@
-// Mevcut functions/index.js dosyanın export'larının altına şunları ekle:
-const mediaCleanupVerifiedV2 = require('./mediaCleanupVerifiedV2');
-exports.bdMediaCleanupStatusV2 = mediaCleanupVerifiedV2.bdMediaCleanupStatusV2;
-exports.bdMediaCleanupPrepareV2 = mediaCleanupVerifiedV2.bdMediaCleanupPrepareV2;
-exports.bdMediaCleanupExecuteV2 = mediaCleanupVerifiedV2.bdMediaCleanupExecuteV2;

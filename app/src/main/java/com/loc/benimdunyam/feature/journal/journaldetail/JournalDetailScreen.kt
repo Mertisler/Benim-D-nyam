@@ -141,7 +141,11 @@ fun JournalDetailScreen(
                                 onPersonClick = onNavigateToPersonDetail,
                                 modifier = Modifier.fillMaxWidth().weight(1f),
                                 moodContent = {
-                                    JournalDetailMoodBadge(journalId = journal.id)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        JournalDetailMoodBadge(journalId = journal.id)
+                                        // Yapay zekâ notları (yalnızca izin açıksa ve analiz varsa).
+                                        com.loc.benimdunyam.feature.journal.journaldetail.insight.JournalInsightBadge(journalId = journal.id)
+                                    }
                                 }
                             )
                         }
